@@ -28,6 +28,7 @@ class lognflow:
     
     def __init__(self, 
                  logs_root : pathlib.Path = None,
+                 log_dir : pathlib.Path = None,
                  print_text = True):
         """ lognflow construction
         
@@ -40,33 +41,33 @@ class lognflow:
             logs_root: pathlib.Path
                 This is the root directory for all logs. We will use the time.time()
                 to create a log directory for each instance of the lognflow. 
-                default: ./lognflow/
+                default: logs/
             print_text ; bool
                 If True, everything that is logged as text will be printed as well
         """
-        
-        if(logs_root is None):
-            # from tempfile import gettempdir
-            # logs_root = pathlib.Path(gettempdir()) / 'lognflow/'
-            logs_root = 'logs'
         self.init_time = time.time()
-        self.logs_root = pathlib.Path(logs_root)
-        self.logs_dir = self.logs_root / f'{int(self.init_time):d}/'
+
+        if(log_dir is None):
+            if(logs_root is None):
+                logs_root = 'logs'
+            self.log_dir = pathlib.Path(logs_root) / f'{int(self.init_time):d}/'
+        else:
+            self.log_dir = pathlib.Path(log_dir)
+        if(not self.log_dir.is_dir()):
+            self.log_dir.mkdir(parents = True, exist_ok = True)
+        if(not self.log_dir.is_dir()):
+            return
+        
+        self.print_text = print_text
 
         self.loggers_dict = {}
         self.vars_dict = {}
-        self.variables_dir = self.logs_dir
-        self.snapshots_dir = self.logs_dir
-        self.results_dir = self.logs_dir
-        
-        if(not self.logs_dir.is_dir()):
-            self.logs_dir.mkdir(parents = True, exist_ok = True)
-
-        self.print_text = print_text
-
+        self.variables_dir = self.log_dir
+        self.snapshots_dir = self.log_dir
+        self.results_dir = self.log_dir
         self.log_name = 'main_log'
         self._log_text_handler(title = 'lognflow main log file')
-        self.log_text(str(self.logs_dir))
+        self.log_text(str(self.log_dir))
         self.log_text(\
              'lognflow log file for run ' + \
              f'{int(self.init_time):d}')
@@ -75,23 +76,21 @@ class lognflow:
         
     def _log_text_handler(self, log_name = None, 
                          title = None, 
-                         n_lines_limit: int = int(1e+4)):
+                         n_lines_limit: int = int(1e+7)):
         if(log_name is None):
             log_name = self.log_name
         if(log_name in self.loggers_dict.keys()):
-            _logger, n_lines_limit, _, log_file_cnt = \
+            _logger, n_lines_limit, _, _ = \
                 self.loggers_dict[log_name]
             for handler in _logger.handlers[:]:
                 _logger.removeHandler(handler)
                 handler.close()
-            log_file_cnt += 1
-        else:
-            log_file_cnt = 0
-
+        
         log_text_cnt = 0
         _logger = logging.getLogger(title)
         _logger.setLevel(logging.INFO)
-        log_fpath = self.logs_dir / (log_name + f'_{log_file_cnt:03d}.txt')
+        log_file_id = log_name + f'{int(time.time()):d}.txt'
+        log_fpath = self.log_dir / log_file_id
         fh = logging.FileHandler(log_fpath)
         fh.setLevel(logging.INFO)
         _logger.addHandler(fh)
@@ -99,11 +98,13 @@ class lognflow:
         self.loggers_dict[log_name] = [_logger, 
                                        n_lines_limit, 
                                        log_text_cnt, 
-                                       log_file_cnt]
+                                       log_file_id]
         
     def log_text(self, text : str = '\n', 
                  log_name : str = None,
                  print_text = None,
+                 title = None, 
+                 n_lines_limit: int = int(1e+7),
                  **_):
         time_time = time.time() - self.init_time
 
@@ -118,9 +119,11 @@ class lognflow:
             print(text)
         
         if not (log_name in self.loggers_dict.keys()):
-            self._log_text_handler(log_name)
+            self._log_text_handler(log_name, 
+                                   title = title, 
+                                   n_lines_limit = n_lines_limit)
 
-        _logger, n_lines_limit, log_text_cnt, log_file_cnt = \
+        _logger, n_lines_limit, log_text_cnt, log_file_id = \
             self.loggers_dict[log_name]
         if isinstance(text, np.ndarray):
             try:
@@ -139,21 +142,27 @@ class lognflow:
         else:
             _logger.info(f'T:{time_time:>6.6f}|')
             _logger.info(text)
-        log_text_cnt += 1
+        log_text_cnt += len(text)
         self.loggers_dict[log_name] = [_logger, 
                                        n_lines_limit, 
                                        log_text_cnt, 
-                                       log_file_cnt]
+                                       log_file_id]
 
         if(log_text_cnt >= n_lines_limit):
             self._log_text_handler(log_name)
-            _logger, n_lines_limit, log_text_cnt, log_file_cnt = \
-                self.loggers_dict[log_name]
+            _logger, _, _, _ = self.loggers_dict[log_name]
         return _logger.handlers[0].baseFilename
     
-    def __call__(self, to_be_logged, log_name : str = None, **_):
+    def __call__(self, to_be_logged, 
+                 log_name : str = None,
+                 print_text = None, 
+                 title = None, 
+                 n_lines_limit: int = int(1e+7), **_):
         if isinstance(to_be_logged, str):
-            self.log_text(to_be_logged, log_name)
+            self.log_text(to_be_logged, log_name, 
+                          print_text = print_text,
+                          title = title, 
+                          n_lines_limit = n_lines_limit)
         elif isinstance(to_be_logged, np.ndarray):
             if(to_be_logged.size() < 256):
                 self.log_text(f'{to_be_logged}')
@@ -164,30 +173,65 @@ class lognflow:
                                    ' is given without name. I named it: '\
                                   f'{log_name}')
                     self.single_var_call_cnt += 1
-    
                 self.log_single(log_name, to_be_logged)
                     
-    def log_var(self, parameter_name : str, parameter_value, 
-                save_as='npz', log_counter_limit: int = int(1e+3)):
-        time_time = time.time() - self.init_time
+    def _prepare_param_dir(self, parameter_name, is_dir = False):
+        try:
+            _ = parameter_name.split()
+        except:
+            self.log_text('I the parameter name is not a string')
+            self.log_text(f'Its type is {type(parameter_name)}')
+            self.log_text(f'It is {parameter_name}')
+            parameter_name.split()
+        assert len(parameter_name.split()) == 1, \
+            self.log_text(\
+                f'The variable name {parameter_name} you chose is'          \
+                +f' I can split it into {parameter_name.split()}'
+                +' splitable. Make sure you dont use space, tab, or ....'   \
+                +' If you are using single backslash, e.g. for windows'     \
+                +' folders, replace it with \\ or make it a literal string' \
+                +' by putting an r before the variable name.')
+        if(is_dir):
+            param_name = pathlib.Path(parameter_name).name
+            parameter_name = parameter_name + os_sep + '/_'
+        
+        parameter_name_as_path = pathlib.Path(parameter_name)
+        param_dir = self.log_dir / parameter_name_as_path.parent
+        if(not is_dir):
+            param_name = parameter_name_as_path.name
+        if(not param_dir.is_dir()):
+            self.log_text(f'Creating directory: {param_dir.absolute()}')
+            param_dir.mkdir(parents = True, exist_ok = True)
+        return(param_dir, param_name)                    
 
+    def _get_log_counter_limit(self, param, log_size_limit):
+        cnt_limit = int(log_size_limit/(param.size*param.itemsize))
+        return cnt_limit
+
+    def log_var(self, parameter_name : str, parameter_value, 
+                save_as='npz', log_size_limit: int = int(1e+7)):
+        time_time = time.time() - self.init_time
+        
         try:
             _ = parameter_value.shape
         except:
             parameter_value = np.array([parameter_value])
         
+        log_counter_limit = self._get_log_counter_limit(\
+            parameter_value, log_size_limit)
+
         if(parameter_name in self.vars_dict.keys()):
             _var = self.vars_dict[parameter_name]
             data_array, time_array, cur_index, \
                 filesplit_cnt, save_as, log_counter_limit = _var
             cur_index += 1
         else:
-            filesplit_cnt = 0
+            filesplit_cnt = time.time()
             cur_index = 0
 
         if(cur_index >= log_counter_limit):
             self._log_var_save(parameter_name)
-            filesplit_cnt += 1
+            filesplit_cnt = time.time()
             cur_index = 0
 
         if(cur_index == 0):
@@ -214,52 +258,23 @@ class lognflow:
                                                   save_as,
                                                   log_counter_limit)
 
-    def _prepare_param_dir(self, parameter_name, is_dir = False):
-        try:
-            _ = parameter_name.split()
-        except:
-            self.log_text('I the parameter name is not a string')
-            self.log_text(f'Its type is {type(parameter_name)}')
-            self.log_text(f'It is {parameter_name}')
-            parameter_name.split()
-        assert len(parameter_name.split()) == 1, \
-            self.log_text(\
-                f'The variable name {parameter_name} you chose is'          \
-                +f' I can split it into {parameter_name.split()}'
-                +' splitable. Make sure you dont use space, tab, or ....'   \
-                +' If you are using single backslash, e.g. for windows'     \
-                +' folders, replace it with \\ or make it a literal string' \
-                +' by putting an r before the variable name.')
-        if(is_dir):
-            param_name = pathlib.Path(parameter_name).name
-            parameter_name = parameter_name + os_sep + '/_'
-        
-        parameter_name_as_path = pathlib.Path(parameter_name)
-        param_dir = self.logs_dir / parameter_name_as_path.parent
-        if(not is_dir):
-            param_name = parameter_name_as_path.name
-        if(not param_dir.is_dir()):
-            self.log_text(f'Creating directory: {param_dir.absolute()}')
-            param_dir.mkdir(parents = True, exist_ok = True)
-        return(param_dir, param_name)
-
     def _log_var_save(self, parameter_name : str):
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         
         _var = self.vars_dict[parameter_name]
         if(_var.save_as == 'npz'):
-            fpath = param_dir / (f'{param_name}_{_var.filesplit_cnt:03d}.npz')
+            fpath = param_dir / (f'{param_name}_{_var.filesplit_cnt}.npz')
             np.savez(fpath,
                 time_array = _var.time_array,
                 data_array = _var.data_array)
         elif(_var.save_as == 'txt'):
-            fpath = param_dir / (f'{param_name}_time_{_var.filesplit_cnt:03d}.txt')
+            fpath = param_dir / (f'{param_name}_time_{_var.filesplit_cnt}.txt')
             np.savetxt(fpath, _var.data_array)
-            fpath = param_dir / (f'{param_name}_data_{_var.filesplit_cnt:03d}.txt')
+            fpath = param_dir / (f'{param_name}_data_{_var.filesplit_cnt}.txt')
             np.savetxt(fpath, _var.data_array)
         return fpath
     
-    def log_var_push(self):
+    def log_var_flush(self):
         for parameter_name in self.vars_dict.keys():
             self._log_var_save(parameter_name)
     

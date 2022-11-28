@@ -18,19 +18,26 @@ def response():
     # import requests
     # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
 
-
 def test_content(response):
     """Sample pytest test function with the pytest fixture as an argument."""
     # from bs4 import BeautifulSoup
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_lognflow():
-    temp_dir = use_GUI_to_get_a_directory()
+    temp_dir = 'c:\Alireza\logs'
     logger = lognflow(temp_dir)
-    logger('Well this is my first easy log')
+    logger('Well this is my first easy log')    
+    for _ in range(10000):
+        logger(f'Log{_}'*200)
+
+    import numpy as np
+    for _ in range(1000):
+        logger.log_var('vars/vec/v', np.random.rand(10000))
 
 def test_logviewer():
-    log_dir = use_GUI_to_get_a_directory()
+    from PyQt5 import QtWidgets
+    dialog = QtWidgets.QFileDialog()
+    log_dir = dialog.getExistingDirectory(None, 'Select Folder')
     logged = logviewer(log_dir)
     print(logged.get_main_log_text())
 
@@ -41,3 +48,6 @@ def test_printprogress():
         pprog()
     
     #assert input('Did it show you a progress bar? (y for yes)')=='y'
+if __name__ == '__main__':
+    test_lognflow()
+    
