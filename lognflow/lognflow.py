@@ -332,30 +332,34 @@ class lognflow:
             from scipy.io import savemat
             savemat(fpath, {f'{param_name}' :parameter_value})
         elif('torch'):
-            fpath = param_dir / (f'{time_time}.model')
-            import torch
-            torch.save(parameter_value.state_dict(), fpath)
+            fpath = param_dir / (f'{time_time}.torch')
+            from torch import save as torch_save
+            torch_save(parameter_value.state_dict(), fpath)
         return fpath
     
     def log_plot(self, parameter_name : str, 
-                       parameter_value,
-                       x_name = None, x_value = None, 
+                       parameter_value_list,
+                       x_value = None,
                        image_format='jpeg', dpi=1200):
         time_time = time.time() - self.init_time
         param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
         fpath = param_dir / (f'{time_time}.jpg')
         
         try:
-            if(x_value is None):
-                plt.plot(parameter_value)
-            else:
-                plt.plot(x_value, parameter_value)
-            plt.savefig(fpath, format='jpg', dpi=1200)
+            if not isinstance(parameter_value_list, list):
+                parameter_value_list = [parameter_value_list]
+            
+            for parameter_value in parameter_value_list:
+                if(x_value is None):
+                    plt.plot(parameter_value)
+                else:
+                    plt.plot(x_value, parameter_value)
+
+            plt.savefig(fpath, format=image_format, dpi=dpi)
             plt.close()
             return fpath
         except:
-            self.log_text(f'Cannot plot variable {parameter_name} with shape' + \
-                          f'{parameter_value.shape}')
+            self.log_text(f'Cannot plot variable {parameter_name}.')
             return None
     
     def log_hexbin(self, parameter_name : str, parameter_value,

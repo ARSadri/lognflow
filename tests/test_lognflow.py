@@ -4,10 +4,11 @@
 
 import pytest
 
-
 from lognflow import lognflow
 from lognflow import logviewer
 from lognflow import printprogress
+
+import numpy as np
 
 @pytest.fixture
 def response():
@@ -30,7 +31,6 @@ def test_lognflow():
     for _ in range(10000):
         logger(f'Log{_}'*200)
 
-    import numpy as np
     for _ in range(1000):
         logger.log_var('vars/vec/v', np.random.rand(10000))
 
@@ -48,6 +48,22 @@ def test_printprogress():
         pprog()
     
     #assert input('Did it show you a progress bar? (y for yes)')=='y'
+    
+def test_log_plot():
+    var1 = np.random.rand(100)
+    var2 = 3 + np.random.rand(100)
+    var3 = 6 + np.random.rand(100)
+    
+    temp_dir = 'c:\Alireza\logs'
+    logger = lognflow(temp_dir)
+    logger('Well this is my first easy log')    
+    
+    logger.log_plot(parameter_name = 'var1', 
+                    parameter_value_list = var1)
+    
+    logger.log_plot(parameter_name = 'vars', 
+                    parameter_value_list = [var1, var2, var3])
+
 if __name__ == '__main__':
-    test_lognflow()
+    test_log_plot()
     
