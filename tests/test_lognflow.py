@@ -64,6 +64,22 @@ def test_log_plot():
     logger.log_plot(parameter_name = 'vars', 
                     parameter_value_list = [var1, var2, var3])
 
+def test_log_canvas():
+    imgs=[]
+    for _ in range(5):
+        _imgs = np.random.rand(5, 100, 100)
+        _imgs[:, 50, 50] = 2
+        imgs.append(_imgs)
+    
+    temp_dir = 'c:\Alireza\logs'
+    logger = lognflow(temp_dir)
+    logger('Well this is my first easy log')    
+    logger(f'imgs.shape: {imgs[0].shape}')
+
+    logger.log_canvas(parameter_name = 'test_canvas', 
+                      list_of_stacks = imgs, 
+                      text_as_colorbar = True)
+
 if __name__ == '__main__':
-    test_log_plot()
+    test_log_canvas()
     

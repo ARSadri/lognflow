@@ -419,7 +419,7 @@ class lognflow:
             return
 
     def _handle_images_stack(self, stack):
-        stack = np.squeeze(stack)
+        # stack = np.squeeze(stack)
         if(len(stack.shape) == 2):
             canv = np.expand_dims(stack, axis=0)
         elif(len(stack.shape) == 3):
@@ -518,16 +518,21 @@ class lognflow:
                             canvas_mask_warning = True
                 im = ax1.imshow(data_canvas, vmin = vmin, vmax = vmax)
                 if(text_as_colorbar):
-                    ax1.text(data_canvas.shape[0]*0.8,
+                    ax1.text(data_canvas.shape[0]*0,
                              data_canvas.shape[1]*0.05,
-                             f'{data_canvas.max():.3f}', 
+                             f'{data_canvas.max():.6f}', 
                              color = 'yellow',
-                             fontsize = 3)
-                    ax1.text(data_canvas.shape[0]*0.8,
+                             fontsize = 2)
+                    ax1.text(data_canvas.shape[0]*0,
+                             data_canvas.shape[1]*0.5, 
+                             f'{data_canvas.mean():.6f}', 
+                             color = 'yellow',
+                             fontsize = 2)
+                    ax1.text(data_canvas.shape[0]*0,
                              data_canvas.shape[1]*0.95, 
-                             f'{data_canvas.min():.3f}', 
+                             f'{data_canvas.min():.6f}', 
                              color = 'yellow',
-                             fontsize = 3)
+                             fontsize = 2)
                 if(use_colorbar):
                     cbar = plt.colorbar(im, ax=ax1, fraction=0.046, pad=0.04)
                     cbar.ax.tick_params(labelsize=1)
