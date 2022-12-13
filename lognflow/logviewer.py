@@ -11,18 +11,17 @@ class logviewer:
         self.exp_dir = pathlib.Path(exp_dir)
         self.logger = logger
         if(self.exp_dir.is_dir()):
-            self.logger('Found: ', str(self.exp_dir))
+            self.logger('Found: '+ str(self.exp_dir))
         else:
-            self.logger('No such directory: ', str(self.exp_dir))
+            self.logger('No such directory: ' + str(self.exp_dir))
         
     def get_variable(self, var_name, single_shot_index = -1, mat_file_field = None):
-        var_dir = self.exp_dir / 'variables'
-        var_flist = list(var_dir.glob(f'{var_name}*.*'))
+        var_flist = list(self.exp_dir.glob(f'{var_name}*.*'))
         if(len(var_flist) > 0):
             var_path = var_flist[0]
             if(not var_path.is_file()):
                 return
-            self.logger('Loading ', var_path)
+            self.logger(f'Loading {var_path}')
             if(var_path.suffix == '.npz'):
                 buf = np.load(var_path)
                 time_array = buf['time_array']
@@ -31,8 +30,10 @@ class logviewer:
                 data_array = buf['data_array']
                 data_array = data_array[:n_logs]
                 return(time_array, data_array)
+            elif(var_path.suffix == '.npy'):
+                return(np.load(var_path))
         else:
-            var_dir = var_dir / var_name
+            var_dir = self.exp_dir / var_name
             if(var_dir.is_dir()):
                 flist = list(var_dir.glob('*.*'))
                 flist.sort()
@@ -72,12 +73,13 @@ class logviewer:
             self.logger('Image stack is ready')
             return(img_set)
     
-    def get_main_log_text(self):
-        flist = list(self.exp_dir.glob('main_log*.txt'))
+    def get_log_text(self, log_name='main_log'):
+        flist = list(self.exp_dir.glob(f'{log_name}*.txt'))
         flist.sort()
         n_files = len(flist)
         if (n_files>0):
-            txt = ''
+            txt = []
             for fcnt in range(n_files):
-                txt += flist[fcnt].readlines()
+                with open(flist[fcnt]) as f_txt:
+                    txt.append(f_txt.readlines())
             return txt

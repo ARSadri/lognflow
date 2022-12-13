@@ -4,9 +4,7 @@
 
 import pytest
 
-from lognflow import lognflow
-from lognflow import logviewer
-from lognflow import printprogress
+from lognflow import lognflow, select_directory, logviewer, printprogress
 
 import numpy as np
 
@@ -35,11 +33,14 @@ def test_lognflow():
         logger.log_var('vars/vec/v', np.random.rand(10000))
 
 def test_logviewer():
-    from PyQt5 import QtWidgets
-    dialog = QtWidgets.QFileDialog()
-    log_dir = dialog.getExistingDirectory(None, 'Select Folder')
-    logged = logviewer(log_dir)
-    print(logged.get_main_log_text())
+    temp_dir = select_directory()
+    logger = lognflow(temp_dir)
+    logger('Well this is my first easy log')
+    
+    log_dir =  select_directory(temp_dir)
+    logged = logviewer(log_dir, logger)
+    print(logged.get_variable('test_param'))
+    print(logged.get_log_text())
 
 def test_printprogress():
     N = 10000000
@@ -76,10 +77,19 @@ def test_log_canvas():
     logger('Well this is my first easy log')    
     logger(f'imgs.shape: {imgs[0].shape}')
 
-    logger.log_canvas(parameter_name = 'test_canvas', 
+    logger.log_single('test_param1', _imgs)
+    logger.log_single('test_param2/', _imgs)
+    logger.log_single('test_param3\\', _imgs)
+    logger.log_single('test_param4\d', _imgs)
+    logger.log_single('test_param4\d2\\', _imgs)
+    logger.log_single('test_param4\d2/', _imgs)
+    logger.log_single('test_param4\d2/e', _imgs)
+
+    logger.log_canvas(parameter_name = 'test_canvas\\', 
                       list_of_stacks = imgs, 
                       text_as_colorbar = True)
 
 if __name__ == '__main__':
-    test_log_canvas()
+    # test_log_canvas()
+    test_logviewer()
     

@@ -4,6 +4,8 @@
 
 from setuptools import setup, find_packages
 
+_version = '0.2.3'
+
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
@@ -39,6 +41,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/arsadri/lognflow',
-    version='0.2.2',
+    version=_version,
     zip_safe=False,
 )

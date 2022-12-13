@@ -175,30 +175,32 @@ class lognflow:
                     self.single_var_call_cnt += 1
                 self.log_single(log_name, to_be_logged)
                     
-    def _prepare_param_dir(self, parameter_name, is_dir = False):
+    def _prepare_param_dir(self, parameter_name):
+        
         try:
             _ = parameter_name.split()
         except:
-            self.log_text('I the parameter name is not a string')
+            self.log_text('The parameter name is not a string')
             self.log_text(f'Its type is {type(parameter_name)}')
             self.log_text(f'It is {parameter_name}')
-            parameter_name.split()
         assert len(parameter_name.split()) == 1, \
             self.log_text(\
-                f'The variable name {parameter_name} you chose is'          \
-                +f' I can split it into {parameter_name.split()}'
-                +' splitable. Make sure you dont use space, tab, or ....'   \
-                +' If you are using single backslash, e.g. for windows'     \
-                +' folders, replace it with \\ or make it a literal string' \
-                +' by putting an r before the variable name.')
-        if(is_dir):
-            param_name = pathlib.Path(parameter_name).name
-            parameter_name = parameter_name + os_sep + '/_'
+                  f'The variable name {parameter_name} you chose is splitable' \
+                + f' I can split it into {parameter_name.split()}'             \
+                + ' Make sure you dont use space, tab, or ....'                \
+                + ' If you are using single backslash, e.g. for windows'       \
+                + ' folders, replace it with \\ or make it a literal string'   \
+                + ' by putting an r before the variable name.')
         
-        parameter_name_as_path = pathlib.Path(parameter_name)
-        param_dir = self.log_dir / parameter_name_as_path.parent
-        if(not is_dir):
-            param_name = parameter_name_as_path.name
+        is_dir = (parameter_name[-1] == '/') | (parameter_name[-1] == '\\') \
+                 | (parameter_name[-1] == r'/') | (parameter_name[-1] == r'\\')
+        param_dir = self.log_dir /  parameter_name
+        
+        if(is_dir):
+            param_name = ''
+        else:
+            param_name = param_dir.name
+            param_dir = param_dir.parent
         if(not param_dir.is_dir()):
             self.log_text(f'Creating directory: {param_dir.absolute()}')
             param_dir.mkdir(parents = True, exist_ok = True)
@@ -278,30 +280,17 @@ class lognflow:
         for parameter_name in self.vars_dict.keys():
             self._log_var_save(parameter_name)
     
-    # # Just use logviewer
-    # def log_var_plot(self, parameter_name : str, entry_index = None):
-    #     _var = self.vars_dict[parameter_name]            
-    #     if entry_index is None:
-    #         self.log_plot(parameter_name, _var.data_array, 
-    #                       x_value = _var.time_array)
-    #     else:
-    #         self.log_plot(parameter_name, _var.data_array[entry_index], 
-    #                       x_value = _var.time_array)
-    #
-    # def log_var_imshow(self, parameter_name : str, entry_index = None):
-    #     _var = self.vars_dict[parameter_name]            
-    #     if entry_index is None:
-    #         self.log_imshow(parameter_name, _var.data_array)
-    #     else:
-    #         self.log_imshow(parameter_name, _var.data_array[entry_index])
-
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100):
         time_time = time.time() - self.init_time
-        param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
-        fpath = param_dir / (f'{time_time}.gif')
-
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+                    
+        fpath = param_dir / (fname +'.gif')
         fig, ax = plt.subplots()
         ims = []
         for img in stack:    
@@ -320,19 +309,24 @@ class lognflow:
                          parameter_value,
                          save_as = 'npy'):
         time_time = time.time() - self.init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name, is_dir = True)
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
         if(save_as == 'npy'):
-            fpath = param_dir / (f'{time_time}.npy')
+            fpath = param_dir / (fname + '.npy')
             np.save(fpath, parameter_value)
         elif(save_as == 'txt'):
-            fpath = param_dir / (f'{time_time}.txt')
+            fpath = param_dir / (fname + '.txt')
             np.savetxt(fpath, parameter_value)
         elif(save_as == 'mat'):
-            fpath = param_dir / (f'{time_time}.mat')
+            fpath = param_dir / (fname + '.mat')
             from scipy.io import savemat
             savemat(fpath, {f'{param_name}' :parameter_value})
         elif('torch'):
-            fpath = param_dir / (f'{time_time}.torch')
+            fpath = param_dir / (fname + '.torch')
             from torch import save as torch_save
             torch_save(parameter_value.state_dict(), fpath)
         return fpath
@@ -342,8 +336,13 @@ class lognflow:
                        x_value = None,
                        image_format='jpeg', dpi=1200):
         time_time = time.time() - self.init_time
-        param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
-        fpath = param_dir / (f'{time_time}.jpg')
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        fpath = param_dir / (fname + '.jpg')
         
         try:
             if not isinstance(parameter_value_list, list):
@@ -364,23 +363,33 @@ class lognflow:
     
     def log_hexbin(self, parameter_name : str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200):
+        
         time_time = time.time() - self.init_time
-        param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
-        fpath = param_dir / (f'{time_time}.jpg')
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+        fpath = param_dir / (f'{fname}.{image_format}')
         
         plt.figure()
         plt.hexbin(parameter_value[0], 
                    parameter_value[1], 
                    gridsize = gridsize)
-        plt.savefig(fpath, format='jpg', dpi=1200)
+        plt.savefig(fpath, format=image_format, dpi=dpi)
         plt.close()    
         return fpath
     
     def log_imshow(self, parameter_name : str, parameter_value,
                    image_format='jpeg', dpi=1200):
         time_time = time.time() - self.init_time
-        param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
-        fpath = param_dir / (f'{time_time}.{image_format}')
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        fpath = param_dir / (f'{fname}.{image_format}')
         
         parameter_value = np.squeeze(parameter_value)
         parameter_value_shape = parameter_value.shape
@@ -410,7 +419,7 @@ class lognflow:
         if(FLAG_img_ready):
             plt.imshow(parameter_value)
             plt.colorbar()
-            plt.savefig(fpath, format = image_format, dpi=1200)
+            plt.savefig(fpath, format = image_format, dpi=dpi)
             plt.close()
             return fpath
         else:
@@ -419,7 +428,6 @@ class lognflow:
             return
 
     def _handle_images_stack(self, stack):
-        # stack = np.squeeze(stack)
         if(len(stack.shape) == 2):
             canv = np.expand_dims(stack, axis=0)
         elif(len(stack.shape) == 3):
@@ -470,8 +478,14 @@ class lognflow:
                    use_colorbar = False,
                    image_format='jpeg', 
                    dpi=600):
+        
         time_time = time.time() - self.init_time
-        param_dir, _ = self._prepare_param_dir(parameter_name, is_dir = True)
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+        fpath = param_dir / (f'{fname}.{image_format}')
                 
         try:
             _ = list_of_stacks.shape
@@ -538,26 +552,9 @@ class lognflow:
                     cbar.ax.tick_params(labelsize=1)
                 ax1.set_aspect('equal')
         
-        fpath = param_dir / f'{time_time}.{image_format}'
         plt.savefig(fpath, format=image_format, dpi=dpi)
         plt.close()
         return fpath
-
-    # def log_model_snapshot(self, model, model_type='torch'):
-    #     time_time = time.time() - self.init_time
-    #     if(not self.snapshots_dir.is_dir()):
-    #         self.log_text(f'Creating directory: {self.snapshots_dir.absolute()}')
-    #         self.snapshots_dir.mkdir(parents = True, exist_ok = True)
-    #     if(model_type == 'torch'):
-    #         fpath = self.snapshots_dir / (f'{time_time:06.6f}.model')
-    #         import torch
-    #         torch.save(model.state_dict(), fpath)
-    #     if(model_type == 'numpy'):
-    #         fpath = self.snapshots_dir / (f'{time_time:06.6f}.npy')
-    #         np.savez(model, fpath)
-    #     self.log_text(f'Torch snapshot: {fpath}')
-    #     self.latest_snapshot_path = fpath
-    #     return fpath
 
     def log_confusion_matrix(self,
                              parameter_name : str,
@@ -597,7 +594,13 @@ class lognflow:
     
         """
         time_time = time.time() - self.init_time
-    
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+        fpath = param_dir / (f'{fname}.{image_format}')
+        
         accuracy = np.trace(cm) / np.sum(cm).astype('float')
         misclass = 1 - accuracy
     
@@ -629,21 +632,21 @@ class lognflow:
         plt.title(title)
         plt.colorbar(im,fraction=0.046, pad=0.04)
         plt.tight_layout()
-
-        param_dir = self.variables_dir / (f'{parameter_name}/')
-        if(not param_dir.is_dir()):
-            self.log_text(f'Creating directory: {param_dir.absolute()}')
-            param_dir.mkdir(parents = True, exist_ok = True)
-        
-        fpath = param_dir / f'{parameter_name}_{time_time}.{image_format}'
         plt.savefig(fpath, format=image_format, dpi=dpi)
         plt.close()
         return fpath
-
-# def test_lognflow():
-#     logger = lognflow(r'C:\Alireza\mcemtools_logs')
-#     for _ in range(20):
-#         logger.log_text(_)
-#
-# if __name__ == '__main__':
-#     test_lognflow()
+    
+    def __del__(self):
+        self.log_var_flush()
+        
+def select_directory(start_directory = './'):
+    from PyQt5.QtWidgets import QFileDialog, QApplication
+    from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout
+    app = QApplication([])
+    log_dir = QFileDialog.getExistingDirectory(
+        None,
+        "Open a folder",
+        start_directory,
+        QFileDialog.ShowDirsOnly
+        )
+    return(log_dir)
