@@ -17,22 +17,22 @@ Log and Flow tracking made easy with Python.
 
 In this package we use a folder on the HDD to generate files and folders in typical
 formats such as numpy npy and npz, png, ... to log. A log viewer is also availble
-to turn an already logged flow into variables. Obviously it will read the folders 
-and map them for you, which is something you could spend hours to do yourself.
-Also there is the nicest progress bar in the world that you can easily understand
-and work with and implement yourself when you have the time.
+to turn an already logged flow into variables. Obviously, it will read the folders 
+and map them for you, which is something you could spend hours to do by yourself.
+Also there is the nicest progress bar, that you can easily understand
+and use or implement yourself when you have the time.
 
-Lokking at most logging packages online, you see that you need to spend a lot of time
-learning about them and realizing how they work. Specially when you have to deal
+Looking at most logging packages online, you see that you need to spend a lot of time
+learning how to use them and realizing how they work. Especially when you have to deal
 with http servers and ... which will be a huge pain when working for companies
 who have their own HPC. 
 
-This is why lognflow is supposed to be handy and strugt forward.
+This is why lognflow is supposed to be handy and straight forward.
 
+Many tests are avialable in the tests directory.
 
 * Free software: GNU General Public License v3
 * Documentation: https://lognflow.readthedocs.io.
-
 
 Features
 --------

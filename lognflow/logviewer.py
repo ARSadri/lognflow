@@ -15,10 +15,12 @@ class logviewer:
         else:
             self.logger('No such directory: ' + str(self.exp_dir))
         
-    def get_variable(self, var_name, single_shot_index = -1, mat_file_field = None):
-        var_flist = list(self.exp_dir.glob(f'{var_name}*.*'))
+    def get_variable(self, var_name, single_shot_index = -1, 
+                     suffix = '.np*', mat_file_field = None):
+        var_flist = list(self.exp_dir.glob(f'{var_name}*{suffix}'))
         if(len(var_flist) > 0):
-            var_path = var_flist[0]
+            var_flist.sort()
+            var_path = var_flist[single_shot_index]
             if(not var_path.is_file()):
                 return
             self.logger(f'Loading {var_path}')
@@ -32,6 +34,11 @@ class logviewer:
                 return(time_array, data_array)
             elif(var_path.suffix == '.npy'):
                 return(np.load(var_path))
+            elif(var_path.suffix == '.mat'):
+                    if(mat_file_field is not None):
+                        return loadmat(var_path)[mat_file_field]
+                    else:
+                        self.logger('You need to provide the field name for the mat file')
         else:
             var_dir = self.exp_dir / var_name
             if(var_dir.is_dir()):
