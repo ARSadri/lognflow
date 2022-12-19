@@ -4,9 +4,12 @@
 
 import pytest
 
-from lognflow import lognflow, select_directory, logviewer, printprogress
+from lognflow import lognflow, logviewer, printprogress
 
 import numpy as np
+import matplotlib.pyplot as plt
+
+temp_dir = 'c:\Alireza\logs'
 
 @pytest.fixture
 def response():
@@ -23,47 +26,116 @@ def test_content(response):
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_lognflow():
-    temp_dir = 'c:\Alireza\logs'
     logger = lognflow(temp_dir)
-    logger('Well this is my first easy log')    
+    logger('This is a test for lognflow and log_var')    
     for _ in range(10000):
         logger(f'Log{_}'*200)
 
+    logger('This is a new log file for another script', log_name = 'not_main_script')
+    logger('For other log files you need to mention the log_name', log_name = 'not_main_script')
+
+def test_log_var():
+    logger = lognflow(temp_dir)
+    logger('This is a test for lognflow and log_var')    
+
     for _ in range(1000):
         logger.log_var('vars/vec/v', np.random.rand(10000))
-
-def test_logviewer():
-    temp_dir = select_directory()
+        
+def test_log_animation():
+    var1 = np.random.rand(32, 100, 100)
     logger = lognflow(temp_dir)
-    logger('Well this is my first easy log')
+    logger('This is a test for log_animation')    
     
-    log_dir =  select_directory(temp_dir)
-    logged = logviewer(log_dir, logger)
-    print(logged.get_variable('test_param'))
-    print(logged.get_log_text())
+    logger.log_animation('var1',var1)
 
-def test_printprogress():
-    N = 10000000
-    pprog = printprogress(N)
-    for _ in range(N):
-        pprog()
+def test_log_single():
+    var1 = np.random.rand(100)
     
-    #assert input('Did it show you a progress bar? (y for yes)')=='y'
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_plot')    
     
+    logger.log_single('var1',var1)
+
 def test_log_plot():
     var1 = np.random.rand(100)
     var2 = 3 + np.random.rand(100)
     var3 = 6 + np.random.rand(100)
     
-    temp_dir = 'c:\Alireza\logs'
     logger = lognflow(temp_dir)
-    logger('Well this is my first easy log')    
+    logger('This is a test for log_plot')    
     
     logger.log_plot(parameter_name = 'var1', 
                     parameter_value_list = var1)
     
     logger.log_plot(parameter_name = 'vars', 
                     parameter_value_list = [var1, var2, var3])
+    
+def test_log_hist():
+    var1 = np.random.rand(10000)
+    var2 = 3 + np.random.rand(10000)
+    var3 = 6 + np.random.rand(10000)
+    
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_hist')    
+    
+    logger.log_hist(parameter_name = 'var1', 
+                    parameter_value_list = var1,
+                    n_bins = 100)
+    
+    logger.log_hist(parameter_name = 'vars', 
+                    parameter_value_list = [var1, var2, var3],
+                    n_bins = 100)
+    
+def test_log_scatter3():
+    var1 = np.random.rand(100)
+    var2 = 3 + np.random.rand(100)
+    var3 = 6 + np.random.rand(100)
+
+    var3d = np.array([var1, var2, var3])
+    
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_scatter3')    
+    
+    logger.log_scatter3('var3d', var3d)    
+    
+def test_log_plt():
+    plt.imshow(np.random.rand(100, 100))
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_plt')    
+    logger.log_plt('var3d')        
+    
+def test_log_hexbin():
+    var1 = np.random.randn(10000)
+    var2 = 3 + np.random.randn(10000)
+
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_hexbin')    
+    
+    logger.log_hexbin('hexbin', [var1, var2])    
+
+def test_log_imshow():
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_imshow')    
+    logger.log_imshow('var3d', np.random.rand(100, 100))    
+
+def test_prepare_stack_of_images():
+    stack_1 = np.random.rand(8, 100, 100, 9)
+    stack_1[:, :1, :, :] = np.nan
+    stack_1[:, :, :1, :] = np.nan
+    stack_1[:, -1:, :, :] = np.nan
+    stack_1[:, :, -1:, :] = np.nan
+    stack_2 = np.random.rand(8, 100, 100)
+    stack_3 = np.random.rand(8, 100, 100, 3, 9)
+    stack_3[:, :1] = np.nan
+    stack_3[:, :, :1] = np.nan
+    stack_3[:, -1:] = np.nan
+    stack_3[:, :, -1:] = np.nan
+    
+    list_of_stacks123 = [stack_1, stack_2, stack_3]
+    logger = lognflow(temp_dir)
+    logger('This is a test for prepare_stack_of_images')
+    list_of_stacks123 = logger.prepare_stack_of_images(list_of_stacks123)
+    logger.log_canvas('canvas_before_handling', list_of_stacks123)
 
 def test_log_canvas():
     imgs=[]
@@ -72,9 +144,8 @@ def test_log_canvas():
         _imgs[:, 50, 50] = 2
         imgs.append(_imgs)
     
-    temp_dir = 'c:\Alireza\logs'
     logger = lognflow(temp_dir)
-    logger('Well this is my first easy log')    
+    logger('This is a test for log_canvas')    
     logger(f'imgs.shape: {imgs[0].shape}')
 
     logger.log_single('test_param1', _imgs)
@@ -88,8 +159,36 @@ def test_log_canvas():
     logger.log_canvas(parameter_name = 'test_canvas\\', 
                       list_of_stacks = imgs, 
                       text_as_colorbar = True)
-
-if __name__ == '__main__':
-    # test_log_canvas()
-    test_logviewer()
     
+def test_log_confusion_matrix():
+    from sklearn.metrics import confusion_matrix
+    
+    vec1 = np.random.rand(10000) > 0.8
+    vec2 = np.random.rand(10000) > 0.2
+    
+    cm = confusion_matrix(vec1, vec2, normalize='all')
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_confusion_matrix')
+    logger.log_confusion_matrix('cm1', cm, title = 'test_log_confusion_matrix')
+
+def test_rename():
+    logger = lognflow(temp_dir)
+    logger('This is a test for test_rename')
+    logger.rename(logger.log_dir.name + '_new_name')
+    logger('This is another test for test_rename')
+    
+if __name__ == '__main__':
+    test_lognflow()
+    test_log_var()
+    test_log_animation()
+    test_log_single()
+    test_log_plot()
+    test_log_hist()
+    test_log_scatter3()
+    test_log_plt()
+    test_log_hexbin()
+    test_log_imshow()
+    test_prepare_stack_of_images()
+    test_log_canvas()
+    test_log_confusion_matrix()
+    test_rename()

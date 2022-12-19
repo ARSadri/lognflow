@@ -27,7 +27,7 @@ learning how to use them and realizing how they work. Especially when you have t
 with http servers and ... which will be a huge pain when working for companies
 who have their own HPC. 
 
-This is why lognflow is supposed to be handy and straight forward.
+This is why lognflow is handy and straight forward.
 
 Many tests are avialable in the tests directory.
 
@@ -37,8 +37,8 @@ Many tests are avialable in the tests directory.
 Features
 --------
 
-* Implement log_hist
-* Bring scatter3 from rgflib here
+* lognflow puts all the logs into a directory on your pc
+* lognflow makes it easy to log text or simple plots.
 
 Credits
 ^^^^^^^^

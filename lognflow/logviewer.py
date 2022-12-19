@@ -11,7 +11,7 @@ class logviewer:
         self.exp_dir = pathlib.Path(exp_dir)
         self.logger = logger
         if(self.exp_dir.is_dir()):
-            self.logger('Found: '+ str(self.exp_dir))
+            self.logger('Looking for a log in: '+ str(self.exp_dir))
         else:
             self.logger('No such directory: ' + str(self.exp_dir))
         

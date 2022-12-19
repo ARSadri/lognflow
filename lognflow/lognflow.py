@@ -1,6 +1,6 @@
 import pathlib
 import time
-import logging
+# import logging
 import numpy as np
 import itertools
 from os import sep as os_sep
@@ -29,7 +29,8 @@ class lognflow:
     def __init__(self, 
                  logs_root : pathlib.Path = None,
                  log_dir : pathlib.Path = None,
-                 print_text = True):
+                 print_text = True,
+                 main_log_name = 'main_log'):
         """ lognflow construction
         
         The lognflow is an easy way to log your variables on a local disk..
@@ -41,16 +42,22 @@ class lognflow:
             logs_root: pathlib.Path
                 This is the root directory for all logs. We will use the time.time()
                 to create a log directory for each instance of the lognflow. 
-                default: logs/
+            log_dir: pathlib.Path
+                This is the final directory path for the log files. 
+            
+            note:
+            ^^^^^^^^
+                One of the variables logs_root or log_dir must be provided.
+
             print_text ; bool
                 If True, everything that is logged as text will be printed as well
         """
-        self.init_time = time.time()
+        self._init_time = time.time()
 
         if(log_dir is None):
             if(logs_root is None):
                 logs_root = 'logs'
-            self.log_dir = pathlib.Path(logs_root) / f'{int(self.init_time):d}/'
+            self.log_dir = pathlib.Path(logs_root) / f'{int(self._init_time):d}/'
         else:
             self.log_dir = pathlib.Path(log_dir)
         if(not self.log_dir.is_dir()):
@@ -58,122 +65,113 @@ class lognflow:
         if(not self.log_dir.is_dir()):
             return
         
-        self.print_text = print_text
+        self._print_text = print_text
+        self._loggers_dict = {}
+        self._vars_dict = {}
+        self._single_var_call_cnt = 0
 
-        self.loggers_dict = {}
-        self.vars_dict = {}
-        self.variables_dir = self.log_dir
-        self.snapshots_dir = self.log_dir
-        self.results_dir = self.log_dir
-        self.log_name = 'main_log'
-        self._log_text_handler(title = 'lognflow main log file')
-        self.log_text(str(self.log_dir))
-        self.log_text(\
-             'lognflow log file for run ' + \
-             f'{int(self.init_time):d}')
-        self.log_text('-=-' * 20)
-        self.single_var_call_cnt = 0
-        
+        self.log_name = main_log_name
+    
+    def rename(self, new_dir:str):
+        for log_name in self._loggers_dict.keys():
+            _logger, _, _, _ = self._loggers_dict[log_name]
+            _logger.close()
+        self.log_dir = self.log_dir.rename(self.log_dir.parent / new_dir)
+        for log_name in self._loggers_dict.keys():
+            _logger, n_lines_limit, log_text_cnt, log_file_id = \
+                self._loggers_dict[log_name]
+            log_fpath = self.log_dir / log_file_id
+            _logger = open(log_fpath, 'a')
+            self._loggers_dict[log_name] = [_logger, 
+                                       n_lines_limit, 
+                                       log_text_cnt, 
+                                       log_file_id]
+    
     def _log_text_handler(self, log_name = None, 
                          title = None, 
-                         n_lines_limit: int = int(1e+7)):
-        if(log_name is None):
-            log_name = self.log_name
-        if(log_name in self.loggers_dict.keys()):
-            _logger, n_lines_limit, _, _ = \
-                self.loggers_dict[log_name]
-            for handler in _logger.handlers[:]:
-                _logger.removeHandler(handler)
-                handler.close()
+                         n_lines_limit: int = int(1e+7),
+                         time_in_file_name = True):
+
+        if(log_name in self._loggers_dict.keys()):
+            _logger, n_lines_limit, log_text_cnt, log_file_id = \
+                self._loggers_dict[log_name]
+            _logger.close()
         
         log_text_cnt = 0
-        _logger = logging.getLogger(title)
-        _logger.setLevel(logging.INFO)
-        log_file_id = log_name + f'{int(time.time()):d}.txt'
+        if(time_in_file_name):
+            log_file_id = log_name + f'_{int(time.time()):d}.txt'
+        else:
+            log_file_id = log_name + '.txt'
         log_fpath = self.log_dir / log_file_id
-        fh = logging.FileHandler(log_fpath)
-        fh.setLevel(logging.INFO)
-        _logger.addHandler(fh)
-        
-        self.loggers_dict[log_name] = [_logger, 
+        _logger = open(log_fpath, 'w')
+        if(title is not None):
+            _logger.write(title + '\n')
+        self._loggers_dict[log_name] = [_logger, 
                                        n_lines_limit, 
                                        log_text_cnt, 
                                        log_file_id]
         
-    def log_text(self, text : str = '\n', 
+    def log_text(self, 
+                 to_be_logged : str = '\n', 
                  log_name : str = None,
+                 log_time_stamp = True,
                  print_text = None,
                  title = None, 
                  n_lines_limit: int = int(1e+7),
+                 time_in_file_name = True,
                  **_):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
 
         if(log_name is None):
             log_name = self.log_name
         
         if(print_text is None):
-            print_text = self.print_text
+            print_text = self._print_text
         
         if(print_text):
-            print(f'T:{time_time:>6.6f}| log name: {log_name}')
-            print(text)
+            if(log_time_stamp):
+                print(f'T:{time_time:>6.6f}|')
+            print(f' log name: {log_name}')
+            print(to_be_logged)
         
-        if not (log_name in self.loggers_dict.keys()):
+        if not (log_name in self._loggers_dict.keys()):
             self._log_text_handler(log_name, 
                                    title = title, 
-                                   n_lines_limit = n_lines_limit)
+                                   n_lines_limit = n_lines_limit,
+                                   time_in_file_name = time_in_file_name)
 
         _logger, n_lines_limit, log_text_cnt, log_file_id = \
-            self.loggers_dict[log_name]
-        if isinstance(text, np.ndarray):
+            self._loggers_dict[log_name]
+        if(log_time_stamp):
+            _logger.write(f'T:{time_time:>6.6f}| ')
+        if isinstance(to_be_logged, np.ndarray):
             try:
-                _logger.info(f'T:{time_time:>6.6f}| numpy.ndarray:\n')
-                if(text.size()>100):
-                    _logger.info('The first and last 50 elements:')
-                    text = text.ravel()
-                    _logger.info(text[:50])
-                    _logger.info('...')
-                    _logger.info(text[-50:])
+                _logger.write('numpy.ndarray')
+                if(to_be_logged.size()>100):
+                    _logger.write(', The first and last 50 elements:\n')
+                    to_be_logged = to_be_logged.ravel()
+                    _logger.write(np.array2string(to_be_logged[:50]))
+                    _logger.write(' ... ')
+                    _logger.write(np.array2string(to_be_logged[-50:]))
                 else:
-                    _logger.info(text)
+                    _logger.write(':\n' + np.array2string(to_be_logged))
             except:
-                _logger.info(f'T:{time_time:>6.6f}| not possible to log ' + 
-                             log_name)
+                _logger.write(' not possible to log ' + log_name + '\n')
         else:
-            _logger.info(f'T:{time_time:>6.6f}|')
-            _logger.info(text)
-        log_text_cnt += len(text)
-        self.loggers_dict[log_name] = [_logger, 
+            _logger.write(to_be_logged + '\n')
+        log_text_cnt += len(to_be_logged)
+        self._loggers_dict[log_name] = [_logger, 
                                        n_lines_limit, 
                                        log_text_cnt, 
                                        log_file_id]
 
         if(log_text_cnt >= n_lines_limit):
             self._log_text_handler(log_name)
-            _logger, _, _, _ = self.loggers_dict[log_name]
-        return _logger.handlers[0].baseFilename
+            _, _, _, log_file_id = self._loggers_dict[log_name]
+        return log_file_id
     
-    def __call__(self, to_be_logged, 
-                 log_name : str = None,
-                 print_text = None, 
-                 title = None, 
-                 n_lines_limit: int = int(1e+7), **_):
-        if isinstance(to_be_logged, str):
-            self.log_text(to_be_logged, log_name, 
-                          print_text = print_text,
-                          title = title, 
-                          n_lines_limit = n_lines_limit)
-        elif isinstance(to_be_logged, np.ndarray):
-            if(to_be_logged.size() < 256):
-                self.log_text(f'{to_be_logged}')
-            else:
-                if(log_name is not None):
-                    log_name = f'single_variable_{self.single_var_call_cnt}'
-                    self.log_text(f'array with sahpe {to_be_logged.shape}'\
-                                   ' is given without name. I named it: '\
-                                  f'{log_name}')
-                    self.single_var_call_cnt += 1
-                self.log_single(log_name, to_be_logged)
+    def __call__(self, *args, **kwargs):
+        self.log_text(*args, **kwargs)
                     
     def _prepare_param_dir(self, parameter_name):
         
@@ -212,7 +210,7 @@ class lognflow:
 
     def log_var(self, parameter_name : str, parameter_value, 
                 save_as='npz', log_size_limit: int = int(1e+7)):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         
         try:
             _ = parameter_value.shape
@@ -222,8 +220,8 @@ class lognflow:
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
 
-        if(parameter_name in self.vars_dict.keys()):
-            _var = self.vars_dict[parameter_name]
+        if(parameter_name in self._vars_dict.keys()):
+            _var = self._vars_dict[parameter_name]
             data_array, time_array, cur_index, \
                 filesplit_cnt, save_as, log_counter_limit = _var
             cur_index += 1
@@ -253,7 +251,7 @@ class lognflow:
                 f'from {data_array[cur_index].shape} '\
                 f'to {parameter_value.shape}. Coppying from the last time.')
             data_array[cur_index] = data_array[cur_index - 1]
-        self.vars_dict[parameter_name] = varinlog(data_array, 
+        self._vars_dict[parameter_name] = varinlog(data_array, 
                                                   time_array, 
                                                   cur_index,
                                                   filesplit_cnt,
@@ -263,7 +261,7 @@ class lognflow:
     def _log_var_save(self, parameter_name : str):
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         
-        _var = self.vars_dict[parameter_name]
+        _var = self._vars_dict[parameter_name]
         if(_var.save_as == 'npz'):
             fpath = param_dir / (f'{param_name}_{_var.filesplit_cnt}.npz')
             np.savez(fpath,
@@ -277,13 +275,13 @@ class lognflow:
         return fpath
     
     def log_var_flush(self):
-        for parameter_name in self.vars_dict.keys():
+        for parameter_name in self._vars_dict.keys():
             self._log_var_save(parameter_name)
     
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -308,8 +306,12 @@ class lognflow:
     def log_single(self, parameter_name : str, 
                          parameter_value,
                          save_as = 'npy'):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(save_as == 'mat'):
+            if(len(param_name) == 0):
+                param_name = 'data'
+        
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
         else:
@@ -335,7 +337,7 @@ class lognflow:
                        parameter_value_list,
                        x_value = None,
                        image_format='jpeg', dpi=1200):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -347,13 +349,26 @@ class lognflow:
         try:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
+                
+            if(x_value is not None):
+                if not isinstance(x_value, list):
+                    x_value = [x_value]
             
-            for parameter_value in parameter_value_list:
+            if( (len(x_value) != len(parameter_value)) & \
+                (len(x_value) != 1)):
+                self.log_text(f'x_value for {parameter_name} should have ' \
+                    + 'length of 1 or the same as parameters list.')
+                raise ValueError
+            
+            for list_cnt, parameter_value in enumerate(parameter_value_list):
                 if(x_value is None):
                     plt.plot(parameter_value)
                 else:
-                    plt.plot(x_value, parameter_value)
-
+                    if(len(x_value) == len(parameter_value)):
+                        plt.plot(x_value[list_cnt], parameter_value)
+                    else:
+                        plt.plot(x_value[0], parameter_value)
+                        
             plt.savefig(fpath, format=image_format, dpi=dpi)
             plt.close()
             return fpath
@@ -361,10 +376,82 @@ class lognflow:
             self.log_text(f'Cannot plot variable {parameter_name}.')
             return None
     
+    def log_hist(self, parameter_name : str, 
+                       parameter_value_list,
+                       n_bins = 10,
+                       image_format='jpeg', dpi=1200):
+        time_time = time.time() - self._init_time
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        fpath = param_dir / (fname + '.jpg')
+        
+        try:
+            if not isinstance(parameter_value_list, list):
+                parameter_value_list = [parameter_value_list]
+                
+            for list_cnt, parameter_value in enumerate(parameter_value_list):
+                bins, edges = np.histogram(parameter_value, n_bins)
+                plt.bar(edges[:-1], bins, width =np.diff(edges).mean(), alpha=0.5)
+                plt.plot(edges[:-1], bins)
+                        
+            plt.savefig(fpath, format=image_format, dpi=dpi)
+            plt.close()
+            return fpath
+        except:
+            self.log_text(f'Cannot plot variable {parameter_name}.')
+            return None
+    
+    def log_scatter3(self, parameter_name : str, 
+                       parameter_value,
+                       image_format='jpeg', dpi=1200):
+        time_time = time.time() - self._init_time
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        fpath = param_dir / (fname + '.jpg')
+        
+        try:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(parameter_value[0], parameter_value[1], parameter_value[2])
+            plt.savefig(fpath, format=image_format, dpi=dpi)
+            plt.close()
+            return fpath
+        except:
+            self.log_text(f'Cannot plot variable {parameter_name}.')
+            return None
+    
+    def log_plt(self, 
+                parameter_name : str, 
+                image_format='jpeg', dpi=1200):
+        time_time = time.time() - self._init_time
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        fpath = param_dir / (fname + '.jpg')
+        
+        try:
+            plt.savefig(fpath, format=image_format, dpi=dpi)
+            plt.close()
+            return fpath
+        except:
+            self.log_text(f'Cannot save the plt instance {parameter_name}.')
+            return None
+    
     def log_hexbin(self, parameter_name : str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200):
         
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -382,7 +469,7 @@ class lognflow:
     
     def log_imshow(self, parameter_name : str, parameter_value,
                    image_format='jpeg', dpi=1200):
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -411,9 +498,10 @@ class lognflow:
             if(parameter_value_shape[4] == 3):
                 parameter_value = parameter_value.swapaxes(1,2)
                 new_shape = parameter_value.shape
-                parameter_value = parameter_value.reshape(new_shape[0] * new_shape[1],
-                                                          new_shape[2] * new_shape[3],
-                                                          new_shape[4])
+                parameter_value = parameter_value.reshape(\
+                    new_shape[0] * new_shape[1],
+                    new_shape[2] * new_shape[3],
+                    new_shape[4])
                 FLAG_img_ready = True
         
         if(FLAG_img_ready):
@@ -427,7 +515,7 @@ class lognflow:
                           f'{parameter_value.shape}')
             return
 
-    def _handle_images_stack(self, stack):
+    def _handle_images_stack(self, stack, nan_borders):
         if(len(stack.shape) == 2):
             canv = np.expand_dims(stack, axis=0)
         elif(len(stack.shape) == 3):
@@ -438,7 +526,7 @@ class lognflow:
                 if(n_ch == 3):
                     canv = stack
             if(len(stack.shape) == 5):
-                n_imgs, n_R, n_C, n_ch, is_rgb = stack.shape
+                n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
                 if(is_rgb != 3):
                     return None
             square_side = int(np.ceil(np.sqrt(n_ch)))
@@ -449,21 +537,27 @@ class lognflow:
             if(len(stack.shape) == 5):
                 canv = np.zeros((n_imgs, new_n_R, new_n_C, 3), dtype = stack.dtype)
             used_ch_cnt = 0
+
+            stack[:, :1] = np.nan
+            stack[:, :, :1] = np.nan
+            stack[:, -1:] = np.nan
+            stack[:, :, -1:] = np.nan
+            
             for rcnt in range(square_side):
                 for ccnt in range(square_side):
                     ch_cnt = rcnt + square_side*ccnt
                     if (ch_cnt<n_ch):
                         canv[:, rcnt*n_R : (rcnt + 1)*n_R,
                                 ccnt*n_C : (ccnt + 1)*n_C] = \
-                            stack[:, :, :, used_ch_cnt]
+                            stack[..., used_ch_cnt]
                         used_ch_cnt += 1
         else:
             return None
         return canv
 
-    def prepare_stack_of_images(self, list_of_stacks):        
+    def prepare_stack_of_images(self, list_of_stacks, nan_borders = True):        
         for cnt, stack in enumerate(list_of_stacks):
-            stack = self._handle_images_stack(stack)
+            stack = self._handle_images_stack(stack, nan_borders = nan_borders)
             if(stack is None):
                 return
             list_of_stacks[cnt] = stack
@@ -479,7 +573,7 @@ class lognflow:
                    image_format='jpeg', 
                    dpi=600):
         
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -578,22 +672,24 @@ class lognflow:
         title:        the text to display at the top of the matrix
     
         cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
-                      see http://matplotlib.org/examples/color/colormaps_reference.html
+                      (http://matplotlib.org/examples/color/colormaps_reference.html)
                       plt.get_cmap('jet') or plt.cm.Blues
     
         Usage
         -----
-        plot_confusion_matrix(cm           = cm,                  # confusion matrix created by
-                                                                  # sklearn.metrics.confusion_matrix
-                              target_names = y_labels_vals,       # list of names of the classes
-                              title        = best_estimator_name) # title of graph
+        plot_confusion_matrix(\
+            cm           = cm,                  # confusion matrix created by
+                                                # sklearn.metrics.confusion_matrix
+            target_names = y_labels_vals,       # list of names of the classes
+            title        = best_estimator_name) # title of graph
     
         Citiation
         ---------
-        http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+        http://scikit-learn.org/stable/auto_examples/model_selection/
+                                                           plot_confusion_matrix.html
     
         """
-        time_time = time.time() - self.init_time
+        time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
             fname = f'{param_name}_{time_time}'
@@ -622,13 +718,15 @@ class lognflow:
             plt.yticks(tick_marks, target_names)
     
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-            clr = np.array([1, 1, 1, 0])*(cm[i, j] - cm.min())/(cm.max() - cm.min()) + \
-                  np.array([0, 0, 0, 1])
+            clr = np.array([1, 1, 1, 0]) \
+                  * (cm[i, j] - cm.min()) \
+                      / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
             plt.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center",
                      color=clr)
         
         plt.ylabel('True label')
-        plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
+        plt.xlabel('Predicted label\naccuracy={:0.4f}; ' \
+                   + 'misclass={:0.4f}'.format(accuracy, misclass))
         plt.title(title)
         plt.colorbar(im,fraction=0.046, pad=0.04)
         plt.tight_layout()
@@ -641,12 +739,7 @@ class lognflow:
         
 def select_directory(start_directory = './'):
     from PyQt5.QtWidgets import QFileDialog, QApplication
-    from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout
-    app = QApplication([])
+    _ = QApplication([])
     log_dir = QFileDialog.getExistingDirectory(
-        None,
-        "Open a folder",
-        start_directory,
-        QFileDialog.ShowDirsOnly
-        )
+        None, "Open a folder", start_directory, QFileDialog.ShowDirsOnly)
     return(log_dir)
