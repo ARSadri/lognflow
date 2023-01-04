@@ -1,17 +1,17 @@
-lognflow
-========
+# lognflow
 
-[![PyPI version](https://badge.fury.io/py/lognflow.svg)](https://badge.fury.io/py/lognflow)
+[![PyPI version](https://badge.fury.io/py/lognflow.svg)](https://badge.fury.io/py/lognflow) [![Documentation](https://readthedocs.org/projects/lognflow/badge/?version=latest)](https://lognflow.readthedocs.io/en/latest/?version=latest)
 
-[![Documentation](https://readthedocs.org/projects/lognflow/badge/?version=latest)](https://lognflow.readthedocs.io/en/latest/?version=latest)
+Log and flow tracking made easy with Python.
 
-Log and Flow tracking made easy with Python. You can install it by:
+## Installation
+You can install it by:
 
 ```console
 pip install lognflow
 ```
-
-A simple program to use it would be similar to the following:
+## How to use
+A simple program to use ```lognflow``` would be similar to the following:
 
 ```python 
 from lognflow import lognflow
@@ -23,7 +23,7 @@ logger('This is a test for lognflow and log_var')
 logger.log_single('vec', vec)
 ```
 
-The logviewer is also very useful.
+The ```logviewer``` is also very useful.
 
 ```python 
 from lognflow import logviewer
@@ -32,7 +32,7 @@ logged = logviewer('c:\\test\\some_log\')
 vec = logged.get_variable('vec')
 ```
 
-The printprogress makes a pretty nice progress bar.
+The ```printprogress``` makes a pretty nice progress bar.
 
 ```python 
 from lognflow import printprogress
@@ -43,6 +43,8 @@ for _ in range(N):
 	# do_something()
 	pbar()
 ```
+
+## Introduction
 
 In this package we use a folder on the HDD to generate files and folders in typical
 formats such as numpy npy and npz, png, ... to log. A log viewer is also availble
@@ -63,18 +65,15 @@ Many tests are avialable in the tests directory.
 * Free software: GNU General Public License v3
 * Documentation: https://lognflow.readthedocs.io.
 
-Features
---------
+## Features
 
 * lognflow puts all the logs into a directory on your pc
 * lognflow makes it easy to log text or simple plots.
 * logviewer makes it easy to load variables or directories
 * printprogress is one of the best progress bars in Python.
 
-Credits
-^^^^^^^^
+## Author
+* Alireza Sadri `<Alireza[Dot]Sadri[At]Monash[Dot]edu>`
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+## Credits
+This package was created with `Cookiecutter` and the `audreyr/cookiecutter-pypackage` project template.
