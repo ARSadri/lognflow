@@ -1,17 +1,9 @@
-========
 lognflow
 ========
 
+[![PyPI version](https://badge.fury.io/py/lognflow.svg)](https://badge.fury.io/py/lognflow)
 
-.. image:: https://img.shields.io/pypi/v/lognflow.svg
-        :target: https://pypi.python.org/pypi/lognflow
-
-.. image:: https://img.shields.io/travis/arsadri/lognflow.svg
-        :target: https://travis-ci.com/arsadri/lognflow
-
-.. image:: https://readthedocs.org/projects/lognflow/badge/?version=latest
-        :target: https://lognflow.readthedocs.io/en/latest/?version=latest
-        :alt: Documentation Status
+[![Documentation](https://readthedocs.org/projects/lognflow/badge/?version=latest)](https://lognflow.readthedocs.io/en/latest/?version=latest)
 
 Log and Flow tracking made easy with Python. You can install it by:
 
