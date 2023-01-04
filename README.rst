@@ -17,9 +17,9 @@ Log and Flow tracking made easy with Python. You can install it by:
 
 
 
-```
-pip install lognflow
-```
+.. code-block::
+   :caption: A cool example
+        pip install lognflow
 
 A simple program to use it would be similar to the following:
 
