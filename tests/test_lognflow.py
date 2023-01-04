@@ -55,6 +55,11 @@ def test_log_single():
     logger('This is a test for log_plot')    
     
     logger.log_single('var1',var1)
+    
+    a_dict = dict({'str_var': 'This is a string',
+                   'var1': var1})
+    
+    logger.log_single('a_dict', a_dict)
 
 def test_log_plot():
     var1 = np.random.rand(100)

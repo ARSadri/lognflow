@@ -78,26 +78,26 @@ class lognflow:
             _logger.close()
         self.log_dir = self.log_dir.rename(self.log_dir.parent / new_dir)
         for log_name in self._loggers_dict.keys():
-            _logger, n_lines_limit, log_text_cnt, log_file_id = \
+            _logger, log_size_limit, log_size, log_file_id = \
                 self._loggers_dict[log_name]
             log_fpath = self.log_dir / log_file_id
             _logger = open(log_fpath, 'a')
             self._loggers_dict[log_name] = [_logger, 
-                                       n_lines_limit, 
-                                       log_text_cnt, 
+                                       log_size_limit, 
+                                       log_size, 
                                        log_file_id]
     
     def _log_text_handler(self, log_name = None, 
                          title = None, 
-                         n_lines_limit: int = int(1e+7),
+                         log_size_limit: int = int(1e+7),
                          time_in_file_name = True):
 
         if(log_name in self._loggers_dict.keys()):
-            _logger, n_lines_limit, log_text_cnt, log_file_id = \
+            _logger, log_size_limit, log_size, log_file_id = \
                 self._loggers_dict[log_name]
             _logger.close()
         
-        log_text_cnt = 0
+        log_size = 0
         if(time_in_file_name):
             log_file_id = log_name + f'_{int(time.time()):d}.txt'
         else:
@@ -107,8 +107,8 @@ class lognflow:
         if(title is not None):
             _logger.write(title + '\n')
         self._loggers_dict[log_name] = [_logger, 
-                                       n_lines_limit, 
-                                       log_text_cnt, 
+                                       log_size_limit, 
+                                       log_size, 
                                        log_file_id]
         
     def log_text(self, 
@@ -117,7 +117,7 @@ class lognflow:
                  log_time_stamp = True,
                  print_text = None,
                  title = None, 
-                 n_lines_limit: int = int(1e+7),
+                 log_size_limit: int = int(1e+7),
                  time_in_file_name = True,
                  **_):
         time_time = time.time() - self._init_time
@@ -137,35 +137,56 @@ class lognflow:
         if not (log_name in self._loggers_dict.keys()):
             self._log_text_handler(log_name, 
                                    title = title, 
-                                   n_lines_limit = n_lines_limit,
+                                   log_size_limit = log_size_limit,
                                    time_in_file_name = time_in_file_name)
 
-        _logger, n_lines_limit, log_text_cnt, log_file_id = \
+        _logger, log_size_limit, log_size, log_file_id = \
             self._loggers_dict[log_name]
+        len_to_be_logged = 0
         if(log_time_stamp):
-            _logger.write(f'T:{time_time:>6.6f}| ')
+            _time_str = f'T:{time_time:>6.6f}| '
+            _logger.write(_time_str)
+            len_to_be_logged += len(_time_str)
         if isinstance(to_be_logged, np.ndarray):
             try:
                 _logger.write('numpy.ndarray')
+                len_to_be_logged += 10
                 if(to_be_logged.size()>100):
                     _logger.write(', The first and last 50 elements:\n')
+                    len_to_be_logged += 30
                     to_be_logged = to_be_logged.ravel()
-                    _logger.write(np.array2string(to_be_logged[:50]))
+                    _logstr = np.array2string(to_be_logged[:50])
+                    len_to_be_logged += len(_logstr)
+                    _logger.write(_logstr)
                     _logger.write(' ... ')
-                    _logger.write(np.array2string(to_be_logged[-50:]))
+                    _logstr = np.array2string(to_be_logged[-50:])
+                    _logger.write(_logstr)
+                    len_to_be_logged += len(_logstr)
                 else:
-                    _logger.write(':\n' + np.array2string(to_be_logged))
+                    _logstr = ':\n' + np.array2string(to_be_logged)
+                    len_to_be_logged += len(_logstr)
+                    _logger.write(_logstr)
             except:
                 _logger.write(' not possible to log ' + log_name + '\n')
+                len_to_be_logged += 20
         else:
-            _logger.write(to_be_logged + '\n')
-        log_text_cnt += len(to_be_logged)
+            if(isinstance(to_be_logged, list)):
+                for _ in to_be_logged:
+                    _tolog = str(_)
+                    len_to_be_logged += len(_tolog)
+                    _logger.write(_tolog)
+            else:
+                _tolog = str(to_be_logged)
+                _logger.write(_tolog)
+                len_to_be_logged += len(_tolog)
+            _logger.write('\n')
+        log_size += len_to_be_logged
         self._loggers_dict[log_name] = [_logger, 
-                                       n_lines_limit, 
-                                       log_text_cnt, 
+                                       log_size_limit, 
+                                       log_size, 
                                        log_file_id]
 
-        if(log_text_cnt >= n_lines_limit):
+        if(log_size >= log_size_limit):
             self._log_text_handler(log_name)
             _, _, _, log_file_id = self._loggers_dict[log_name]
         return log_file_id
@@ -278,6 +299,46 @@ class lognflow:
         for parameter_name in self._vars_dict.keys():
             self._log_var_save(parameter_name)
     
+    def log_single(self, parameter_name : str, 
+                         parameter_value,
+                         save_as = 'npy'):
+        time_time = time.time() - self._init_time
+        
+        if isinstance(parameter_value, dict):
+            save_as = 'npz'
+        
+        save_as = save_as.strip()
+        save_as = save_as.strip('.')
+        
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        if(save_as == 'mat'):
+            if(len(param_name) == 0):
+                param_name = 'data'
+        
+        if(len(param_name) > 0):
+            fname = f'{param_name}_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        if(save_as == 'npy'):
+            fpath = param_dir / (fname + '.npy')
+            np.save(fpath, parameter_value)
+        elif(save_as == 'npz'):
+            fpath = param_dir / (fname + '.npz')
+            np.savez(fpath, **parameter_value)
+        elif(save_as == 'txt'):
+            fpath = param_dir / (fname + '.txt')
+            np.savetxt(fpath, parameter_value)
+        elif(save_as == 'mat'):
+            fpath = param_dir / (fname + '.mat')
+            from scipy.io import savemat
+            savemat(fpath, {f'{param_name}' :parameter_value})
+        elif('torch'):
+            fpath = param_dir / (fname + '.torch')
+            from torch import save as torch_save
+            torch_save(parameter_value.state_dict(), fpath)
+        return fpath
+    
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100):
@@ -303,39 +364,9 @@ class lognflow:
         
         return fpath
 
-    def log_single(self, parameter_name : str, 
-                         parameter_value,
-                         save_as = 'npy'):
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(save_as == 'mat'):
-            if(len(param_name) == 0):
-                param_name = 'data'
-        
-        if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        if(save_as == 'npy'):
-            fpath = param_dir / (fname + '.npy')
-            np.save(fpath, parameter_value)
-        elif(save_as == 'txt'):
-            fpath = param_dir / (fname + '.txt')
-            np.savetxt(fpath, parameter_value)
-        elif(save_as == 'mat'):
-            fpath = param_dir / (fname + '.mat')
-            from scipy.io import savemat
-            savemat(fpath, {f'{param_name}' :parameter_value})
-        elif('torch'):
-            fpath = param_dir / (fname + '.torch')
-            from torch import save as torch_save
-            torch_save(parameter_value.state_dict(), fpath)
-        return fpath
-    
     def log_plot(self, parameter_name : str, 
                        parameter_value_list,
-                       x_value = None,
+                       x_values = None,
                        image_format='jpeg', dpi=1200):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
@@ -350,24 +381,24 @@ class lognflow:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
                 
-            if(x_value is not None):
-                if not isinstance(x_value, list):
-                    x_value = [x_value]
+            if(x_values is not None):
+                if not isinstance(x_values, list):
+                    x_values = [x_values]
             
-            if( (len(x_value) != len(parameter_value)) & \
-                (len(x_value) != 1)):
-                self.log_text(f'x_value for {parameter_name} should have ' \
-                    + 'length of 1 or the same as parameters list.')
-                raise ValueError
+                if( not( (len(x_values) == len(parameter_value_list)) | \
+                         (len(x_values) == 1) )):
+                    self.log_text(f'x_values for {parameter_name} should have ' \
+                        + 'length of 1 or the same as parameters list.')
+                    raise ValueError
             
             for list_cnt, parameter_value in enumerate(parameter_value_list):
-                if(x_value is None):
-                    plt.plot(parameter_value)
+                if(x_values is None):
+                    plt.plot(parameter_value, '-*')
                 else:
-                    if(len(x_value) == len(parameter_value)):
-                        plt.plot(x_value[list_cnt], parameter_value)
+                    if(len(x_values) == len(parameter_value)):
+                        plt.plot(x_values[list_cnt], parameter_value)
                     else:
-                        plt.plot(x_value[0], parameter_value)
+                        plt.plot(x_values[0], parameter_value, '-*')
                         
             plt.savefig(fpath, format=image_format, dpi=dpi)
             plt.close()
@@ -736,6 +767,7 @@ class lognflow:
     
     def __del__(self):
         self.log_var_flush()
+        
         
 def select_directory(start_directory = './'):
     from PyQt5.QtWidgets import QFileDialog, QApplication
