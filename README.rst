@@ -17,13 +17,13 @@ Log and Flow tracking made easy with Python. You can install it by:
 
 
 
-```console
+```
 pip install lognflow
 ```
 
 A simple program to use it would be similar to the following:
 
-```python 
+```
 from lognflow import lognflow
 import numpy as np
 vec = np.random.rand(100)
@@ -35,7 +35,7 @@ logger.log_single('vec', vec)
 
 The logviewer is also very useful.
 
-```python 
+```
 from lognflow import logviewer
 
 logged = logviewer('c:\\test\\some_log\')
@@ -44,7 +44,7 @@ vec = logged.get_variable('vec')
 
 The printprogress makes a pretty nice progress bar.
 
-```python 
+```
 from lognflow import printprogress
 
 N = 100
