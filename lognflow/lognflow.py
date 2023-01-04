@@ -1,3 +1,19 @@
+""" lognflow
+
+lognflow makes logging and vieweing the logs easy in Python. It is so simple
+you can code it yourself, so, why would you?!
+
+First you give it a root to make the log directory in it or give it the
+directory itself. Then start dumping data by giving the variable name and the
+data with the type and you are set. 
+
+Multiple processes in parallel can make as many instances as they want and
+the logviewer can be accessed via HTTP. Because the logs are on a HDD.
+
+There is an option to keep the logged variables in memory for a long time and
+then dump them when they reach a ceratin size. This reduces the network load.
+"""
+
 import pathlib
 import time
 # import logging
@@ -88,7 +104,6 @@ class lognflow:
                                        log_file_id]
     
     def _log_text_handler(self, log_name = None, 
-                         title = None, 
                          log_size_limit: int = int(1e+7),
                          time_in_file_name = True):
 
@@ -104,22 +119,18 @@ class lognflow:
             log_file_id = log_name + '.txt'
         log_fpath = self.log_dir / log_file_id
         _logger = open(log_fpath, 'w')
-        if(title is not None):
-            _logger.write(title + '\n')
         self._loggers_dict[log_name] = [_logger, 
                                        log_size_limit, 
                                        log_size, 
                                        log_file_id]
         
     def log_text(self, 
-                 to_be_logged : str = '\n', 
                  log_name : str = None,
+                 to_be_logged = '\n', 
                  log_time_stamp = True,
                  print_text = None,
-                 title = None, 
                  log_size_limit: int = int(1e+7),
-                 time_in_file_name = True,
-                 **_):
+                 time_in_file_name = True):
         time_time = time.time() - self._init_time
 
         if(log_name is None):
@@ -136,7 +147,6 @@ class lognflow:
         
         if not (log_name in self._loggers_dict.keys()):
             self._log_text_handler(log_name, 
-                                   title = title, 
                                    log_size_limit = log_size_limit,
                                    time_in_file_name = time_in_file_name)
 
@@ -191,11 +201,12 @@ class lognflow:
             _, _, _, log_file_id = self._loggers_dict[log_name]
         return log_file_id
     
-    def __call__(self, *args, **kwargs):
-        self.log_text(*args, **kwargs)
+    def __call__(self, to_be_logged = '\n', **kwargs):
+        self.log_text(log_name = self.log_name,
+                      to_be_logged = to_be_logged, 
+                      **kwargs)
                     
     def _prepare_param_dir(self, parameter_name):
-        
         try:
             _ = parameter_name.split()
         except:
@@ -304,7 +315,7 @@ class lognflow:
                          save_as = 'npy'):
         time_time = time.time() - self._init_time
         
-        if isinstance(parameter_value, dict):
+        if ((save_as is None) & isinstance(parameter_value, dict)):
             save_as = 'npz'
         
         save_as = save_as.strip()
@@ -328,7 +339,8 @@ class lognflow:
             np.savez(fpath, **parameter_value)
         elif(save_as == 'txt'):
             fpath = param_dir / (fname + '.txt')
-            np.savetxt(fpath, parameter_value)
+            with open(fpath,'a') as fdata: 
+                fdata.write(str(parameter_value))
         elif(save_as == 'mat'):
             fpath = param_dir / (fname + '.mat')
             from scipy.io import savemat

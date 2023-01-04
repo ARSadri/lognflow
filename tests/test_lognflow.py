@@ -60,6 +60,8 @@ def test_log_single():
                    'var1': var1})
     
     logger.log_single('a_dict', a_dict)
+    
+    logger.log_single('a_dict', a_dict, save_as = 'txt')
 
 def test_log_plot():
     var1 = np.random.rand(100)
@@ -183,6 +185,8 @@ def test_rename():
     logger('This is another test for test_rename')
     
 if __name__ == '__main__':
+    test_log_single()
+    exit()
     test_lognflow()
     test_log_var()
     test_log_animation()

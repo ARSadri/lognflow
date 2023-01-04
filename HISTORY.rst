@@ -11,3 +11,8 @@ History
 ------------------
 
 * Very consistent and easy-to-handle interface
+
+0.3.2 (2022-12-19)
+------------------
+
+* log your dictionary.

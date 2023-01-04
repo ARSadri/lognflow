@@ -18,3 +18,10 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+Components
+==================
+.. toctree::
+   :maxdepth: 2
+
+    lognflow - lognflow's python package<lognflow>
