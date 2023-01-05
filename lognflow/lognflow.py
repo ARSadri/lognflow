@@ -146,7 +146,7 @@ class lognflow:
                                        log_size, 
                                        log_file_id]
         
-    def text_logs_flush(self):
+    def log_text_flush(self):
         time_time = time.time() - self._init_time
         self.log_flush_period_var += self.log_flush_period_increase_rate
         if(self.log_flush_period_var >  self.log_flush_period):
@@ -228,7 +228,7 @@ class lognflow:
                                        log_size, 
                                        log_file_id]
 
-        self.text_logs_flush()        
+        self.log_text_flush()        
 
         if(log_size >= log_size_limit):
             self._log_text_handler(log_name)
@@ -863,7 +863,7 @@ class lognflow:
         return fpath
     
     def __del__(self):
-        self.text_logs_flush()
+        self.log_text_flush()
         self.log_var_flush()
         
 def select_directory(start_directory = './'):
