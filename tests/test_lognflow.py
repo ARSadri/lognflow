@@ -2,12 +2,12 @@
 
 """Tests for `lognflow` package."""
 
+import time
+import numpy as np
+import matplotlib.pyplot as plt
 import pytest
 
 from lognflow import lognflow, logviewer, printprogress
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 temp_dir = 'c:/Alireza/logs'
 
@@ -35,6 +35,24 @@ def test_lognflow():
            'This is a new log file for another script')
     logger.log_text('not_main_script',
                     'For other log files you need to mention the log_name')
+
+def test_log_flush_period():
+    logger = lognflow(temp_dir, log_flush_period = 30)
+    logger('This is a test for lognflow and log_var')    
+    
+    time_time = time.time()
+    for _ in range(20):
+        while(time.time() < time_time + 10):
+            pass
+        time_time = time.time()
+        logger(f'Log{_}'*200)
+        
+
+    logger.log_text('not_main_script',
+           'This is a new log file for another script')
+    logger.log_text('not_main_script',
+                    'For other log files you need to mention the log_name')
+
 
 def test_log_var():
     logger = lognflow(temp_dir)
@@ -195,8 +213,9 @@ def test_rename():
     logger('This is another test for test_rename')
     
 if __name__ == '__main__':
-    test_log_var_without_time_stamp()
+    test_log_flush_period()
     exit()
+    test_log_var_without_time_stamp()
     test_lognflow()
     test_log_var()
     test_log_animation()

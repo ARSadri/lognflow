@@ -4,7 +4,7 @@
 
 from setuptools import setup, find_packages
 
-_version = '0.3.2'
+_version = '0.3.3'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()

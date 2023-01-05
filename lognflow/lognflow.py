@@ -46,7 +46,8 @@ class lognflow:
                  logs_root : pathlib.Path = None,
                  log_dir : pathlib.Path = None,
                  print_text = True,
-                 main_log_name = 'main_log'):
+                 main_log_name = 'main_log',
+                 log_flush_period = 60):
         """ lognflow construction
         
         The lognflow is an easy way to log your variables on a local disk..
@@ -60,13 +61,20 @@ class lognflow:
                 to create a log directory for each instance of the lognflow. 
             log_dir: pathlib.Path
                 This is the final directory path for the log files. 
-            
             note:
             ^^^^^^^^
                 One of the variables logs_root or log_dir must be provided.
 
-            print_text ; bool
+            print_text : bool
                 If True, everything that is logged as text will be printed as well
+
+            main_log_name : str
+                main log file name, by default: 'main_log'
+                
+            log_flush_period: int
+                The period between flushing the log files into HDD. By not
+                flushing, you can reduce network or HDD overhead.
+
         """
         self._init_time = time.time()
 
@@ -87,6 +95,10 @@ class lognflow:
         self._single_var_call_cnt = 0
 
         self.log_name = main_log_name
+        self.last_log_flush_time = 0
+        self.log_flush_period_var = 0
+        self.log_flush_period_var_rate = 4
+        self.log_flush_period = log_flush_period
     
     def rename(self, new_dir:str):
         for log_name in self._loggers_dict.keys():
@@ -124,6 +136,19 @@ class lognflow:
                                        log_size, 
                                        log_file_id]
         
+    def text_logs_flush(self):
+        time_time = time.time() - self._init_time
+        self.log_flush_period_var += self.log_flush_period_var_rate
+        if(self.log_flush_period_var >  self.log_flush_period):
+            self.log_flush_period_var = self.log_flush_period
+        print(f'self.log_flush_period_var:{self.log_flush_period_var}')
+        if(time_time - self.last_log_flush_time > self.log_flush_period_var):
+            print('here')
+            for log_name in self._loggers_dict.keys():
+                _logger, _, _, _ = self._loggers_dict[log_name]
+                _logger.flush()
+            self.last_log_flush_time = time_time
+
     def log_text(self, 
                  log_name : str = None,
                  to_be_logged = '\n', 
@@ -143,7 +168,7 @@ class lognflow:
             if(log_time_stamp):
                 print(f'T:{time_time:>6.6f}| ', end='')
             print(to_be_logged)
-        
+                
         if not (log_name in self._loggers_dict.keys()):
             self._log_text_handler(log_name, 
                                    log_size_limit = log_size_limit,
@@ -194,6 +219,8 @@ class lognflow:
                                        log_size_limit, 
                                        log_size, 
                                        log_file_id]
+
+        self.text_logs_flush()        
 
         if(log_size >= log_size_limit):
             self._log_text_handler(log_name)
@@ -828,6 +855,7 @@ class lognflow:
         return fpath
     
     def __del__(self):
+        self.text_logs_flush()
         self.log_var_flush()
         
 def select_directory(start_directory = './'):
