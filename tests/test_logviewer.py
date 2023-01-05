@@ -27,14 +27,16 @@ def test_logviewer():
     logger = lognflow(temp_dir)
     logger('Well this is a test for logviewer')
     
-    log_dir =  select_directory(temp_dir)
-    logged = logviewer(log_dir, logger)
+    logger.log_single('test_param', np.random.rand(100))
+    
+    logged = logviewer(logger.log_dir, logger)
     print(logged.get_variable('test_param'))
     print(logged.get_log_text())
 
 def test_get_images_as_stack():
-    temp_dir = select_directory()
-    logger = lognflow(log_dir=temp_dir)
+    root_dir = select_directory()
+    logger = lognflow(root_dir)
+    
     logger('Well this is a test for logviewer')
 
     for _ in range(5):
@@ -50,8 +52,10 @@ def test_get_images_as_stack():
     
     logger.log_canvas('data_samples', [stack_A, stack_B], dpi = 300)
 
-    flist_A = logged.get_stack_of_files('A/', return_data=False, return_flist=True)
-    flist_B = logged.get_stack_of_files('B/', return_data=False, return_flist=True)
+    flist_A = logged.get_stack_of_files(
+        'A/', return_data=False, return_flist=True)
+    flist_B = logged.get_stack_of_files(
+        'B/', return_data=False, return_flist=True)
     
     logger(flist_A)
     logger(flist_B)
@@ -60,12 +64,44 @@ def test_get_images_as_stack():
     logger(flist_A_AB)
     logger(flist_B_AB)
     
-    dataset_A = logged.get_stack_of_files(flist = flist_A_AB)
-    dataset_B = logged.get_stack_of_files(flist = flist_B_AB)
+    if(flist_A_AB):
+        
+        dataset_A = logged.get_stack_of_files(flist = flist_A_AB)
+        dataset_B = logged.get_stack_of_files(flist = flist_B_AB)
+        
+        logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
+        
+        logger(logger._loggers_dict['main_log'][2])
+
+def test_replace_time_with_index():
+    temp_dir = select_directory()
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for logviewer')
     
-    logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
+    for _ in range(5):
+        logger.log_single('test_param', np.array([_]))
+        logger.log_single('testy/t', np.array([_]))
     
-    logger(logger._loggers_dict['main_log'][2])
+    logged = logviewer(logger.log_dir, logger)
+
+    data_in, flist = logged.get_stack_of_files(
+        'test_param', return_data=True, return_flist=True)
+    
+    logger(flist)
+
+    logged.replace_time_with_index('test_param')
+    
+    data_out, flist = logged.get_stack_of_files(
+        'test_param', return_data=True, return_flist=True)
+    
+    logger(flist)
+    
+    logger(data_in)
+    logger(data_out)
+    
 
 if __name__ == '__main__':
+    test_replace_time_with_index()
+    exit()
     test_get_images_as_stack()
+    test_logviewer()

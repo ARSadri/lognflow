@@ -31,7 +31,7 @@ varinlog = namedtuple('varinlog',
                       ['data_array', 
                       'time_array', 
                       'cur_index', 
-                      'filesplit_cnt', 
+                      'file_start_time', 
                       'save_as',
                       'log_counter_limit'])
 
@@ -141,8 +141,7 @@ class lognflow:
         
         if(print_text):
             if(log_time_stamp):
-                print(f'T:{time_time:>6.6f}|')
-            print(f' log name: {log_name}')
+                print(f'T:{time_time:>6.6f}| ', end='')
             print(to_be_logged)
         
         if not (log_name in self._loggers_dict.keys()):
@@ -202,7 +201,7 @@ class lognflow:
         return log_file_id
     
     def __call__(self, to_be_logged = '\n', **kwargs):
-        self.log_text(log_name = self.log_name,
+        self.log_text(self.log_name,
                       to_be_logged = to_be_logged, 
                       **kwargs)
                     
@@ -210,11 +209,12 @@ class lognflow:
         try:
             _ = parameter_name.split()
         except:
-            self.log_text('The parameter name is not a string')
-            self.log_text(f'Its type is {type(parameter_name)}')
-            self.log_text(f'It is {parameter_name}')
+            self.log_text(
+                self.log_name,
+                'The parameter name is not a string. ' \
+                + f'Its type is {type(parameter_name)}. It is {parameter_name}')
         assert len(parameter_name.split()) == 1, \
-            self.log_text(\
+            self.log_text(self.log_name,\
                   f'The variable name {parameter_name} you chose is splitable' \
                 + f' I can split it into {parameter_name.split()}'             \
                 + ' Make sure you dont use space, tab, or ....'                \
@@ -232,7 +232,8 @@ class lognflow:
             param_name = param_dir.name
             param_dir = param_dir.parent
         if(not param_dir.is_dir()):
-            self.log_text(f'Creating directory: {param_dir.absolute()}')
+            self.log_text(self.log_name,
+                          f'Creating directory: {param_dir.absolute()}')
             param_dir.mkdir(parents = True, exist_ok = True)
         return(param_dir, param_name)                    
 
@@ -255,15 +256,15 @@ class lognflow:
         if(parameter_name in self._vars_dict.keys()):
             _var = self._vars_dict[parameter_name]
             data_array, time_array, cur_index, \
-                filesplit_cnt, save_as, log_counter_limit = _var
+                file_start_time, save_as, log_counter_limit = _var
             cur_index += 1
         else:
-            filesplit_cnt = time.time()
+            file_start_time = time.time()
             cur_index = 0
 
         if(cur_index >= log_counter_limit):
             self._log_var_save(parameter_name)
-            filesplit_cnt = time.time()
+            file_start_time = time.time()
             cur_index = 0
 
         if(cur_index == 0):
@@ -274,11 +275,14 @@ class lognflow:
         try:
             time_array[cur_index] = time_time
         except:
-            self.log_text(f'current index {cur_index} cannot be used in the logger')
+            self.log_text(
+                self.log_name,
+                f'current index {cur_index} cannot be used in the logger')
         if(parameter_value.shape == data_array[cur_index].shape):
             data_array[cur_index] = parameter_value
         else:
-            self.log_text(\
+            self.log_text(
+                self.log_name,
                 f'Shape of variable {parameter_name} cannot change '\
                 f'from {data_array[cur_index].shape} '\
                 f'to {parameter_value.shape}. Coppying from the last time.')
@@ -286,7 +290,7 @@ class lognflow:
         self._vars_dict[parameter_name] = varinlog(data_array, 
                                                   time_array, 
                                                   cur_index,
-                                                  filesplit_cnt,
+                                                  file_start_time,
                                                   save_as,
                                                   log_counter_limit)
 
@@ -295,14 +299,14 @@ class lognflow:
         
         _var = self._vars_dict[parameter_name]
         if(_var.save_as == 'npz'):
-            fpath = param_dir / (f'{param_name}_{_var.filesplit_cnt}.npz')
+            fpath = param_dir / (f'{param_name}_{_var.file_start_time}.npz')
             np.savez(fpath,
                 time_array = _var.time_array,
                 data_array = _var.data_array)
         elif(_var.save_as == 'txt'):
-            fpath = param_dir / (f'{param_name}_time_{_var.filesplit_cnt}.txt')
+            fpath = param_dir / (f'{param_name}_time_{_var.file_start_time}.txt')
             np.savetxt(fpath, _var.data_array)
-            fpath = param_dir / (f'{param_name}_data_{_var.filesplit_cnt}.txt')
+            fpath = param_dir / (f'{param_name}_data_{_var.file_start_time}.txt')
             np.savetxt(fpath, _var.data_array)
         return fpath
     
@@ -312,7 +316,8 @@ class lognflow:
     
     def log_single(self, parameter_name : str, 
                          parameter_value,
-                         save_as = 'npy'):
+                         save_as = 'npy',
+                         time_in_file_name = True):
         time_time = time.time() - self._init_time
         
         if ((save_as is None) & isinstance(parameter_value, dict)):
@@ -327,7 +332,9 @@ class lognflow:
                 param_name = 'data'
         
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -353,11 +360,14 @@ class lognflow:
     
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
-                         repeat_delay = None, dpi=100):
+                         repeat_delay = None, dpi=100,
+                         time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
                     
@@ -379,11 +389,14 @@ class lognflow:
     def log_plot(self, parameter_name : str, 
                        parameter_value_list,
                        x_values = None,
-                       image_format='jpeg', dpi=1200):
+                       image_format='jpeg', dpi=1200,
+                       time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -399,8 +412,10 @@ class lognflow:
             
                 if( not( (len(x_values) == len(parameter_value_list)) | \
                          (len(x_values) == 1) )):
-                    self.log_text(f'x_values for {parameter_name} should have ' \
-                        + 'length of 1 or the same as parameters list.')
+                    self.log_text(
+                        self.log_name,
+                        f'x_values for {parameter_name} should have'\
+                        + ' length of 1 or the same as parameters list.')
                     raise ValueError
             
             for list_cnt, parameter_value in enumerate(parameter_value_list):
@@ -416,17 +431,21 @@ class lognflow:
             plt.close()
             return fpath
         except:
-            self.log_text(f'Cannot plot variable {parameter_name}.')
+            self.log_text(self.log_name,
+                          f'Cannot plot variable {parameter_name}.')
             return None
     
     def log_hist(self, parameter_name : str, 
                        parameter_value_list,
                        n_bins = 10,
-                       image_format='jpeg', dpi=1200):
+                       image_format='jpeg', dpi=1200,
+                       time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -438,23 +457,28 @@ class lognflow:
                 
             for list_cnt, parameter_value in enumerate(parameter_value_list):
                 bins, edges = np.histogram(parameter_value, n_bins)
-                plt.bar(edges[:-1], bins, width =np.diff(edges).mean(), alpha=0.5)
+                plt.bar(edges[:-1], bins, 
+                        width =np.diff(edges).mean(), alpha=0.5)
                 plt.plot(edges[:-1], bins)
                         
             plt.savefig(fpath, format=image_format, dpi=dpi)
             plt.close()
             return fpath
         except:
-            self.log_text(f'Cannot plot variable {parameter_name}.')
+            self.log_text(self.log_name,
+                          f'Cannot plot variable {parameter_name}.')
             return None
     
     def log_scatter3(self, parameter_name : str, 
                        parameter_value,
-                       image_format='jpeg', dpi=1200):
+                       image_format='jpeg', dpi=1200,
+                       time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -463,21 +487,27 @@ class lognflow:
         try:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(parameter_value[0], parameter_value[1], parameter_value[2])
+            ax.scatter(parameter_value[0], 
+                       parameter_value[1], 
+                       parameter_value[2])
             plt.savefig(fpath, format=image_format, dpi=dpi)
             plt.close()
             return fpath
         except:
-            self.log_text(f'Cannot plot variable {parameter_name}.')
+            self.log_text(self.log_name,
+                          f'Cannot plot variable {parameter_name}.')
             return None
     
     def log_plt(self, 
                 parameter_name : str, 
-                image_format='jpeg', dpi=1200):
+                image_format='jpeg', dpi=1200,
+                time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -488,16 +518,20 @@ class lognflow:
             plt.close()
             return fpath
         except:
-            self.log_text(f'Cannot save the plt instance {parameter_name}.')
+            self.log_text(self.log_name,
+                          f'Cannot save the plt instance {parameter_name}.')
             return None
     
     def log_hexbin(self, parameter_name : str, parameter_value,
-                   gridsize = 20, image_format='jpeg', dpi=1200):
+                   gridsize = 20, image_format='jpeg', dpi=1200,
+                   time_in_file_name = True):
         
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
         fpath = param_dir / (f'{fname}.{image_format}')
@@ -511,11 +545,14 @@ class lognflow:
         return fpath
     
     def log_imshow(self, parameter_name : str, parameter_value,
-                   image_format='jpeg', dpi=1200):
+                   image_format='jpeg', dpi=1200,
+                   time_in_file_name = True):
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
             
@@ -534,8 +571,9 @@ class lognflow:
         elif(n_dims == 4):
             parameter_value = parameter_value.swapaxes(1,2)
             new_shape = parameter_value.shape
-            parameter_value = parameter_value.reshape(new_shape[0] * new_shape[1],
-                                                      new_shape[2] * new_shape[3])
+            parameter_value = \
+                parameter_value.reshape(new_shape[0] * new_shape[1],
+                                        new_shape[2] * new_shape[3])
             FLAG_img_ready = True
         elif(n_dims == 5):
             if(parameter_value_shape[4] == 3):
@@ -554,8 +592,10 @@ class lognflow:
             plt.close()
             return fpath
         else:
-            self.log_text(f'Cannot plot variable {parameter_name} with shape' + \
-                          f'{parameter_value.shape}')
+            self.log_text(
+                self.log_name,
+                f'Cannot plot variable {parameter_name} with shape' + \
+                f'{parameter_value.shape}')
             return
 
     def _handle_images_stack(self, stack, nan_borders):
@@ -576,9 +616,11 @@ class lognflow:
             new_n_R = n_R * square_side
             new_n_C = n_C * square_side
             if(len(stack.shape) == 4):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C), dtype = stack.dtype)
+                canv = np.zeros((n_imgs, new_n_R, new_n_C), 
+                                dtype = stack.dtype)
             if(len(stack.shape) == 5):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C, 3), dtype = stack.dtype)
+                canv = np.zeros((n_imgs, new_n_R, new_n_C, 3),
+                                 dtype = stack.dtype)
             used_ch_cnt = 0
 
             stack[:, :1] = np.nan
@@ -614,12 +656,15 @@ class lognflow:
                    text_as_colorbar = False,
                    use_colorbar = False,
                    image_format='jpeg', 
-                   dpi=600):
+                   dpi=600,
+                   time_in_file_name = True):
         
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
         fpath = param_dir / (f'{fname}.{image_format}')
@@ -663,7 +708,7 @@ class lognflow:
                             vmin = data_canvas[mask>0].min()
                             vmax = data_canvas[mask>0].max()
                         elif(not canvas_mask_warning):
-                            self.log_text(\
+                            self.log_text(self.log_name,\
                                 'The mask shape is different from the canvas.' \
                                 + ' No mask will be applied.')
                             canvas_mask_warning = True
@@ -701,7 +746,8 @@ class lognflow:
                              cmap=None,
                              figsize = None,
                              image_format = 'jpeg',
-                             dpi = 1200):
+                             dpi = 1200,
+                             time_in_file_name = True):
         """
         given a sklearn confusion matrix (cm), make a nice plot
     
@@ -717,6 +763,8 @@ class lognflow:
         cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
                       (http://matplotlib.org/examples/color/colormaps_reference.html)
                       plt.get_cmap('jet') or plt.cm.Blues
+        
+        time_in_file_name: if True, the file name will be stamped with time
     
         Usage
         -----
@@ -735,7 +783,9 @@ class lognflow:
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
-            fname = f'{param_name}_{time_time}'
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
         fpath = param_dir / (f'{fname}.{image_format}')
@@ -779,7 +829,6 @@ class lognflow:
     
     def __del__(self):
         self.log_var_flush()
-        
         
 def select_directory(start_directory = './'):
     from PyQt5.QtWidgets import QFileDialog, QApplication

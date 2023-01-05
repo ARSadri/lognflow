@@ -9,7 +9,7 @@ from lognflow import lognflow, logviewer, printprogress
 import numpy as np
 import matplotlib.pyplot as plt
 
-temp_dir = 'c:\Alireza\logs'
+temp_dir = 'c:/Alireza/logs'
 
 @pytest.fixture
 def response():
@@ -31,8 +31,10 @@ def test_lognflow():
     for _ in range(10000):
         logger(f'Log{_}'*200)
 
-    logger('This is a new log file for another script', log_name = 'not_main_script')
-    logger('For other log files you need to mention the log_name', log_name = 'not_main_script')
+    logger.log_text('not_main_script',
+           'This is a new log file for another script')
+    logger.log_text('not_main_script',
+                    'For other log files you need to mention the log_name')
 
 def test_log_var():
     logger = lognflow(temp_dir)
@@ -40,6 +42,14 @@ def test_log_var():
 
     for _ in range(1000):
         logger.log_var('vars/vec/v', np.random.rand(10000))
+        
+def test_log_var_without_time_stamp():
+    logger = lognflow(temp_dir)
+    logger('This is a test for lognflow and log_var')    
+
+    for _ in range(10):
+        logger.log_single('vars/vec/v', np.random.rand(10000), 
+                       time_in_file_name = False)
         
 def test_log_animation():
     var1 = np.random.rand(32, 100, 100)
@@ -155,13 +165,13 @@ def test_log_canvas():
     logger('This is a test for log_canvas')    
     logger(f'imgs.shape: {imgs[0].shape}')
 
-    logger.log_single('test_param1', _imgs)
-    logger.log_single('test_param2/', _imgs)
-    logger.log_single('test_param3\\', _imgs)
-    logger.log_single('test_param4\d', _imgs)
-    logger.log_single('test_param4\d2\\', _imgs)
-    logger.log_single('test_param4\d2/', _imgs)
-    logger.log_single('test_param4\d2/e', _imgs)
+    logger.log_single(r'test_param1', _imgs)
+    logger.log_single(r'test_param2/', _imgs)
+    logger.log_single(r'test_param3\\', _imgs)
+    logger.log_single(r'test_param4\d', _imgs)
+    logger.log_single(r'test_param4\d2\\', _imgs)
+    logger.log_single(r'test_param4\d2/', _imgs)
+    logger.log_single(r'test_param4\d2/e', _imgs)
 
     logger.log_canvas(parameter_name = 'test_canvas\\', 
                       list_of_stacks = imgs, 
@@ -185,7 +195,7 @@ def test_rename():
     logger('This is another test for test_rename')
     
 if __name__ == '__main__':
-    test_log_single()
+    test_log_var_without_time_stamp()
     exit()
     test_lognflow()
     test_log_var()

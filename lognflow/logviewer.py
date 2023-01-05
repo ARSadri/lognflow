@@ -15,6 +15,19 @@ class logviewer:
         else:
             self.logger('No such directory: ' + str(self.log_dir))
         
+    def get_log_text(self, log_name='main_log'):
+        flist = list(self.log_dir.glob(f'{log_name}*.txt'))
+        flist.sort()
+        n_files = len(flist)
+        if (n_files>0):
+            txt = []
+            for fcnt in range(n_files):
+                with open(flist[fcnt]) as f_txt:
+                    txt.append(f_txt.readlines())
+            if(n_files == 1):
+                txt = txt[0]
+            return txt
+
     def get_variable(self, var_name, single_shot_index = -1, 
                      suffix = '.np*', mat_file_field = None):
         flist = list(self.log_dir.glob(f'{var_name}*{suffix}'))
@@ -65,20 +78,16 @@ class logviewer:
         var_name = None, flist : list = [], 
         return_flist : bool = False, return_data : bool = True):
         if not flist:
-            assert var_name is not None, 'Variable name or flist must be given'
-            var_dir = self.log_dir / var_name
-            flist = list(var_dir.glob('*.*'))
+            assert var_name is not None, \
+                ' The file list is empty. Please provide the ' \
+                + 'variable name or a non-empty file list.'
+            var_fdir = self.log_dir / var_name
+            var_name = var_fdir.name
+            var_dir = var_fdir.parent
+            flist = list(var_dir.glob(f'{var_name}_*.*'))
         if flist:
-            files_inds = np.zeros(len(flist))
-            for fcnt, fpath in enumerate(flist):
-                self.logger(f'listing  {fpath.name}')
-                ints_in_stem = re.findall('\d+', fpath.stem )
-                ints_in_stem = [str(_) for _ in ints_in_stem]
-                files_inds[fcnt] = int(''.join(ints_in_stem))
-            inds = np.argsort(files_inds)
-            flist = [flist[ind] for ind in inds]
+            flist.sort()
             n_files = len(flist)
-            self.logger(f'There are {n_files} files to stack')
             if((not return_data) & return_flist):
                 return(flist)
             data_type = None
@@ -110,20 +119,7 @@ class logviewer:
             else:
                 self.logger(f'File {flist[0].name} cannot be opened by '\
                           + r'np.load() or plt.imread()')
-    
-    def get_log_text(self, log_name='main_log'):
-        flist = list(self.log_dir.glob(f'{log_name}*.txt'))
-        flist.sort()
-        n_files = len(flist)
-        if (n_files>0):
-            txt = []
-            for fcnt in range(n_files):
-                with open(flist[fcnt]) as f_txt:
-                    txt.append(f_txt.readlines())
-            if(n_files == 1):
-                txt = txt[0]
-            return txt
-        
+            
     def common_files(self, var_name_A, var_name_B):
         
         flist_A = self.get_stack_of_files(
@@ -149,3 +145,18 @@ class logviewer:
                           for common_stem in common_stems]
 
         return(flist_A_new, flist_B_new)
+    
+    def replace_time_with_index(self, var_name):
+        var_fdir = self.log_dir / var_name
+        var_fname = var_fdir.name
+        var_dir = var_fdir.parent
+        flist = list(var_dir.glob(f'{var_fname}_*.*'))
+        flist.sort()
+        fcnt_width = len(str(len(flist)))
+        for fcnt, fpath in enumerate(flist):
+            self.logger(f'Changing \n{flist[fcnt].name}')
+            fpath_new = flist[fcnt].parent / \
+                (var_fname + '_' + f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix)
+            self.logger(f'To \n{fpath_new.name}')
+            flist[fcnt].rename(fpath_new)
+            
