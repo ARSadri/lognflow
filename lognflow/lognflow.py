@@ -47,7 +47,8 @@ class lognflow:
                  log_dir : pathlib.Path = None,
                  print_text = True,
                  main_log_name = 'main_log',
-                 log_flush_period = 60):
+                 log_flush_period = 60,
+                 log_flush_period_increase_rate = 4):
         """ lognflow construction
         
         The lognflow is an easy way to log your variables on a local disk..
@@ -74,6 +75,15 @@ class lognflow:
             log_flush_period: int
                 The period between flushing the log files into HDD. By not
                 flushing, you can reduce network or HDD overhead.
+                
+            log_flush_period_increase_rate: int
+                we do not begin the timeout for the flush to be log_flush_period
+                because it can happen that a code finishes very fast. Such a 
+                code of course will flush everything when Python closes all
+                the files. We would like to flush at small intervals at first
+                and increase that timput over time. This is the rate. However,
+                when the log_flush_period reaches the given input, it will
+                not increase anymore.
 
         """
         self._init_time = time.time()
@@ -97,7 +107,7 @@ class lognflow:
         self.log_name = main_log_name
         self.last_log_flush_time = 0
         self.log_flush_period_var = 0
-        self.log_flush_period_var_rate = 4
+        self.log_flush_period_increase_rate = 4
         self.log_flush_period = log_flush_period
     
     def rename(self, new_dir:str):
@@ -138,12 +148,10 @@ class lognflow:
         
     def text_logs_flush(self):
         time_time = time.time() - self._init_time
-        self.log_flush_period_var += self.log_flush_period_var_rate
+        self.log_flush_period_var += self.log_flush_period_increase_rate
         if(self.log_flush_period_var >  self.log_flush_period):
             self.log_flush_period_var = self.log_flush_period
-        print(f'self.log_flush_period_var:{self.log_flush_period_var}')
         if(time_time - self.last_log_flush_time > self.log_flush_period_var):
-            print('here')
             for log_name in self._loggers_dict.keys():
                 _logger, _, _, _ = self._loggers_dict[log_name]
                 _logger.flush()
