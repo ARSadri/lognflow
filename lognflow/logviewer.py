@@ -1,4 +1,3 @@
-import re
 import pathlib
 import numpy as np
 from scipy.io import loadmat
@@ -15,7 +14,7 @@ class logviewer:
         else:
             self.logger('No such directory: ' + str(self.log_dir))
         
-    def get_log_text(self, log_name='main_log'):
+    def get_text(self, log_name='main_log'):
         flist = list(self.log_dir.glob(f'{log_name}*.txt'))
         flist.sort()
         n_files = len(flist)
@@ -28,7 +27,7 @@ class logviewer:
                 txt = txt[0]
             return txt
 
-    def get_variable(self, var_name, single_shot_index = -1, 
+    def get_single(self, var_name, single_shot_index = -1, 
                      suffix = '.np*', mat_file_field = None):
         flist = list(self.log_dir.glob(f'{var_name}*{suffix}'))
         if(len(flist) > 0):
@@ -75,16 +74,21 @@ class logviewer:
                             + f'could not be found in the mat file {var_path}')
     
     def get_stack_of_files(self, 
-        var_name = None, flist : list = [], 
-        return_flist : bool = False, return_data : bool = True):
+        var_name = None, flist = [], 
+        return_data = True, return_flist = False):
+        
         if not flist:
             assert var_name is not None, \
                 ' The file list is empty. Please provide the ' \
                 + 'variable name or a non-empty file list.'
-            var_fdir = self.log_dir / var_name
-            var_name = var_fdir.name
-            var_dir = var_fdir.parent
-            flist = list(var_dir.glob(f'{var_name}_*.*'))
+            var_dir = self.log_dir / var_name
+            if(var_dir.is_dir()):
+                var_fname = None
+                flist = list(var_dir.glob(f'*.*'))
+            else:
+                var_fname = var_dir.name
+                var_dir = var_dir.parent
+                flist = list(var_dir.glob(f'{var_fname}_*.*'))
         if flist:
             flist.sort()
             n_files = len(flist)
@@ -123,9 +127,9 @@ class logviewer:
     def common_files(self, var_name_A, var_name_B):
         
         flist_A = self.get_stack_of_files(
-            var_name_A, return_flist = True, return_data = False)
+            var_name_A, return_data = False, return_flist = True)
         flist_B = self.get_stack_of_files(
-            var_name_B, return_flist = True, return_data = False)
+            var_name_B, return_data = False, return_flist = True)
         
         suffix_A = flist_A[0].suffix
         suffix_B = flist_B[0].suffix 
@@ -147,16 +151,23 @@ class logviewer:
         return(flist_A_new, flist_B_new)
     
     def replace_time_with_index(self, var_name):
-        var_fdir = self.log_dir / var_name
-        var_fname = var_fdir.name
-        var_dir = var_fdir.parent
-        flist = list(var_dir.glob(f'{var_fname}_*.*'))
-        flist.sort()
-        fcnt_width = len(str(len(flist)))
-        for fcnt, fpath in enumerate(flist):
-            self.logger(f'Changing \n{flist[fcnt].name}')
-            fpath_new = flist[fcnt].parent / \
-                (var_fname + '_' + f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix)
-            self.logger(f'To \n{fpath_new.name}')
-            flist[fcnt].rename(fpath_new)
-            
+        var_dir = self.log_dir / var_name
+        if(var_dir.is_dir()):
+            var_fname = None
+            flist = list(var_dir.glob(f'*.*'))
+        else:
+            var_fname = var_dir.name
+            var_dir = var_dir.parent
+            flist = list(var_dir.glob(f'{var_fname}_*.*'))
+        if flist:
+            flist.sort()
+            fcnt_width = len(str(len(flist)))
+            for fcnt, fpath in enumerate(flist):
+                self.logger(f'Changing {flist[fcnt].name}')
+                fname_new = ''
+                if(var_fname is not None):
+                    fname_new = var_fname + '_'
+                fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
+                fpath_new = flist[fcnt].parent / fname_new
+                self.logger(f'To {fpath_new.name}')
+                flist[fcnt].rename(fpath_new)

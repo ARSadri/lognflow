@@ -3,10 +3,13 @@
 """Tests for `lognflow` package."""
 
 import pytest
-
+import re
 from lognflow import lognflow, select_directory, logviewer, printprogress
 
 import numpy as np
+
+import tempfile
+temp_dir = tempfile.gettempdir()
 
 @pytest.fixture
 def response():
@@ -23,19 +26,17 @@ def test_content(response):
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_logviewer():
-    temp_dir = select_directory()
     logger = lognflow(temp_dir)
     logger('Well this is a test for logviewer')
     
     logger.log_single('test_param', np.random.rand(100))
     
     logged = logviewer(logger.log_dir, logger)
-    print(logged.get_variable('test_param'))
-    print(logged.get_log_text())
+    print(logged.get_single('test_param'))
+    print(logged.get_text())
 
 def test_get_images_as_stack():
-    root_dir = select_directory()
-    logger = lognflow(root_dir)
+    logger = lognflow(temp_dir)
     
     logger('Well this is a test for logviewer')
 
@@ -44,11 +45,23 @@ def test_get_images_as_stack():
         logger.log_imshow('B/', np.random.randn(100, 100), dpi = 300)
 
     logged = logviewer(logger.log_dir, logger)
+
+    flist_A = logged.get_stack_of_files(
+        'A/', return_data=False, return_flist=True)
+    flist_B = logged.get_stack_of_files(
+        'B/', return_data=False, return_flist=True)
+    
+    logger(flist_A)
+    logger(flist_B)
+    
+    logged.replace_time_with_index('A/')
+    logged.replace_time_with_index('B/')
+    
     stack_A = logged.get_stack_of_files('A/')
     stack_B = logged.get_stack_of_files('B/')
 
-    print(stack_A.shape)
-    print(stack_B.shape)
+    logger(stack_A.shape)
+    logger(stack_B.shape)
     
     logger.log_canvas('data_samples', [stack_A, stack_B], dpi = 300)
 
@@ -70,11 +83,11 @@ def test_get_images_as_stack():
         dataset_B = logged.get_stack_of_files(flist = flist_B_AB)
         
         logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
-        
-        logger(logger._loggers_dict['main_log'][2])
+        _ = logger._loggers_dict['main_log'][2]
+        logger('Size of the log file in bytes is: ' \
+               + f'{_}')
 
 def test_replace_time_with_index():
-    temp_dir = select_directory()
     logger = lognflow(temp_dir)
     logger('Well this is a test for logviewer')
     
@@ -98,10 +111,9 @@ def test_replace_time_with_index():
     
     logger(data_in)
     logger(data_out)
-    
 
 if __name__ == '__main__':
-    test_replace_time_with_index()
-    exit()
+    temp_dir = select_directory()
     test_get_images_as_stack()
+    test_replace_time_with_index()
     test_logviewer()

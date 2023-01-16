@@ -16,7 +16,6 @@ then dump them when they reach a ceratin size. This reduces the network load.
 
 import pathlib
 import time
-# import logging
 import numpy as np
 import itertools
 from os import sep as os_sep
@@ -38,7 +37,7 @@ varinlog = namedtuple('varinlog',
 class lognflow:
     """ lognflow logs your workflow
     
-    Indeed we need a simple lognflow that works on local machine disk.
+    Indeed we need a simple log maker that works on local machine disk.
     This is a minimalist approach to solve this problem. 
     """
     
@@ -52,7 +51,7 @@ class lognflow:
         """ lognflow construction
         
         The lognflow is an easy way to log your variables on a local disk..
-        It will also count files up when they get too large. It also can save
+        It will also size up files when they get too large. It also can save
         np.arrays in npz format which is better than csv or what not.
         
         Parameters
@@ -111,6 +110,20 @@ class lognflow:
         self.log_flush_period = log_flush_period
     
     def rename(self, new_dir:str):
+        """ renaming the log directory
+            It is possible to rename the log directory while logging is going
+            on. This is particulary useful when at the end of an experiment,
+            it is necessary to put some variables in the name of the directory,
+            which is very realistic in the eyes of an experimentalist.
+            
+            There is only one input and that is the new name of the directory.
+            
+            Parameters
+            ----------
+                new_dir : str
+                    The new name of the directory.
+            
+        """
         for log_name in self._loggers_dict.keys():
             _logger, _, _, _ = self._loggers_dict[log_name]
             _logger.close()
@@ -147,6 +160,14 @@ class lognflow:
                                        log_file_id]
         
     def log_text_flush(self):
+        """ Flush the logs
+            Writing text to open(file, 'a') does not constantly happen on HDD.
+            There is an OS buffer in between. This funciton should be called
+            regularly. lognflow calls it once in a while when log_text is
+            called multiple times. but use needs to also call it once in a
+            while.
+            In later versions, a timer will be used to call it automatically.
+        """
         time_time = time.time() - self._init_time
         self.log_flush_period_var += self.log_flush_period_increase_rate
         if(self.log_flush_period_var >  self.log_flush_period):
@@ -164,12 +185,38 @@ class lognflow:
                  print_text = None,
                  log_size_limit: int = int(1e+7),
                  time_in_file_name = True):
+        """ log a string into a text file
+            You can shose a name for the log and give the text to put in it.
+            Also you can pass a small numpy array. You can ask it to put time
+            stamp in the log and in the log file name, you can disable
+            printing the text. You can set the log size limit to split it into
+            another file with a new time stamp.
+            
+            Parameters
+            ----------
+                log_name : str
+                    examples: mylog or myscript/mylog
+                    log_name can be just a name e.g. mylog, or could be a
+                    pathlike name such as myscript/mylog.
+                to_be_logged : str, nd.array, list, dict
+                    the string to be logged, could be a list
+                    or numpy array or even a dictionary. It uses str(...).
+                log_time_stamp : bool
+                    Put time stamp for every entry of the log
+                print_text : bool
+                    if False, what is logged will not be printed.
+                log_size_limit : int
+                    log size limit in bytes.
+                time_in_file_name : bool
+                    put time stamp in file names.
+            
+        """
         time_time = time.time() - self._init_time
 
         if(log_name is None):
             log_name = self.log_name
         
-        if(print_text is None):
+        if((print_text is None) | (print_text is True)):
             print_text = self._print_text
         
         if(print_text):
@@ -235,10 +282,13 @@ class lognflow:
             _, _, _, log_file_id = self._loggers_dict[log_name]
         return log_file_id
     
-    def __call__(self, to_be_logged = '\n', **kwargs):
-        self.log_text(self.log_name,
-                      to_be_logged = to_be_logged, 
-                      **kwargs)
+    def __call__(self, *args, **kwargs):
+        if(len(args) == 1):
+            self.log_text(self.log_name,
+                          to_be_logged = args[0], 
+                          **kwargs)
+        else:
+            self.log_single(*args, **kwargs)
                     
     def _prepare_param_dir(self, parameter_name):
         try:
@@ -278,6 +328,33 @@ class lognflow:
 
     def log_var(self, parameter_name : str, parameter_value, 
                 save_as='npz', log_size_limit: int = int(1e+7)):
+        """log a numpy array in buffer then dump
+            It can be the case that we need to take snapshots of a numpy array
+            over time. The size of the array would not change and this is hoing
+            to happen frequently.
+            This log_ver makes a buffer in RAM and keeps many instances of the
+            array along with their time stamp and then when the size of the 
+            array reaches a threhshold flushes it into HDD with a file that
+            has an initial time stamp.
+            The benefit of using this function over log_single is that it
+            does not use the connection to the directoy all time and if that is
+            on a network, there will be less overhead.
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value : np.array
+                    An np array whose size doesn't change
+                save_as : str
+                    can be 'npz' or 'txt' which will save it as text.
+                log_size_limit: int
+                    log_size_limit in bytes, default : 1e+7.
+                    
+        """
+        
         time_time = time.time() - self._init_time
         
         try:
@@ -346,6 +423,11 @@ class lognflow:
         return fpath
     
     def log_var_flush(self):
+        """ Flush the buffered numpy arrays
+            If you have been using log_ver, this will flush all the buffered
+            arrays. It is called using log_size_limit for a variable and als
+            when the code that made the logger ends.
+        """
         for parameter_name in self._vars_dict.keys():
             self._log_var_save(parameter_name)
     
@@ -353,6 +435,28 @@ class lognflow:
                          parameter_value,
                          save_as = 'npy',
                          time_in_file_name = True):
+        """log a single variable
+            The most frequently used function would probably be this one.
+            
+            if you call the logger object as a function and give it a parameter
+            name and something to be logged, the __call__ referes to this
+            function.
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value : np.array
+                    An np array whose size doesn't change
+                save_as : str
+                    can be 'npz' or 'txt' which will save it as text.
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
+        
         time_time = time.time() - self._init_time
         
         if ((save_as is None) & isinstance(parameter_value, dict)):
@@ -397,6 +501,21 @@ class lognflow:
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100,
                          time_in_file_name = True):
+        
+        """Make an animation from a stack of images
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                stack : np.array of shape n_f x n_r x n_c or n_f x n_r x n_c x 3
+                    stack[cnt] needs to be plotable by plt.imshow()
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+        """
+        
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
@@ -426,6 +545,29 @@ class lognflow:
                        x_values = None,
                        image_format='jpeg', dpi=1200,
                        time_in_file_name = True):
+        """log a single plot
+            If you have a numpy array or a list of arrays (or indexable by
+            first dimension, an array of 1D arrays), use this to log a plot 
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value_list : np.array
+                    An np array or a list of np arrays or indexable-by-0th-dim
+                    np arrays
+                x_values : np.array
+                    if set, must be an np.array of same size of all y values
+                    or a list for each vector in y values where every element
+                    of x-values list is the same as the y-values element in 
+                    their list
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
+        
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
@@ -473,8 +615,34 @@ class lognflow:
     def log_hist(self, parameter_name : str, 
                        parameter_value_list,
                        n_bins = 10,
+                       alpha = 0.5,
                        image_format='jpeg', dpi=1200,
                        time_in_file_name = True):
+        """log a single histogram
+            If you have a numpy array or a list of arrays (or indexable by
+            first dimension, an array of 1D arrays), use this to log a hist
+            if multiple inputs are given they will be plotted on top of each
+            other using the alpha opacity. 
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value_list : np.array
+                    An np array or a list of np arrays or indexable-by-0th-dim
+                    np arrays
+                n_bins : number or np.array
+                    used to set the bins for making of the histogram
+                alpha : float 
+                    the opacity of histograms, a flot between 0 and 1. If you
+                    have multiple histograms on top of each other,
+                    use 1/number_of_your_variables.
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
@@ -493,7 +661,7 @@ class lognflow:
             for list_cnt, parameter_value in enumerate(parameter_value_list):
                 bins, edges = np.histogram(parameter_value, n_bins)
                 plt.bar(edges[:-1], bins, 
-                        width =np.diff(edges).mean(), alpha=0.5)
+                        width =np.diff(edges).mean(), alpha=alpha)
                 plt.plot(edges[:-1], bins)
                         
             plt.savefig(fpath, format=image_format, dpi=dpi)
@@ -508,6 +676,21 @@ class lognflow:
                        parameter_value,
                        image_format='jpeg', dpi=1200,
                        time_in_file_name = True):
+        """log a single scatter in 3D
+            Scatter plotting in 3D
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value_list : np.array
+                    An np array of size 3 x n, to sctter n data points in 3D
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):
@@ -537,6 +720,19 @@ class lognflow:
                 parameter_name : str, 
                 image_format='jpeg', dpi=1200,
                 time_in_file_name = True):
+        """log a single plt
+            log a plt that you have on the screen.
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
         time_time = time.time() - self._init_time
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         if(len(param_name) > 0):

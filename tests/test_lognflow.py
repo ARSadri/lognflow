@@ -7,9 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 
-from lognflow import lognflow, logviewer, printprogress
+from lognflow import lognflow, logviewer, printprogress, select_directory
 
-temp_dir = 'c:/Alireza/logs'
+import tempfile
+temp_dir = tempfile.gettempdir()
 
 @pytest.fixture
 def response():
@@ -35,6 +36,23 @@ def test_lognflow():
            'This is a new log file for another script')
     logger.log_text('not_main_script',
                     'For other log files you need to mention the log_name')
+
+def test_logger():
+    logger = lognflow(temp_dir)
+    logger('This is a test for lognflow and logger call')
+
+    a = 20
+    b = np.array([34])
+    c = 'asdf'
+    
+    logger(a)
+    logger('a', a)
+    logger('aa', a, save_as = 'txt', time_in_file_name = False)
+    logger(b)
+    logger('b', b)
+    logger('bb', b, save_as = 'txt', time_in_file_name = False)
+    logger(c)
+    logger('test/c', c, save_as = 'txt')
 
 def test_log_flush_period():
     logger = lognflow(temp_dir, log_flush_period = 30)
@@ -213,8 +231,9 @@ def test_rename():
     logger('This is another test for test_rename')
     
 if __name__ == '__main__':
+    temp_dir = select_directory()
+    test_logger()
     test_log_flush_period()
-    exit()
     test_log_var_without_time_stamp()
     test_lognflow()
     test_log_var()
