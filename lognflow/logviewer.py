@@ -4,6 +4,20 @@ from scipy.io import loadmat
 from matplotlib.pyplot import imread
 
 class logviewer:
+    """ log viewer
+        Since lognflow makes lots of files and folders, maybe it is nice
+        to have a logviewer that loads those information. In this module we
+        provide a set of functions for a logged object that can load variables,
+        texts, file lists and .... simply, use it by:
+        
+        .. highlight:: python
+           :linenothreshold: 5
+           
+        .. code-block:: python
+        
+           logged = logviewer(log_dir = some_dir)
+           var = logged.get_single('your_desired_variable_name')
+    """ 
     def __init__(self,
                  log_dir : pathlib.Path,
                  logger = print):
@@ -15,6 +29,14 @@ class logviewer:
             self.logger('No such directory: ' + str(self.log_dir))
         
     def get_text(self, log_name='main_log'):
+        """ get text log files
+            Given the log_name, this function returns the text therein.
+            
+            Parameters
+            ----------
+            log_name: str
+                the log name. If not given then it is the main log.
+        """
         flist = list(self.log_dir.glob(f'{log_name}*.txt'))
         flist.sort()
         n_files = len(flist)
@@ -29,6 +51,23 @@ class logviewer:
 
     def get_single(self, var_name, single_shot_index = -1, 
                      suffix = '.np*', mat_file_field = None):
+        """ get a single variable
+            return the value of a saved variable.
+            
+            Parameters
+            ----------
+                var_name: str
+                    variable name
+                single_shot_index : integer index
+                    If there are many snapshots of a variable, this input can
+                    limit the returned to a set of indices.
+                suffix : str
+                    If there are different suffixes availble for a variable
+                    this input needs to be set. npy, npz, mat, and torch are
+                    supported.
+                mat_file_field : str
+                    when reading a MATLAB file, the field name is necessary.
+        """
         flist = list(self.log_dir.glob(f'{var_name}*{suffix}'))
         if(len(flist) > 0):
             flist.sort()
@@ -54,6 +93,9 @@ class logviewer:
                 except:
                     self.logger(f'The firld name: {mat_file_field}, '\
                             + f'could not be found in the mat file {var_path}')
+            elif(var_path.suffix == '.torch'):      
+                from torch import load as torch_load 
+                return(torch_load(var_path))
         else:
             var_dir = self.log_dir / var_name
             if(var_dir.is_dir()):
@@ -76,6 +118,26 @@ class logviewer:
     def get_stack_of_files(self, 
         var_name = None, flist = [], 
         return_data = True, return_flist = False):
+        
+        """ Get list or data of all files in a directory
+        
+            This function gives the list of paths of all files in a directory
+            for a single variable. 
+
+            Parameters
+            ----------
+                var_name : str
+                    The directory or variable name to look for the files
+                flist: list of Paths
+                    If data is returned, this flist input can limit the data
+                    requested to this list.
+                return_data : bool
+                    with flist you can limit the data that is returned.
+                    Otherwise the data for all files in the directory will be
+                    returned
+                return_flist : bool
+                    Maybe you are only intrested in the flist.
+        """
         
         if not flist:
             assert var_name is not None, \
@@ -124,8 +186,18 @@ class logviewer:
                 self.logger(f'File {flist[0].name} cannot be opened by '\
                           + r'np.load() or plt.imread()')
             
-    def common_files(self, var_name_A, var_name_B):
+    def get_common_files(self, var_name_A, var_name_B):
+        """ get common files in two directories
         
+            It happens often in ML that there are two directories, A and B,
+            and we are interested to get the flist in both that is common 
+            between them.
+            
+            Parameters
+            ----------
+            var_name_A and var_name_B:
+                directories A and B names.
+        """
         flist_A = self.get_stack_of_files(
             var_name_A, return_data = False, return_flist = True)
         flist_B = self.get_stack_of_files(
@@ -151,6 +223,18 @@ class logviewer:
         return(flist_A_new, flist_B_new)
     
     def replace_time_with_index(self, var_name):
+        """ index in file names
+            lognflow uses time stamps to make new log files for a variable.
+            That is done by putting _time_stamp after the name of the variable.
+            This function changes all of the time stamps, sorted ascendingly,
+            by indices.
+            
+            Parameters
+            ----------
+            
+                var_name: str
+                variable name
+        """
         var_dir = self.log_dir / var_name
         if(var_dir.is_dir()):
             var_fname = None

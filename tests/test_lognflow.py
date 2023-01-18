@@ -189,7 +189,11 @@ def test_prepare_stack_of_images():
     logger('This is a test for prepare_stack_of_images')
     list_of_stacks123 = logger.prepare_stack_of_images(list_of_stacks123)
     logger.log_canvas('canvas_before_handling', list_of_stacks123)
-
+    
+    stack_4 = np.random.rand(1, 32, 32, 16)
+    l_stack4 = logger.prepare_stack_of_images(stack_4)
+    logger.log_canvas('just_one_canvas', l_stack4, cmap = 'cool')
+    
 def test_log_canvas():
     imgs=[]
     for _ in range(5):
@@ -232,6 +236,8 @@ def test_rename():
     
 if __name__ == '__main__':
     temp_dir = select_directory()
+    test_log_plot()
+    test_prepare_stack_of_images()
     test_logger()
     test_log_flush_period()
     test_log_var_without_time_stamp()
@@ -239,13 +245,11 @@ if __name__ == '__main__':
     test_log_var()
     test_log_animation()
     test_log_single()
-    test_log_plot()
     test_log_hist()
     test_log_scatter3()
     test_log_plt()
     test_log_hexbin()
     test_log_imshow()
-    test_prepare_stack_of_images()
     test_log_canvas()
     test_log_confusion_matrix()
     test_rename()

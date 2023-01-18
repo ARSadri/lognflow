@@ -3,13 +3,14 @@ from time import time
 
 class printprogress:
     """
-    While there are modules that use \r to show a progress bar, 
-    there are cases e.g. a print_function or an ssh terminals that do not 
-    support \r. In such cases, if something is written at the end of 
+    While there are packages that use \r to show a progress bar, 
+    there are cases e.g. a print_function or an ssh terminal that does not 
+    support \r. In such cases, if something is typed at the end of 
     the line, it cannot be deleted. The following code provides a good 
-    looking simple title for the progress bar and shows the limits and 
+    looking progress bar with a simple title and limits and 
     is very simple to use. Define the object with number of steps of the loop 
-    and then  call it in every iteration of the loop.
+    and then call it in every iteration of the loop. If you'd like it
+    to go faster, call it with give number of steps that have passed.
     """
     def __init__(self, 
                  n_steps, 

@@ -73,7 +73,7 @@ def test_get_images_as_stack():
     logger(flist_A)
     logger(flist_B)
 
-    flist_A_AB, flist_B_AB = logged.common_files('A/', 'B/')
+    flist_A_AB, flist_B_AB = logged.get_common_files('A/', 'B/')
     logger(flist_A_AB)
     logger(flist_B_AB)
     

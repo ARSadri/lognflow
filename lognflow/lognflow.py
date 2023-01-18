@@ -411,14 +411,14 @@ class lognflow:
         
         _var = self._vars_dict[parameter_name]
         if(_var.save_as == 'npz'):
-            fpath = param_dir / (f'{param_name}_{_var.file_start_time}.npz')
+            fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var.time_array,
                 data_array = _var.data_array)
         elif(_var.save_as == 'txt'):
-            fpath = param_dir / (f'{param_name}_time_{_var.file_start_time}.txt')
-            np.savetxt(fpath, _var.data_array)
-            fpath = param_dir / (f'{param_name}_data_{_var.file_start_time}.txt')
+            fpath = param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
+            np.savetxt(fpath, _var.time_array)
+            fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var.data_array)
         return fpath
     
@@ -431,9 +431,27 @@ class lognflow:
         for parameter_name in self._vars_dict.keys():
             self._log_var_save(parameter_name)
     
+    def _get_fpath(self, 
+                   param_dir, param_name, 
+                   save_as, time_in_file_name):
+        time_time = time.time() - self._init_time
+        if(save_as == 'mat'):
+            if(len(param_name) == 0):
+                param_name = param_dir.name
+        
+        if(len(param_name) > 0):
+            fname = f'{param_name}'
+            if(time_in_file_name):
+                fname += f'_{time_time}'
+        else:
+            fname = f'{time_time}'
+            
+        return(param_dir / f'{fname}.{save_as}')
+    
     def log_single(self, parameter_name : str, 
                          parameter_value,
                          save_as = 'npy',
+                         mat_field = None,
                          time_in_file_name = True):
         """log a single variable
             The most frequently used function would probably be this one.
@@ -452,13 +470,13 @@ class lognflow:
                     An np array whose size doesn't change
                 save_as : str
                     can be 'npz' or 'txt' which will save it as text.
+                mat_field : str
+                    when saving as 'mat' file, the field can be set.
+                    otherwise it will be the parameter_name
                 time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        
-        time_time = time.time() - self._init_time
-        
         if ((save_as is None) & isinstance(parameter_value, dict)):
             save_as = 'npz'
         
@@ -466,36 +484,56 @@ class lognflow:
         save_as = save_as.strip('.')
         
         param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(save_as == 'mat'):
-            if(len(param_name) == 0):
-                param_name = 'data'
-        
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
+        fpath = self._get_fpath(param_dir, param_name, 
+                                save_as, time_in_file_name)
             
         if(save_as == 'npy'):
-            fpath = param_dir / (fname + '.npy')
             np.save(fpath, parameter_value)
         elif(save_as == 'npz'):
-            fpath = param_dir / (fname + '.npz')
             np.savez(fpath, **parameter_value)
         elif(save_as == 'txt'):
-            fpath = param_dir / (fname + '.txt')
             with open(fpath,'a') as fdata: 
                 fdata.write(str(parameter_value))
         elif(save_as == 'mat'):
-            fpath = param_dir / (fname + '.mat')
             from scipy.io import savemat
-            savemat(fpath, {f'{param_name}' :parameter_value})
-        elif('torch'):
-            fpath = param_dir / (fname + '.torch')
+            if(mat_field is None):
+                mat_field = param_name
+            savemat(fpath, {f'{mat_field}' :parameter_value})
+        elif(save_as == 'torch'):
             from torch import save as torch_save
             torch_save(parameter_value.state_dict(), fpath)
         return fpath
+    
+    def log_plt(self, 
+                parameter_name : str, 
+                image_format='jpeg', dpi=1200,
+                time_in_file_name = True):
+        """log a single plt
+            log a plt that you have on the screen.
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        fpath = self._get_fpath(param_dir, param_name, 
+                                image_format, time_in_file_name)
+        
+        try:
+            plt.savefig(fpath, format=image_format, dpi=dpi)
+            plt.close()
+            return fpath
+        except:
+            plt.close()
+            self.log_text(self.log_name,
+                          f'Cannot save the plt instance {parameter_name}.')
+            return None
     
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
@@ -515,17 +553,6 @@ class lognflow:
                 time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
         """
-        
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-                    
-        fpath = param_dir / (fname +'.gif')
         fig, ax = plt.subplots()
         ims = []
         for img in stack:    
@@ -535,9 +562,11 @@ class lognflow:
         ani = animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit,
             repeat_delay = repeat_delay)    
+
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        fpath = self._get_fpath(param_dir, param_name, 'gif', time_in_file_name)
         ani.save(fpath, dpi = dpi, 
                  writer = animation.PillowWriter(fps=int(1000/interval)))
-        
         return fpath
 
     def log_plot(self, parameter_name : str, 
@@ -568,17 +597,6 @@ class lognflow:
                     
         """
         
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        fpath = param_dir / (fname + '.jpg')
-        
         try:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
@@ -603,9 +621,12 @@ class lognflow:
                         plt.plot(x_values[list_cnt], parameter_value)
                     else:
                         plt.plot(x_values[0], parameter_value, '-*')
+            
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
                         
-            plt.savefig(fpath, format=image_format, dpi=dpi)
-            plt.close()
             return fpath
         except:
             self.log_text(self.log_name,
@@ -643,17 +664,6 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        fpath = param_dir / (fname + '.jpg')
-        
         try:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
@@ -663,9 +673,11 @@ class lognflow:
                 plt.bar(edges[:-1], bins, 
                         width =np.diff(edges).mean(), alpha=alpha)
                 plt.plot(edges[:-1], bins)
-                        
-            plt.savefig(fpath, format=image_format, dpi=dpi)
-            plt.close()
+            
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
             return fpath
         except:
             self.log_text(self.log_name,
@@ -685,43 +697,33 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value_list : np.array
+                parameter_value : np.array
                     An np array of size 3 x n, to sctter n data points in 3D
                 time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        fpath = param_dir / (fname + '.jpg')
-        
         try:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
             ax.scatter(parameter_value[0], 
                        parameter_value[1], 
                        parameter_value[2])
-            plt.savefig(fpath, format=image_format, dpi=dpi)
-            plt.close()
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
             return fpath
         except:
             self.log_text(self.log_name,
                           f'Cannot plot variable {parameter_name}.')
             return None
     
-    def log_plt(self, 
-                parameter_name : str, 
-                image_format='jpeg', dpi=1200,
-                time_in_file_name = True):
-        """log a single plt
-            log a plt that you have on the screen.
+    def log_hexbin(self, parameter_name : str, parameter_value,
+                   gridsize = 20, image_format='jpeg', dpi=1200,
+                   time_in_file_name = True):
+        """log a 2D histogram 
+            The 2D histogram is made out of hexagonals
             
             Parameters
             ----------
@@ -729,66 +731,43 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
+                parameter_value : np.array
+                    An np array of size 2 x n, to make the 2D histogram
+                gridsize : int
+                    grid size is the number of bins in 2D
                 time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
-        """
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        fpath = param_dir / (fname + '.jpg')
-        
-        try:
-            plt.savefig(fpath, format=image_format, dpi=dpi)
-            plt.close()
-            return fpath
-        except:
-            self.log_text(self.log_name,
-                          f'Cannot save the plt instance {parameter_name}.')
-            return None
-    
-    def log_hexbin(self, parameter_name : str, parameter_value,
-                   gridsize = 20, image_format='jpeg', dpi=1200,
-                   time_in_file_name = True):
-        
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-        fpath = param_dir / (f'{fname}.{image_format}')
-        
+        """        
         plt.figure()
         plt.hexbin(parameter_value[0], 
                    parameter_value[1], 
                    gridsize = gridsize)
-        plt.savefig(fpath, format=image_format, dpi=dpi)
-        plt.close()    
+        fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
         return fpath
     
-    def log_imshow(self, parameter_name : str, parameter_value,
-                   image_format='jpeg', dpi=1200,
+    def log_imshow(self, parameter_name : str, 
+                   parameter_value,
+                   image_format='jpeg', dpi=1200, cmap = 'jet',
                    time_in_file_name = True):
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
+        """log an image
+            The image is logged using plt.imshow
             
-        fpath = param_dir / (f'{fname}.{image_format}')
-        
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                parameter_value : np.array
+                    An np array of size n x m, to be shown by imshow
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
         parameter_value = np.squeeze(parameter_value)
         parameter_value_shape = parameter_value.shape
         n_dims = len(parameter_value_shape)
@@ -817,28 +796,41 @@ class lognflow:
                 FLAG_img_ready = True
         
         if(FLAG_img_ready):
-            plt.imshow(parameter_value)
+            plt.imshow(parameter_value, cmap = cmap)
             plt.colorbar()
-            plt.savefig(fpath, format = image_format, dpi=dpi)
-            plt.close()
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
             return fpath
         else:
+            plt.close()
             self.log_text(
                 self.log_name,
                 f'Cannot plot variable {parameter_name} with shape' + \
                 f'{parameter_value.shape}')
             return
 
-    def _handle_images_stack(self, stack, nan_borders):
-        if(len(stack.shape) == 2):
-            canv = np.expand_dims(stack, axis=0)
-        elif(len(stack.shape) == 3):
-            canv = stack
-        elif((len(stack.shape) == 4) | (len(stack.shape) == 5)):
+    def multichannel_to_square(self, stack, nan_borders = np.nan):
+        """ turn a stack of multi-channel images into stack of square images
+            This is very useful when lots of images need to be tiled
+            against each other.
+        
+            Parameters
+            ----------
+                stack : np.ndarray
+                It must have the shape of either
+                    n_f x n_r x n_c x n_ch
+                    n_f x n_r x n_c x 3 x n_ch
+                    
+                In both cases n_ch will be turned into square tile
+                Remember if you have N images to put into a square, you only
+                have n_f = 1 image with n_ch = N, you do not have N images
+                and the shape of the ndarray will be 1 x n_r x n_c x N
+        """
+        if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
             if(len(stack.shape) == 4):
                 n_imgs, n_R, n_C, n_ch = stack.shape
-                if(n_ch == 3):
-                    canv = stack
             if(len(stack.shape) == 5):
                 n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
                 if(is_rgb != 3):
@@ -854,10 +846,10 @@ class lognflow:
                                  dtype = stack.dtype)
             used_ch_cnt = 0
 
-            stack[:, :1] = np.nan
-            stack[:, :, :1] = np.nan
-            stack[:, -1:] = np.nan
-            stack[:, :, -1:] = np.nan
+            stack[:,   :1      ] = nan_borders
+            stack[:,   : ,   :1] = nan_borders
+            stack[:, -1:       ] = nan_borders
+            stack[:,   : , -1: ] = nan_borders
             
             for rcnt in range(square_side):
                 for ccnt in range(square_side):
@@ -871,7 +863,36 @@ class lognflow:
             return None
         return canv
 
-    def prepare_stack_of_images(self, list_of_stacks, nan_borders = True):        
+    def _handle_images_stack(self, stack, nan_borders = np.nan):
+        canv = None
+        if(len(stack.shape) == 2):
+            canv = np.expand_dims(stack, axis=0)
+        elif(len(stack.shape) == 3):
+            canv = stack
+        elif((len(stack.shape) == 4) | (len(stack.shape) == 5)):
+            canv = self.multichannel_to_square(stack, nan_borders = nan_borders)
+        return canv
+    
+    def prepare_stack_of_images(self, 
+                                list_of_stacks, 
+                                nan_borders = True):
+        """Prepare the stack of images
+            If you wish to use the log_canvas, chances are you have a list
+            of stacks of images where one element, has many channels.
+            In that case, the channels can be tiled beside each other
+            to make one image for showing. This is very useful for ML apps.
+    
+            Parameters
+            ----------
+                list_of_stacks
+                    list_of_stacks would include arrays iteratable by their
+                    first dimension.
+                nan_borders : float
+                    borders between tiles will be filled with this variable
+                    default: np.nan
+        """        
+        if (not isinstance(list_of_stacks, list)):
+            list_of_stacks = [list_of_stacks]
         for cnt, stack in enumerate(list_of_stacks):
             stack = self._handle_images_stack(stack, nan_borders = nan_borders)
             if(stack is None):
@@ -887,19 +908,42 @@ class lognflow:
                    text_as_colorbar = False,
                    use_colorbar = False,
                    image_format='jpeg', 
+                   cmap = 'jet',
                    dpi=600,
                    time_in_file_name = True):
-        
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-        fpath = param_dir / (f'{fname}.{image_format}')
-                
+        """log a cavas of stacks of images
+            One way to show many images and how they change is to make
+            stacks of images and put them in a list. Then each
+            element of the list is supposed to be iteratable by the first
+            dimension and all must have the same length.
+            This function will start putting them in coloumns of a canvas.
+            If you have an image with many channels, call 
+            prepare_stack_of_images on the list to make a large single
+            image by tiling the channels of that element beside each other.
+            This is very useful when it comes to self-supervised ML.
+            
+            Parameters
+            ----------
+                parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+                list_of_stacks : list
+                    List of stack of images, each of which can be a
+                    n_F x n_r x n_c. Notice that n_F should be the same for all
+                    elements of the list.
+                list_of_masks : list
+                    the same as the list_of_stacks and will be used to make
+                    accurate colorbars
+                text_as_colorbar : bool
+                    if True, max and mean and min of each image will be written
+                    on it.
+                use_colorbar : bool
+                    actual colorbar for each iamge will be shown
+                time_in_file_name: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
         try:
             _ = list_of_stacks.shape
             list_of_stacks = [list_of_stacks]
@@ -943,7 +987,10 @@ class lognflow:
                                 'The mask shape is different from the canvas.' \
                                 + ' No mask will be applied.')
                             canvas_mask_warning = True
-                im = ax1.imshow(data_canvas, vmin = vmin, vmax = vmax)
+                im = ax1.imshow(data_canvas, 
+                                vmin = vmin, 
+                                vmax = vmax,
+                                cmap = cmap)
                 if(text_as_colorbar):
                     ax1.text(data_canvas.shape[0]*0,
                              data_canvas.shape[1]*0.05,
@@ -965,8 +1012,10 @@ class lognflow:
                     cbar.ax.tick_params(labelsize=1)
                 ax1.set_aspect('equal')
         
-        plt.savefig(fpath, format=image_format, dpi=dpi)
-        plt.close()
+        fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
         return fpath
 
     def log_confusion_matrix(self,
@@ -982,7 +1031,7 @@ class lognflow:
         """
         given a sklearn confusion matrix (cm), make a nice plot
     
-        Arguments
+        Parameters
         ---------
         cm:           confusion matrix from sklearn.metrics.confusion_matrix
     
@@ -1011,16 +1060,6 @@ class lognflow:
                                                            plot_confusion_matrix.html
     
         """
-        time_time = time.time() - self._init_time
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_in_file_name):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-        fpath = param_dir / (f'{fname}.{image_format}')
-        
         accuracy = np.trace(cm) / np.sum(cm).astype('float')
         misclass = 1 - accuracy
     
@@ -1054,8 +1093,10 @@ class lognflow:
         plt.title(title)
         plt.colorbar(im,fraction=0.046, pad=0.04)
         plt.tight_layout()
-        plt.savefig(fpath, format=image_format, dpi=dpi)
-        plt.close()
+        fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_in_file_name = time_in_file_name)
         return fpath
     
     def __del__(self):
@@ -1063,6 +1104,14 @@ class lognflow:
         self.log_var_flush()
         
 def select_directory(start_directory = './'):
+    """ Open dialog to select a directory
+        It works for windows and Linux.
+    
+        Parameters
+        ----------
+            start_directory: pathlib.Path
+            When dialog opens, it starts from here.
+    """
     from PyQt5.QtWidgets import QFileDialog, QApplication
     _ = QApplication([])
     log_dir = QFileDialog.getExistingDirectory(
