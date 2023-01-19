@@ -38,6 +38,14 @@ def test_lognflow():
                     'For other log files you need to mention the log_name')
 
 def test_logger():
+    ''' test the logger call funciton
+        when lognflow object is made, you can call it.
+        If it is called with a string as input, it will log that into the
+        main_log text file.
+        If a string is given and then something else is also provided afterwards
+        the funciton log_single will be called with that while the first input
+        string is going to be considered as the name of a variable.
+    '''
     logger = lognflow(temp_dir)
     logger('This is a test for lognflow and logger call')
 

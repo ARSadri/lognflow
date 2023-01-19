@@ -48,55 +48,65 @@ class lognflow:
                  main_log_name = 'main_log',
                  log_flush_period = 60,
                  log_flush_period_increase_rate = 4):
-        """ lognflow construction
+        """ lognflow initialization
         
-        The lognflow is an easy way to log your variables on a local disk..
-        It will also size up files when they get too large. It also can save
-        np.arrays in npz format which is better than csv or what not.
+        The lognflow is an easy way to log your variables into a directory.
+        This directory is assumed to be local but it can be a map to a network
+        location. It will also size up files when they get too large.
+        It also can save np.arrays in npz format which is better than 
+        other formats.
         
-        Parameters
-        ----------
-            logs_root: pathlib.Path
-                This is the root directory for all logs. We will use the time.time()
-                to create a log directory for each instance of the lognflow. 
-            log_dir: pathlib.Path
-                This is the final directory path for the log files. 
-            note:
-            ^^^^^^^^
-                One of the variables logs_root or log_dir must be provided.
+        .. note::
+            One of the variables ``logs_root`` or ``log_dir`` must be given.
+            if ``log_dir`` is given, ``logs_root`` is disregarded.
 
-            print_text : bool
-                If True, everything that is logged as text will be printed as well
+        :param logs_root: 
+            This is the root directory for all logs.
+            We will use the time.time() to create a log directory for each 
+            instance of the lognflow. 
+        :type logs_root: pathlib.Path
+        
+        :param log_dir: 
+            This is the final directory path for the log files. 
+        :type log_dir: pathlib.Path
 
-            main_log_name : str
-                main log file name, by default: 'main_log'
+        :param print_text: 
+            If True, everything that is logged as text will be printed as well
+        :type print_text: bool
+        
+        :param main_log_name: 
+            main log file name, by default: 'main_log'
+        :type main_log_name: str
                 
-            log_flush_period: int
-                The period between flushing the log files into HDD. By not
-                flushing, you can reduce network or HDD overhead.
+        :param log_flush_period:
+            The period between flushing the log files into HDD. By not
+            flushing, you can reduce network or HDD overhead.
+        :type log_flush_period: int
                 
-            log_flush_period_increase_rate: int
-                we do not begin the timeout for the flush to be log_flush_period
-                because it can happen that a code finishes very fast. Such a 
-                code of course will flush everything when Python closes all
-                the files. We would like to flush at small intervals at first
-                and increase that timput over time. This is the rate. However,
-                when the log_flush_period reaches the given input, it will
-                not increase anymore.
-
+        :param log_flush_period_increase_rate:
+            we do not begin the timeout for the flush to be log_flush_period
+            because it can happen that a code finishes very fast. Such a 
+            code of course will flush everything when Python closes all
+            the files. We would like to flush at small intervals at first
+            and increase that timput over time. This is the rate. However,
+            when the log_flush_period reaches the given input, it will
+            not increase anymore.
+        :type log_flush_period_increase_rate: int
+        
         """
         self._init_time = time.time()
 
         if(log_dir is None):
             if(logs_root is None):
                 logs_root = 'logs'
-            self.log_dir = pathlib.Path(logs_root) / f'{int(self._init_time):d}/'
+            self.log_dir = \
+                pathlib.Path(logs_root) / f'{int(self._init_time):d}/'
         else:
             self.log_dir = pathlib.Path(log_dir)
         if(not self.log_dir.is_dir()):
             self.log_dir.mkdir(parents = True, exist_ok = True)
-        if(not self.log_dir.is_dir()):
-            return
+        assert self.log_dir.is_dir(), \
+            f'Could not access the log directory {self.log_dir}'
         
         self._print_text = print_text
         self._loggers_dict = {}
@@ -118,10 +128,8 @@ class lognflow:
             
             There is only one input and that is the new name of the directory.
             
-            Parameters
-            ----------
-                new_dir : str
-                    The new name of the directory.
+            :param new_dir: The new name of the directory.
+            :type new_dir: str
             
         """
         for log_name in self._loggers_dict.keys():
