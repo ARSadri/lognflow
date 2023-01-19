@@ -1,13 +1,26 @@
-lognflow package
-============
+lognflow Module contents
+========================
 
-Module contents
+lognflow
 ---------------
 
-.. automodule:: lognflow
+.. automodule:: lognflow.lognflow
    :members:
    :undoc-members:
    :show-inheritance:
+   
+logviewer
+---------------
 
-.. toctree::
-   :maxdepth: 2
+.. automodule:: lognflow.logviewer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   
+printprogress
+---------------
+
+.. automodule:: lognflow.printprogress
+   :members:
+   :undoc-members:
+   :show-inheritance:
