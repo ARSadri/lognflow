@@ -50,7 +50,7 @@ class logviewer:
             return txt
 
     def get_single(self, var_name, single_shot_index = -1, 
-                     suffix = '.np*', mat_file_field = None):
+                     suffix = '.np*'):
         """ get a single variable
             return the value of a saved variable.
             
@@ -65,15 +65,32 @@ class logviewer:
                     If there are different suffixes availble for a variable
                     this input needs to be set. npy, npz, mat, and torch are
                     supported.
-                mat_file_field : str
-                    when reading a MATLAB file, the field name is necessary.
+                
+                .. note::
+                    when reading a MATLAB file, the output is a dictionary.
         """
-        flist = list(self.log_dir.glob(f'{var_name}*{suffix}'))
+        suffix = suffix.strip('.')
+        assert single_shot_index == int(single_shot_index), \
+                    f'single_shot_index {single_shot_index} must be an integer'
+                    
+        if((log_dir / var_name).is_file()):
+            flist = [log_dir / var_name]
+        elif((log_dir / f'{var_name}.{suffix}').is_file()):
+            flist = [log_dir / f'{var_name}.{suffix}']
+        else:
+            flist = list(self.log_dir.glob(f'{var_name}*.{suffix}'))
+        
         if(len(flist) > 0):
             flist.sort()
             var_path = flist[single_shot_index]
-            if(not var_path.is_file()):
-                return
+        else:
+            var_dir = self.log_dir / var_name
+            if(var_dir.is_dir()):
+                flist = list(var_dir.glob('*.*'))
+                flist.sort()
+                var_path = flist[single_shot_index]
+                
+        if(var_path.is_file()):
             self.logger(f'Loading {var_path}')
             if(var_path.suffix == '.npz'):
                 buf = np.load(var_path)
@@ -82,38 +99,17 @@ class logviewer:
                 time_array = time_array[:n_logs]
                 data_array = buf['data_array']
                 data_array = data_array[:n_logs]
-                return(time_array, data_array)
+                return((time_array, data_array))
             elif(var_path.suffix == '.npy'):
                 return(np.load(var_path))
             elif(var_path.suffix == '.mat'):
-                if(mat_file_field is None):
-                    mat_file_field = var_path.name
-                try:
-                    return(loadmat(var_path)[mat_file_field])
-                except:
-                    self.logger(f'The firld name: {mat_file_field}, '\
-                            + f'could not be found in the mat file {var_path}')
+                return(loadmat(var_path))
             elif(var_path.suffix == '.torch'):      
                 from torch import load as torch_load 
                 return(torch_load(var_path))
         else:
-            var_dir = self.log_dir / var_name
-            if(var_dir.is_dir()):
-                flist = list(var_dir.glob('*.*'))
-                flist.sort()
-                assert single_shot_index == int(single_shot_index), \
-                    f'single_shot_index {single_shot_index} must be an integer'
-                var_path = flist[single_shot_index]
-                if(var_path.suffix == '.npy'):
-                    return np.load(var_path)
-                elif(var_path.suffix == '.mat'):
-                    if(mat_file_field is None):
-                        mat_file_field = var_path.name
-                    try:
-                        return(loadmat(var_path)[mat_file_field])
-                    except:
-                        self.logger(f'The firld name: {mat_file_field}, '\
-                            + f'could not be found in the mat file {var_path}')
+            self.logger(f'{var_name} not found.')
+            return
     
     def get_stack_of_files(self, 
         var_name = None, flist = [], 

@@ -34,7 +34,7 @@ class printprogress:
         self.in_print_function = print_function
         
         if(n_steps != int(n_steps)):
-            self._print_function('textProgBar takes integers no less than 2 ')
+            self._print_func('textProgBar takes integers no less than 2 ')
             n_steps = int(n_steps)
         if(n_steps<2):
             n_steps = 2
@@ -50,19 +50,20 @@ class printprogress:
             self.numTicks = len(title)+2
         else:
             self.numTicks = numTicks
-        for _ in range(self.numTicks):
-            self._print_function('_', end='')
-        self._print_function(' ')
-        self._print_function('/', end='')
-        for idx in range(self.numTicks - len(title)):
-            if(idx==int((self.numTicks - len(title))/2)):
-                self._print_function(title, end='')
-            else:
-                self._print_function(' ', end='')
-        self._print_function(' \\')
-        self._print_function(' ', end = '')
+        
+        self._print_func(' ', end='')
+        self._print_func('_'*self.numTicks, end='')
+        self._print_func(' ')
+        
+        self._print_func('/', end='')
+        self._print_func(' '*int((self.numTicks - len(title))/2), end='')
+        self._print_func(title, end='')
+        self._print_func(' '*int((self.numTicks - len(title))/2), end='')
+        self._print_func(' \\')
+        
+        self._print_func(' ', end = '')
     
-    def _print_function(self, text, end='\n'):
+    def _print_func(self, text, end='\n'):
         if (self.in_print_function == print):
             print(text, end = end, flush = True)
         else:
@@ -79,7 +80,7 @@ class printprogress:
         if(self.FLAG_ended):
             if(not self.FLAG_warning):
                 self.FLAG_warning = True
-                self._print_function('-' * self.numTicks)
+                self._print_func('-' * self.numTicks)
         else:
             self.ck += ck
             if(self.ck >= self.n_steps):
@@ -93,19 +94,22 @@ class printprogress:
                     remTimeS = passedTime * ( self.n_steps / self.ck - 1)
                     if(remTimeS>=5940):
                         progStr = "%02d" % int(ceil(remTimeS/3600))
-                        self._print_function(progStr, end='')
-                        self._print_function('h', end='')
+                        self._print_func(progStr, end='')
+                        self._print_func('h', end='')
                     elif(remTimeS>=99):
                         progStr = "%02d" % int(ceil(remTimeS/60))
-                        self._print_function(progStr, end='')
-                        self._print_function('m', end='')
+                        self._print_func(progStr, end='')
+                        self._print_func('m', end='')
                     elif(remTimeS>0):
                         progStr = "%02d" % int(ceil(remTimeS))
-                        self._print_function(progStr, end='')
-                        self._print_function('s', end='')
+                        self._print_func(progStr, end='')
+                        self._print_func('s', end='')
                     else:
                         self.end()
     def end(self):
         if(not self.FLAG_ended):
-            self._print_function('')
+            self._print_func('')
             self.FLAG_ended = True
+            
+    def __del__(self):
+        self.end()

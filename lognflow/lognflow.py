@@ -883,7 +883,7 @@ class lognflow:
     
     def prepare_stack_of_images(self, 
                                 list_of_stacks, 
-                                nan_borders = True):
+                                nan_borders = np.nan):
         """Prepare the stack of images
             If you wish to use the log_canvas, chances are you have a list
             of stacks of images where one element, has many channels.
@@ -981,20 +981,23 @@ class lognflow:
                 ax1.set_xticklabels([])
                 ax1.set_yticklabels([])
                 data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
-                vmin = data_canvas.min()
-                vmax = data_canvas.max()
                 if(list_of_masks is not None):
                     mask = list_of_masks[stack_cnt]
                     if(mask is not None):
                         if(data_canvas.shape == mask.shape):
                             data_canvas[mask==0] = 0
-                            vmin = data_canvas[mask>0].min()
-                            vmax = data_canvas[mask>0].max()
+                            data_canvas_stat = data_canvas[mask>0]
                         elif(not canvas_mask_warning):
                             self.log_text(self.log_name,\
                                 'The mask shape is different from the canvas.' \
                                 + ' No mask will be applied.')
                             canvas_mask_warning = True
+                else:
+                    data_canvas_stat = data_canvas.copy()
+                data_canvas_stat = data_canvas_stat[np.isnan(data_canvas_stat) == 0]
+                data_canvas_stat = data_canvas_stat[np.isinf(data_canvas_stat) == 0]
+                vmin = data_canvas_stat.min()
+                vmax = data_canvas_stat.max()
                 im = ax1.imshow(data_canvas, 
                                 vmin = vmin, 
                                 vmax = vmax,

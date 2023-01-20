@@ -31,5 +31,3 @@ def test_printprogress():
     
 if __name__ == '__main__':
     test_printprogress()
-    
-    
