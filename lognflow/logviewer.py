@@ -8,7 +8,7 @@ class logviewer:
         Since lognflow makes lots of files and folders, maybe it is nice
         to have a logviewer that loads those information. In this module we
         provide a set of functions for a logged object that can load variables,
-        texts, file lists and .... simply, use it by:
+        texts, file lists and etc.. Use it simply by:
         
         .. highlight:: python
            :linenothreshold: 5
@@ -31,10 +31,8 @@ class logviewer:
     def get_text(self, log_name='main_log'):
         """ get text log files
             Given the log_name, this function returns the text therein.
-            
-            Parameters
-            ----------
-            log_name: str
+
+            :param log_name:
                 the log name. If not given then it is the main log.
         """
         flist = list(self.log_dir.glob(f'{log_name}*.txt'))
@@ -53,30 +51,28 @@ class logviewer:
                      suffix = '.np*'):
         """ get a single variable
             return the value of a saved variable.
-            
-            Parameters
-            ----------
-                var_name: str
-                    variable name
-                single_shot_index : integer index
-                    If there are many snapshots of a variable, this input can
-                    limit the returned to a set of indices.
-                suffix : str
-                    If there are different suffixes availble for a variable
-                    this input needs to be set. npy, npz, mat, and torch are
-                    supported.
+
+            :param var_name:
+                variable name
+            :param single_shot_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
                 
-                .. note::
-                    when reading a MATLAB file, the output is a dictionary.
+            .. note::
+                when reading a MATLAB file, the output is a dictionary.
         """
         suffix = suffix.strip('.')
         assert single_shot_index == int(single_shot_index), \
                     f'single_shot_index {single_shot_index} must be an integer'
                     
-        if((log_dir / var_name).is_file()):
-            flist = [log_dir / var_name]
-        elif((log_dir / f'{var_name}.{suffix}').is_file()):
-            flist = [log_dir / f'{var_name}.{suffix}']
+        if((self.log_dir / var_name).is_file()):
+            flist = [self.log_dir / var_name]
+        elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
+            flist = [self.log_dir / f'{var_name}.{suffix}']
         else:
             flist = list(self.log_dir.glob(f'{var_name}*.{suffix}'))
         
@@ -120,18 +116,20 @@ class logviewer:
             This function gives the list of paths of all files in a directory
             for a single variable. 
 
-            Parameters
-            ----------
-                var_name : str
-                    The directory or variable name to look for the files
-                flist: list of Paths
-                    If data is returned, this flist input can limit the data
-                    requested to this list.
-                return_data : bool
+            :param var_name:
+                The directory or variable name to look for the files
+            :type var_name: str
+            
+            :param flist:
+                list of Paths, if data is returned, this flist input can limit 
+                the data requested to this list.
+            :type flist: list
+            
+            :param return_data: 
                     with flist you can limit the data that is returned.
                     Otherwise the data for all files in the directory will be
                     returned
-                return_flist : bool
+            :param return_flist
                     Maybe you are only intrested in the flist.
         """
         
@@ -187,12 +185,12 @@ class logviewer:
         
             It happens often in ML that there are two directories, A and B,
             and we are interested to get the flist in both that is common 
-            between them.
+            between them. returns a tuple of two lists of files.
             
-            Parameters
-            ----------
-            var_name_A and var_name_B:
-                directories A and B names.
+            :param var_name_A:
+                directory A name
+            :param var_name_B:
+                directory B name
         """
         flist_A = self.get_stack_of_files(
             var_name_A, return_data = False, return_flist = True)
@@ -225,10 +223,7 @@ class logviewer:
             This function changes all of the time stamps, sorted ascendingly,
             by indices.
             
-            Parameters
-            ----------
-            
-                var_name: str
+            :param var_name:
                 variable name
         """
         var_dir = self.log_dir / var_name

@@ -35,10 +35,51 @@ varinlog = namedtuple('varinlog',
                       'log_counter_limit'])
 
 class lognflow:
-    """ lognflow logs your workflow
+    """ lognflow initialization
+        
+    The lognflow is an easy way to log your variables into a directory.
+    This directory is assumed to be local but it can be a map to a network
+    location. It will also size up files when they get too large.
+    It also can save np.arrays in npz format which is better than 
+    other formats.
     
-    Indeed we need a simple log maker that works on local machine disk.
-    This is a minimalist approach to solve this problem. 
+    .. note::
+        One of the variables ``logs_root`` or ``log_dir`` must be given.
+        if ``log_dir`` is given, ``logs_root`` is disregarded.
+
+    :param logs_root: 
+        This is the root directory for all logs.
+        We will use the time.time() to create a log directory for each 
+        instance of the lognflow. 
+    :type logs_root: pathlib.Path
+    
+    :param log_dir: 
+        This is the final directory path for the log files. 
+    :type log_dir: pathlib.Path
+
+    :param print_text: 
+        If True, everything that is logged as text will be printed as well
+    :type print_text: bool
+    
+    :param main_log_name: 
+        main log file name, by default: 'main_log'
+    :type main_log_name: str
+            
+    :param log_flush_period:
+        The period between flushing the log files into HDD. By not
+        flushing, you can reduce network or HDD overhead.
+    :type log_flush_period: int
+            
+    :param log_flush_period_increase_rate:
+        we do not begin the timeout for the flush to be log_flush_period
+        because it can happen that a code finishes very fast. Such a 
+        code of course will flush everything when Python closes all
+        the files. We would like to flush at small intervals at first
+        and increase that timput over time. This is the rate. However,
+        when the log_flush_period reaches the given input, it will
+        not increase anymore.
+    :type log_flush_period_increase_rate: int
+    
     """
     
     def __init__(self, 
@@ -48,52 +89,6 @@ class lognflow:
                  main_log_name = 'main_log',
                  log_flush_period = 60,
                  log_flush_period_increase_rate = 4):
-        """ lognflow initialization
-        
-        The lognflow is an easy way to log your variables into a directory.
-        This directory is assumed to be local but it can be a map to a network
-        location. It will also size up files when they get too large.
-        It also can save np.arrays in npz format which is better than 
-        other formats.
-        
-        .. note::
-            One of the variables ``logs_root`` or ``log_dir`` must be given.
-            if ``log_dir`` is given, ``logs_root`` is disregarded.
-
-        :param logs_root: 
-            This is the root directory for all logs.
-            We will use the time.time() to create a log directory for each 
-            instance of the lognflow. 
-        :type logs_root: pathlib.Path
-        
-        :param log_dir: 
-            This is the final directory path for the log files. 
-        :type log_dir: pathlib.Path
-
-        :param print_text: 
-            If True, everything that is logged as text will be printed as well
-        :type print_text: bool
-        
-        :param main_log_name: 
-            main log file name, by default: 'main_log'
-        :type main_log_name: str
-                
-        :param log_flush_period:
-            The period between flushing the log files into HDD. By not
-            flushing, you can reduce network or HDD overhead.
-        :type log_flush_period: int
-                
-        :param log_flush_period_increase_rate:
-            we do not begin the timeout for the flush to be log_flush_period
-            because it can happen that a code finishes very fast. Such a 
-            code of course will flush everything when Python closes all
-            the files. We would like to flush at small intervals at first
-            and increase that timput over time. This is the rate. However,
-            when the log_flush_period reaches the given input, it will
-            not increase anymore.
-        :type log_flush_period_increase_rate: int
-        
-        """
         self._init_time = time.time()
 
         if(log_dir is None):
