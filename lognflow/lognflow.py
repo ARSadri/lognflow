@@ -35,50 +35,53 @@ varinlog = namedtuple('varinlog',
                       'log_counter_limit'])
 
 class lognflow:
-    """ lognflow initialization
+    """Initialization
         
-    The lognflow is an easy way to log your variables into a directory.
-    This directory is assumed to be local but it can be a map to a network
-    location. It will also size up files when they get too large.
-    It also can save np.arrays in npz format which is better than 
-    other formats.
+        The lognflow is an easy way to log your variables into a directory.
+        This directory is assumed to be local but it can be a map to a network
+        location. It will also size up files when they get too large.
+        It also can save np.arrays in npz format which is better than 
+        other formats.
+        
+        Parameters
+        ----------
     
-    .. note::
-        One of the variables ``logs_root`` or ``log_dir`` must be given.
-        if ``log_dir`` is given, ``logs_root`` is disregarded.
-
-    :param logs_root: 
-        This is the root directory for all logs.
-        We will use the time.time() to create a log directory for each 
-        instance of the lognflow. 
-    :type logs_root: pathlib.Path
+        .. note::
+            One of the variables ``logs_root`` or ``log_dir`` must be given.
+            if ``log_dir`` is given, ``logs_root`` is disregarded.
     
-    :param log_dir: 
-        This is the final directory path for the log files. 
-    :type log_dir: pathlib.Path
-
-    :param print_text: 
-        If True, everything that is logged as text will be printed as well
-    :type print_text: bool
+        :param logs_root: 
+            This is the root directory for all logs.
+            We will use the time.time() to create a log directory for each 
+            instance of the lognflow. 
+        :type logs_root: pathlib.Path
+        
+        :param log_dir: 
+            This is the final directory path for the log files. 
+        :type log_dir: pathlib.Path
     
-    :param main_log_name: 
-        main log file name, by default: 'main_log'
-    :type main_log_name: str
-            
-    :param log_flush_period:
-        The period between flushing the log files into HDD. By not
-        flushing, you can reduce network or HDD overhead.
-    :type log_flush_period: int
-            
-    :param log_flush_period_increase_rate:
-        we do not begin the timeout for the flush to be log_flush_period
-        because it can happen that a code finishes very fast. Such a 
-        code of course will flush everything when Python closes all
-        the files. We would like to flush at small intervals at first
-        and increase that timput over time. This is the rate. However,
-        when the log_flush_period reaches the given input, it will
-        not increase anymore.
-    :type log_flush_period_increase_rate: int
+        :param print_text: 
+            If True, everything that is logged as text will be printed as well
+        :type print_text: bool
+        
+        :param main_log_name: 
+            main log file name, by default: 'main_log'
+        :type main_log_name: str
+                
+        :param log_flush_period:
+            The period between flushing the log files into HDD. By not
+            flushing, you can reduce network or HDD overhead.
+        :type log_flush_period: int
+                
+        :param log_flush_period_increase_rate:
+            we do not begin the timeout for the flush to be log_flush_period
+            because it can happen that a code finishes very fast. Such a 
+            code of course will flush everything when Python closes all
+            the files. We would like to flush at small intervals at first
+            and increase that timput over time. This is the rate. However,
+            when the log_flush_period reaches the given input, it will
+            not increase anymore.
+        :type log_flush_period_increase_rate: int
     
     """
     
@@ -93,7 +96,12 @@ class lognflow:
 
         if(log_dir is None):
             if(logs_root is None):
-                logs_root = 'logs'
+                from tempfile import gettempdir
+                logs_root = gettempdir()
+                try:
+                    logs_root = select_directory(logs_root)
+                except:
+                    pass
             self.log_dir = \
                 pathlib.Path(logs_root) / f'{int(self._init_time):d}/'
         else:
@@ -122,8 +130,10 @@ class lognflow:
             which is very realistic in the eyes of an experimentalist.
             
             There is only one input and that is the new name of the directory.
-            
-            :param new_dir: The new name of the directory.
+
+            Parameters
+            ----------
+            :param new_dir: The new name of the directory (without parent path)
             :type new_dir: str
             
         """
@@ -163,7 +173,7 @@ class lognflow:
                                        log_file_id]
         
     def log_text_flush(self):
-        """ Flush the logs
+        """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
             regularly. lognflow calls it once in a while when log_text is
@@ -197,20 +207,20 @@ class lognflow:
             
             Parameters
             ----------
-                log_name : str
+            :param log_name : str
                     examples: mylog or myscript/mylog
                     log_name can be just a name e.g. mylog, or could be a
                     pathlike name such as myscript/mylog.
-                to_be_logged : str, nd.array, list, dict
+            :param to_be_logged : str, nd.array, list, dict
                     the string to be logged, could be a list
                     or numpy array or even a dictionary. It uses str(...).
-                log_time_stamp : bool
+            :param log_time_stamp : bool
                     Put time stamp for every entry of the log
-                print_text : bool
+            :param print_text : bool
                     if False, what is logged will not be printed.
-                log_size_limit : int
+            :param log_size_limit : int
                     log size limit in bytes.
-                time_in_file_name : bool
+            :param time_in_file_name : bool
                     put time stamp in file names.
             
         """
@@ -345,15 +355,15 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value : np.array
+            :param parameter_value : np.array
                     An np array whose size doesn't change
-                save_as : str
+            :param save_as : str
                     can be 'npz' or 'txt' which will save it as text.
-                log_size_limit: int
+            :param log_size_limit: int
                     log_size_limit in bytes, default : 1e+7.
                     
         """
@@ -465,18 +475,19 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value : np.array
+            :param parameter_value : np.array
                     An np array whose size doesn't change
-                save_as : str
-                    can be 'npz' or 'txt' which will save it as text.
-                mat_field : str
+            :param save_as : str
+                    can be 'npz', 'npy', 'mat', 'torch' for pytorch models
+                    or 'txt' which will save it as text.
+            :param mat_field : str
                     when saving as 'mat' file, the field can be set.
                     otherwise it will be the parameter_name
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -516,11 +527,11 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -547,13 +558,13 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                stack : np.array of shape n_f x n_r x n_c or n_f x n_r x n_c x 3
+            :param stack : np.array of shape n_f x n_r x n_c or n_f x n_r x n_c x 3
                     stack[cnt] needs to be plotable by plt.imshow()
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
         """
         fig, ax = plt.subplots()
@@ -583,19 +594,19 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value_list : np.array
+            :param parameter_value_list : np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-                x_values : np.array
+            :param x_values : np.array
                     if set, must be an np.array of same size of all y values
                     or a list for each vector in y values where every element
                     of x-values list is the same as the y-values element in 
                     their list
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -650,20 +661,20 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value_list : np.array
+            :param parameter_value_list : np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-                n_bins : number or np.array
+            :param n_bins : number or np.array
                     used to set the bins for making of the histogram
-                alpha : float 
+            :param alpha : float 
                     the opacity of histograms, a flot between 0 and 1. If you
                     have multiple histograms on top of each other,
                     use 1/number_of_your_variables.
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -684,7 +695,7 @@ class lognflow:
             return fpath
         except:
             self.log_text(self.log_name,
-                          f'Cannot plot variable {parameter_name}.')
+                f'Cannot make the histogram for variable {parameter_name}.')
             return None
     
     def log_scatter3(self, parameter_name : str, 
@@ -696,13 +707,13 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value : np.array
+            :param parameter_value : np.array
                     An np array of size 3 x n, to sctter n data points in 3D
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -719,7 +730,7 @@ class lognflow:
             return fpath
         except:
             self.log_text(self.log_name,
-                          f'Cannot plot variable {parameter_name}.')
+                f'Cannot make the scatter3 for variable {parameter_name}.')
             return None
     
     def log_hexbin(self, parameter_name : str, parameter_value,
@@ -730,28 +741,33 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value : np.array
+            :param parameter_value : np.array
                     An np array of size 2 x n, to make the 2D histogram
-                gridsize : int
+            :param gridsize : int
                     grid size is the number of bins in 2D
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """        
-        plt.figure()
-        plt.hexbin(parameter_value[0], 
-                   parameter_value[1], 
-                   gridsize = gridsize)
-        fpath = self.log_plt(
-                parameter_name = parameter_name, 
-                image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
-        return fpath
-    
+        try:
+            plt.figure()
+            plt.hexbin(parameter_value[0], 
+                       parameter_value[1], 
+                       gridsize = gridsize)
+            fpath = self.log_plt(
+                    parameter_name = parameter_name, 
+                    image_format=image_format, dpi=dpi,
+                    time_in_file_name = time_in_file_name)
+            return fpath
+        except:
+            self.log_text(self.log_name,
+                f'Cannot make the hexbin for variable {parameter_name}.')
+            return None
+        
     def log_imshow(self, parameter_name : str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
@@ -761,13 +777,13 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                parameter_value : np.array
+            :param parameter_value : np.array
                     An np array of size n x m, to be shown by imshow
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -821,8 +837,8 @@ class lognflow:
         
             Parameters
             ----------
-                stack : np.ndarray
-                It must have the shape of either
+            :param stack : np.ndarray
+                    It must have the shape of either
                     n_f x n_r x n_c x n_ch
                     n_f x n_r x n_c x 3 x n_ch
                     
@@ -887,10 +903,10 @@ class lognflow:
     
             Parameters
             ----------
-                list_of_stacks
+            :param list_of_stacks
                     list_of_stacks would include arrays iteratable by their
                     first dimension.
-                nan_borders : float
+            :param nan_borders : float
                     borders between tiles will be filled with this variable
                     default: np.nan
         """        
@@ -927,23 +943,23 @@ class lognflow:
             
             Parameters
             ----------
-                parameter_name : str
+            :param parameter_name : str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-                list_of_stacks : list
+            :param list_of_stacks : list
                     List of stack of images, each of which can be a
                     n_F x n_r x n_c. Notice that n_F should be the same for all
                     elements of the list.
-                list_of_masks : list
+            :param list_of_masks : list
                     the same as the list_of_stacks and will be used to make
                     accurate colorbars
-                text_as_colorbar : bool
+            :param text_as_colorbar : bool
                     if True, max and mean and min of each image will be written
                     on it.
-                use_colorbar : bool
+            :param use_colorbar : bool
                     actual colorbar for each iamge will be shown
-                time_in_file_name: bool
+            :param time_in_file_name: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
@@ -1035,34 +1051,41 @@ class lognflow:
                              dpi = 1200,
                              time_in_file_name = True):
         """
-        given a sklearn confusion matrix (cm), make a nice plot
-    
-        Parameters
-        ---------
-        cm:           confusion matrix from sklearn.metrics.confusion_matrix
-    
-        target_names: given classification classes such as [0, 1, 2]
-                      the class names, for example: ['high', 'medium', 'low']
-    
-        title:        the text to display at the top of the matrix
-    
-        cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
-                      (http://matplotlib.org/examples/color/colormaps_reference.html)
-                      plt.get_cmap('jet') or plt.cm.Blues
+            given a sklearn confusion matrix (cm), make a nice plot
         
-        time_in_file_name: if True, the file name will be stamped with time
-    
-        Usage
-        -----
-        plot_confusion_matrix(\
-            cm           = cm,                  # confusion matrix created by
-                                                # sklearn.metrics.confusion_matrix
-            target_names = y_labels_vals,       # list of names of the classes
-            title        = best_estimator_name) # title of graph
-    
-        Citiation
-        ---------
-        http://scikit-learn.org/stable/auto_examples/model_selection/
+            Parameters
+            ---------
+            :param cm:           confusion matrix from sklearn.metrics.confusion_matrix
+            
+            :param target_names: given classification classes such as [0, 1, 2]
+                              the class names, for example: ['high', 'medium', 'low']
+            
+            :param title:        the text to display at the top of the matrix
+            
+            :param cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
+                              (http://matplotlib.org/examples/color/colormaps_reference.html)
+                              plt.get_cmap('jet') or plt.cm.Blues
+                
+            :param time_in_file_name: if True, the file name will be stamped with time
+        
+            Usage
+            -----
+            .. highlight:: python
+               :linenothreshold: 5
+               
+            .. code-block:: python
+                from lognflow import lognflow
+                logger = lognflow(log_roots or log_dir)
+                logger.plot_confusion_matrix(\
+                    cm           = cm,                  # confusion matrix created by
+                                                        # sklearn.metrics.confusion_matrix
+                    target_names = y_labels_vals,       # list of names of the classes
+                    title        = best_estimator_name) # title of graph
+                        
+        
+            Citiation
+            ---------
+            http://scikit-learn.org/stable/auto_examples/model_selection/
                                                            plot_confusion_matrix.html
     
         """
@@ -1115,8 +1138,8 @@ def select_directory(start_directory = './'):
     
         Parameters
         ----------
-            start_directory: pathlib.Path
-            When dialog opens, it starts from here.
+        :param start_directory: pathlib.Path
+                When dialog opens, it starts from here.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication
     _ = QApplication([])

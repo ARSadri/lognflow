@@ -14,24 +14,24 @@ class logviewer:
            :linenothreshold: 5
            
         .. code-block:: python
-        
-           logged = logviewer(log_dir = some_dir)
-           var = logged.get_single('your_desired_variable_name')
+            from lognflow import logviewer
+            logged = logviewer(log_dir = 'dir_contatining_files')
+            var = logged.get_single('variable_name')
     """ 
     def __init__(self,
                  log_dir : pathlib.Path,
                  logger = print):
         self.log_dir = pathlib.Path(log_dir)
+        assert self.log_dir.is_dir(), \
+            f'lognflow.logviewer| No such directory: '+ str(self.log_dir)
         self.logger = logger
-        if(self.log_dir.is_dir()):
-            self.logger('Looking for a log in: '+ str(self.log_dir))
-        else:
-            self.logger('No such directory: ' + str(self.log_dir))
         
     def get_text(self, log_name='main_log'):
         """ get text log files
             Given the log_name, this function returns the text therein.
 
+            Parameters
+            ----------
             :param log_name:
                 the log name. If not given then it is the main log.
         """
@@ -52,6 +52,8 @@ class logviewer:
         """ get a single variable
             return the value of a saved variable.
 
+            Parameters
+            ----------
             :param var_name:
                 variable name
             :param single_shot_index:
@@ -75,7 +77,13 @@ class logviewer:
             flist = [self.log_dir / f'{var_name}.{suffix}']
         else:
             flist = list(self.log_dir.glob(f'{var_name}*.{suffix}'))
-        
+            if(len(flist) == 0):
+                flist = list(self.log_dir.glob(f'{var_name}*.*'))
+                if(len(flist) > 0):
+                    self.logger('Can not find the file with the given suffix, '\
+                                +'but found some with a different suffix, '\
+                                +f'one file is: {flist[single_shot_index]}')
+                    
         if(len(flist) > 0):
             flist.sort()
             var_path = flist[single_shot_index]
@@ -96,13 +104,21 @@ class logviewer:
                 data_array = buf['data_array']
                 data_array = data_array[:n_logs]
                 return((time_array, data_array))
-            elif(var_path.suffix == '.npy'):
+            if(var_path.suffix == '.npy'):
                 return(np.load(var_path))
-            elif(var_path.suffix == '.mat'):
+            if(var_path.suffix == '.mat'):
                 return(loadmat(var_path))
-            elif(var_path.suffix == '.torch'):      
+            if(var_path.suffix == '.txt'):
+                with open(var_path) as f_txt:
+                    return(f_txt.read())
+            if(var_path.suffix == '.torch'):      
                 from torch import load as torch_load 
                 return(torch_load(var_path))
+            try:
+                img = imread(var_path)
+                return(img)
+            except:
+                pass
         else:
             self.logger(f'{var_name} not found.')
             return
@@ -116,6 +132,8 @@ class logviewer:
             This function gives the list of paths of all files in a directory
             for a single variable. 
 
+            Parameters
+            ----------
             :param var_name:
                 The directory or variable name to look for the files
             :type var_name: str
@@ -187,6 +205,8 @@ class logviewer:
             and we are interested to get the flist in both that is common 
             between them. returns a tuple of two lists of files.
             
+            Parameters
+            ----------
             :param var_name_A:
                 directory A name
             :param var_name_B:
@@ -223,6 +243,8 @@ class logviewer:
             This function changes all of the time stamps, sorted ascendingly,
             by indices.
             
+            Parameters
+            ----------
             :param var_name:
                 variable name
         """

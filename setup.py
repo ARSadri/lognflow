@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-"""The setup script."""
+"""The setup script for lognflow."""
 
 from setuptools import setup, find_packages
 
-_version = '0.4.2'
+_version = '0.4.3'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -12,7 +12,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['numpy', 'scipy', 'matplotlib']
+requirements = ['numpy', 'matplotlib']
 
 test_requirements = ['pytest>=3', ]
 
@@ -21,7 +21,7 @@ setup(
     author_email='arsadri@gmail.com',
     python_requires='>=3.6',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 2 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Natural Language :: English',
@@ -29,6 +29,9 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11'
     ],
     description="Log and Flow tracking made easy with Python",
     install_requires=requirements,

@@ -242,6 +242,14 @@ def test_rename():
     logger.rename(logger.log_dir.name + '_new_name')
     logger('This is another test for test_rename')
     
+def test_log_single_text():
+    logger = lognflow(temp_dir)
+    logger('This is a test for test_log_single_text')
+    var = 2
+    logger.log_single('text_log', 'hello\n', save_as='txt', time_in_file_name = False)
+    logger.log_single('text_log', 'bye\n', save_as='txt', time_in_file_name = False)
+    logger.log_single('text_log', var, save_as='txt', time_in_file_name = False)
+    
 if __name__ == '__main__':
     temp_dir = select_directory()
     test_log_plot()
@@ -261,3 +269,4 @@ if __name__ == '__main__':
     test_log_canvas()
     test_log_confusion_matrix()
     test_rename()
+    test_log_single_text()

@@ -39,7 +39,7 @@ class printprogress:
         if(n_steps<2):
             n_steps = 2
         if (title is None):
-            title = f'Progress bar for {n_steps} steps in {numTicks} ticks'
+            title = f'Progress for {n_steps} steps'
         self.FLAG_ended = False
         self.FLAG_warning = False
         self.startTime = time()
