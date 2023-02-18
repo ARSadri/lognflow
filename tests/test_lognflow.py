@@ -71,7 +71,7 @@ def test_log_flush_period():
         while(time.time() < time_time + 10):
             pass
         time_time = time.time()
-        logger(f'Log{_}'*200)
+        logger(f'Log{_}'*20)
         
 
     logger.log_text('not_main_script',

@@ -18,13 +18,11 @@ import pathlib
 import time
 import numpy as np
 import itertools
-from os import sep as os_sep
-
+from   os import sep as os_sep
+from   collections import namedtuple
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib import animation
-
-from collections import namedtuple
+from   matplotlib import animation
 
 varinlog = namedtuple('varinlog',
                       ['data_array', 
@@ -171,6 +169,46 @@ class lognflow:
                                        log_size_limit, 
                                        log_size, 
                                        log_file_id]
+
+    def log_text_close(self, log_name = None,
+                       to_be_logged = 'EOF', 
+                       log_time_stamp = True,
+                       print_text = None,):
+        """ Close a log text file
+            You can close a log text file. You can let it write the last 
+            text or not and give it a time stamp or not and let it print it
+            or not.
+            
+            Parameters
+            ----------
+            :param log_name : str
+                    examples: mylog or myscript/mylog
+                    log_name can be just a name e.g. mylog, or could be a
+                    pathlike name such as myscript/mylog.
+            :param to_be_logged : str, nd.array, list, dict
+                    the string to be logged, could be a list
+                    or numpy array or even a dictionary. It uses str(...).
+            :param log_time_stamp : bool
+                    Put time stamp for every entry of the log
+            :param print_text : bool
+                    if False, what is logged will not be printed.
+        """
+        time_time = time.time() - self._init_time
+        self.log_text_flush()
+        if(log_name is None):
+            log_name = self.log_name
+        
+        if(log_name in self._loggers_dict.keys()):
+            _logger, log_size_limit, log_size, log_file_id = \
+                self._loggers_dict[log_name]
+            if(log_time_stamp):
+                _time_str = f'T:{time_time:>6.6f}| '
+                _logger.write(_time_str)
+            _logger.write(to_be_logged)
+            _logger.close()
+        
+            self._loggers_dict.pop(log_name)
+            return(1)
         
     def log_text_flush(self):
         """ Flush the text logs
@@ -521,7 +559,8 @@ class lognflow:
     def log_plt(self, 
                 parameter_name : str, 
                 image_format='jpeg', dpi=1200,
-                time_in_file_name = True):
+                time_in_file_name = True,
+                close_plt = True):
         """log a single plt
             log a plt that you have on the screen.
             
@@ -541,13 +580,54 @@ class lognflow:
         
         try:
             plt.savefig(fpath, format=image_format, dpi=dpi)
-            plt.close()
+            if(close_plt):
+                plt.close()
             return fpath
         except:
-            plt.close()
+            if(close_plt):
+                plt.close()
             self.log_text(self.log_name,
                           f'Cannot save the plt instance {parameter_name}.')
             return None
+     
+    def add_colorbar(self, mappable):
+        """ Add colobar to the current axis 
+            This is specially useful in plt.subplots
+            stackoverflow.com/questions/23876588/
+                matplotlib-colorbar-in-each-subplot
+        """
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        last_axes = plt.gca()
+        ax = mappable.axes
+        fig = ax.figure
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = fig.colorbar(mappable, cax=cax)
+        plt.sca(last_axes)
+        return cbar
+
+    def log_multichannel_by_subplots(self, 
+                                 parameter_name : str, 
+                                 parameter_value : np.ndarray,
+                                 image_format='jpeg', 
+                                 dpi=1200, 
+                                 cmap = 'jet',
+                                 time_in_file_name = True,
+                                 **kwargs):
+        n_r, n_c, n_ch = parameter_value.shape
+        n_ch_sq = int(np.ceil(n_ch ** 0.5))
+        _, ax = plt.subplots(n_ch_sq,n_ch_sq)
+        for rcnt in range(n_ch_sq):
+            for ccnt in range(n_ch_sq):
+                im = parameter_value[:, :, rcnt + ccnt * n_ch_sq]
+                im_ch = ax[rcnt, ccnt].imshow(im, vmin = 0, vmax = 10)
+                    # vmin = np.maximum(im.min(), im.mean() - 3 * im.std()),
+                    # vmax = np.minimum(im.max(), im.mean() + 3 * im.std()))
+                self.add_colorbar(im_ch)
+        self.log_plt(parameter_name = parameter_name,
+                     image_format=image_format, dpi=dpi,
+                     time_in_file_name = time_in_file_name)
+
     
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
@@ -771,7 +851,8 @@ class lognflow:
     def log_imshow(self, parameter_name : str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_in_file_name = True):
+                   time_in_file_name = True,
+                   **kwargs):
         """log an image
             The image is logged using plt.imshow
             
@@ -815,7 +896,7 @@ class lognflow:
                 FLAG_img_ready = True
         
         if(FLAG_img_ready):
-            plt.imshow(parameter_value, cmap = cmap)
+            plt.imshow(parameter_value, cmap = cmap, **kwargs)
             plt.colorbar()
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
@@ -1120,29 +1201,49 @@ class lognflow:
         plt.xlabel('Predicted label\naccuracy={:0.4f}; ' \
                    + 'misclass={:0.4f}'.format(accuracy, misclass))
         plt.title(title)
-        plt.colorbar(im,fraction=0.046, pad=0.04)
+        plt.colorbar(im, fraction=0.046, pad=0.04)
         plt.tight_layout()
         fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_in_file_name = time_in_file_name)
         return fpath
-    
+
     def __del__(self):
         self.log_text_flush()
         self.log_var_flush()
-        
-def select_directory(start_directory = './'):
+        _loggers_dict_keys = list(self._loggers_dict.keys())
+        for log_name in _loggers_dict_keys:
+            self.log_text_close(log_name = log_name)
+
+    def __repr__(self):
+        return f'<lognflow(log_dir = {self.log_dir})>'
+
+    def __bool__(self):
+        return self.log_dir.is_dir()
+
+def select_directory(default_directory = './'):
     """ Open dialog to select a directory
-        It works for windows and Linux.
+        It works for windows and Linux using PyQt5.
     
         Parameters
         ----------
-        :param start_directory: pathlib.Path
-                When dialog opens, it starts from here.
+        :param default_directory: pathlib.Path
+                When dialog opens, it starts from this default directory.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication
     _ = QApplication([])
     log_dir = QFileDialog.getExistingDirectory(
-        None, "Open a folder", start_directory, QFileDialog.ShowDirsOnly)
+        None, "Select a directory", default_directory, QFileDialog.ShowDirsOnly)
     return(log_dir)
+
+def open_file():
+    """ Open dialog to select a file
+        It works for windows and Linux using PyQt5.
+    """
+    from PyQt5.QtWidgets import QFileDialog, QApplication
+    from pathlib import Path
+    _ = QApplication([])
+    fpath = QFileDialog.getOpenFileName()
+    fpath = Path(fpath[0])
+    return(fpath)

@@ -57,8 +57,8 @@ def test_get_images_as_stack():
     logged.replace_time_with_index('A/')
     logged.replace_time_with_index('B/')
     
-    stack_A = logged.get_stack_of_files('A/')
-    stack_B = logged.get_stack_of_files('B/')
+    stack_A = logged.get_stack_of_files('A/', return_data = True, return_flist = False)
+    stack_B = logged.get_stack_of_files('B/', return_data = True, return_flist = False)
 
     logger(stack_A.shape)
     logger(stack_B.shape)
@@ -79,8 +79,8 @@ def test_get_images_as_stack():
     
     if(flist_A_AB):
         
-        dataset_A = logged.get_stack_of_files(flist = flist_A_AB)
-        dataset_B = logged.get_stack_of_files(flist = flist_B_AB)
+        dataset_A = logged.get_stack_of_files(flist = flist_A_AB, return_data = True, return_flist = False)
+        dataset_B = logged.get_stack_of_files(flist = flist_B_AB, return_data = True, return_flist = False)
         
         logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
         _ = logger._loggers_dict['main_log'][2]

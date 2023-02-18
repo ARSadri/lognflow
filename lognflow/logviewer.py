@@ -67,18 +67,23 @@ class logviewer:
             .. note::
                 when reading a MATLAB file, the output is a dictionary.
         """
+        var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
+            .replace('\r', '\\r').replace('\b', '\\b')
+        
         suffix = suffix.strip('.')
         assert single_shot_index == int(single_shot_index), \
                     f'single_shot_index {single_shot_index} must be an integer'
-                    
+        flist = []            
         if((self.log_dir / var_name).is_file()):
             flist = [self.log_dir / var_name]
         elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
             flist = [self.log_dir / f'{var_name}.{suffix}']
         else:
-            flist = list(self.log_dir.glob(f'{var_name}*.{suffix}'))
+            _var_name = (self.log_dir / var_name).name
+            _var_dir = (self.log_dir / var_name).parent
+            flist = list(_var_dir.glob(f'{_var_name}*.{suffix}'))
             if(len(flist) == 0):
-                flist = list(self.log_dir.glob(f'{var_name}*.*'))
+                flist = list(_var_dir.glob(f'{_var_name}*.*'))
                 if(len(flist) > 0):
                     self.logger('Can not find the file with the given suffix, '\
                                 +'but found some with a different suffix, '\
@@ -86,13 +91,16 @@ class logviewer:
                     
         if(len(flist) > 0):
             flist.sort()
-            var_path = flist[single_shot_index]
         else:
             var_dir = self.log_dir / var_name
             if(var_dir.is_dir()):
                 flist = list(var_dir.glob('*.*'))
+            if(len(flist) > 0):
                 flist.sort()
-                var_path = flist[single_shot_index]
+            else:
+                self.logger('No such variable')
+                return
+        var_path = flist[single_shot_index]
                 
         if(var_path.is_file()):
             self.logger(f'Loading {var_path}')
@@ -124,8 +132,8 @@ class logviewer:
             return
     
     def get_stack_of_files(self, 
-        var_name = None, flist = [], 
-        return_data = True, return_flist = False):
+        var_name = None, flist = [], suffix = '*',
+        return_data = False, return_flist = True):
         
         """ Get list or data of all files in a directory
         
@@ -143,14 +151,27 @@ class logviewer:
                 the data requested to this list.
             :type flist: list
             
+            :param suffix:
+                the suffix of files to look for, e.g. 'txt'
+            :type siffix: str
+            
             :param return_data: 
                     with flist you can limit the data that is returned.
                     Otherwise the data for all files in the directory will be
                     returned
             :param return_flist
                     Maybe you are only intrested in the flist.
+                    
+            Output
+            ----------
+            
+                It returns a tuple, (dataset, flist),
+                dataset will be a numpy array in case all files produce same
+                shape numpy arrays.
+                flist is type pathlib.Path
+            
         """
-        
+        suffix = suffix.strip('.')
         if not flist:
             assert var_name is not None, \
                 ' The file list is empty. Please provide the ' \
@@ -158,11 +179,11 @@ class logviewer:
             var_dir = self.log_dir / var_name
             if(var_dir.is_dir()):
                 var_fname = None
-                flist = list(var_dir.glob(f'*.*'))
+                flist = list(var_dir.glob(f'*.{suffix}'))
             else:
                 var_fname = var_dir.name
                 var_dir = var_dir.parent
-                flist = list(var_dir.glob(f'{var_fname}_*.*'))
+                flist = list(var_dir.glob(f'{var_fname}_*.{suffix}'))
         if flist:
             flist.sort()
             n_files = len(flist)
