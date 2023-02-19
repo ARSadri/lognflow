@@ -58,6 +58,11 @@ class lognflow:
             This is the final directory path for the log files. 
         :type log_dir: pathlib.Path
     
+        :param exp_prename:
+            this string will be put before the time stamp for log_dir, when
+            only logs_root is given.
+        :type exp_prename: str
+        
         :param print_text: 
             If True, everything that is logged as text will be printed as well
         :type print_text: bool
@@ -86,6 +91,7 @@ class lognflow:
     def __init__(self, 
                  logs_root : pathlib.Path = None,
                  log_dir : pathlib.Path = None,
+                 exp_prename = None,
                  print_text = True,
                  main_log_name = 'main_log',
                  log_flush_period = 60,
@@ -100,8 +106,19 @@ class lognflow:
                     logs_root = select_directory(logs_root)
                 except:
                     pass
-            self.log_dir = \
-                pathlib.Path(logs_root) / f'{int(self._init_time):d}/'
+            
+            new_log_dir_found = False
+            while(not new_log_dir_found):
+                log_dir_name = ''
+                if(exp_prename is not None):
+                    log_dir_name = str(exp_prename)
+                log_dir_name += f'{self._init_time}/'
+                self.log_dir = \
+                    pathlib.Path(logs_root) / log_dir_name
+                if(not self.log_dir.is_dir()):
+                    new_log_dir_found = True
+                else:
+                    self._init_time = time.time()
         else:
             self.log_dir = pathlib.Path(log_dir)
         if(not self.log_dir.is_dir()):
@@ -611,7 +628,6 @@ class lognflow:
                                  parameter_value : np.ndarray,
                                  image_format='jpeg', 
                                  dpi=1200, 
-                                 cmap = 'jet',
                                  time_in_file_name = True,
                                  **kwargs):
         n_r, n_c, n_ch = parameter_value.shape
@@ -619,10 +635,8 @@ class lognflow:
         _, ax = plt.subplots(n_ch_sq,n_ch_sq)
         for rcnt in range(n_ch_sq):
             for ccnt in range(n_ch_sq):
-                im = parameter_value[:, :, rcnt + ccnt * n_ch_sq]
-                im_ch = ax[rcnt, ccnt].imshow(im, vmin = 0, vmax = 10)
-                    # vmin = np.maximum(im.min(), im.mean() - 3 * im.std()),
-                    # vmax = np.minimum(im.max(), im.mean() + 3 * im.std()))
+                im = parameter_value[:, :, ccnt + rcnt * n_ch_sq]
+                im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
                 self.add_colorbar(im_ch)
         self.log_plt(parameter_name = parameter_name,
                      image_format=image_format, dpi=dpi,

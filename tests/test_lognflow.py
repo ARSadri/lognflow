@@ -26,6 +26,12 @@ def test_content(response):
     # from bs4 import BeautifulSoup
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
+def test_lognflow_conflict_in_names():
+    logger1 = lognflow(temp_dir)
+    print(logger1.log_dir)
+    logger2 = lognflow(temp_dir)
+    print(logger2.log_dir)
+
 def test_lognflow():
     logger = lognflow(temp_dir)
     logger('This is a test for lognflow and log_var')    
@@ -251,7 +257,14 @@ def test_log_single_text():
     logger.log_single('text_log', var, save_as='txt', time_in_file_name = False)
     
 if __name__ == '__main__':
+    
+           
+    #--------DO-NOT-TOUCH-------#
     temp_dir = select_directory()
+    #---------------------------#
+    
+    test_lognflow_conflict_in_names()
+    exit()
     test_log_plot()
     test_prepare_stack_of_images()
     test_logger()
