@@ -227,7 +227,7 @@ class lognflow:
             self._loggers_dict.pop(log_name)
             return(1)
         
-    def log_text_flush(self):
+    def log_text_flush(self, force_flush = False):
         """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
@@ -235,12 +235,18 @@ class lognflow:
             called multiple times. but use needs to also call it once in a
             while.
             In later versions, a timer will be used to call it automatically.
+            
+            :param force_flush:
+                force the flush regardless of when the last time was.
+                default: False
+            :type force_flush: bool
         """
         time_time = time.time() - self._init_time
         self.log_flush_period_var += self.log_flush_period_increase_rate
         if(self.log_flush_period_var >  self.log_flush_period):
             self.log_flush_period_var = self.log_flush_period
-        if(time_time - self.last_log_flush_time > self.log_flush_period_var):
+        if((time_time - self.last_log_flush_time > self.log_flush_period_var)
+           | force_flush):
             for log_name in self._loggers_dict.keys():
                 _logger, _, _, _ = self._loggers_dict[log_name]
                 _logger.flush()
@@ -350,14 +356,6 @@ class lognflow:
             _, _, _, log_file_id = self._loggers_dict[log_name]
         return log_file_id
     
-    def __call__(self, *args, **kwargs):
-        if(len(args) == 1):
-            self.log_text(self.log_name,
-                          to_be_logged = args[0], 
-                          **kwargs)
-        else:
-            self.log_single(*args, **kwargs)
-                    
     def _prepare_param_dir(self, parameter_name):
         try:
             _ = parameter_name.split()
@@ -1222,6 +1220,9 @@ class lognflow:
                 image_format=image_format, dpi=dpi,
                 time_in_file_name = time_in_file_name)
         return fpath
+
+    def __call__(self, *args, **kwargs):
+        self.log_text(*args, **kwargs)
 
     def __del__(self):
         self.log_text_flush()
