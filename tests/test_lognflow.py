@@ -31,6 +31,7 @@ def test_lognflow_conflict_in_names():
     print(logger1.log_dir)
     logger2 = lognflow(temp_dir)
     print(logger2.log_dir)
+    
 
 def test_lognflow():
     logger = lognflow(temp_dir)
@@ -60,13 +61,13 @@ def test_logger():
     c = 'asdf'
     
     logger(a)
-    logger('a', a)
-    logger('aa', a, save_as = 'txt', time_in_file_name = False)
+    logger.log_single('a', a)
+    logger.log_single('aa', a, save_as = 'txt', time_tag = False)
     logger(b)
-    logger('b', b)
-    logger('bb', b, save_as = 'txt', time_in_file_name = False)
+    logger.log_single('b', b)
+    logger.log_single('bb', b, save_as = 'txt', time_tag = False)
     logger(c)
-    logger('test/c', c, save_as = 'txt')
+    logger.log_single('test/c', c, save_as = 'txt')
 
 def test_log_flush_period():
     logger = lognflow(temp_dir, log_flush_period = 30)
@@ -99,13 +100,12 @@ def test_log_var_without_time_stamp():
 
     for _ in range(10):
         logger.log_single('vars/vec/v', np.random.rand(10000), 
-                       time_in_file_name = False)
+                       time_tag = False)
         
 def test_log_animation():
     var1 = np.random.rand(32, 100, 100)
     logger = lognflow(temp_dir)
     logger('This is a test for log_animation')    
-    
     logger.log_animation('var1',var1)
 
 def test_log_single():
@@ -113,14 +113,10 @@ def test_log_single():
     
     logger = lognflow(temp_dir)
     logger('This is a test for log_plot')    
-    
     logger.log_single('var1',var1)
-    
     a_dict = dict({'str_var': 'This is a string',
                    'var1': var1})
-    
     logger.log_single('a_dict', a_dict)
-    
     logger.log_single('a_dict', a_dict, save_as = 'txt')
 
 def test_log_plot():
@@ -185,7 +181,16 @@ def test_log_imshow():
     logger('This is a test for log_imshow')    
     logger.log_imshow('var3d', np.random.rand(100, 100))    
 
+def test_log_surface():
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_surface')    
+    logger.log_surface('var3d', np.random.rand(100, 100))    
+
 def test_prepare_stack_of_images():
+    """ 
+        When we have 8 set of images, each is 100x100 and there are 9 of them 
+        which will appear as 3x3 tile.
+    """
     stack_1 = np.random.rand(8, 100, 100, 9)
     stack_1[:, :1, :, :] = np.nan
     stack_1[:, :, :1, :] = np.nan
@@ -252,19 +257,19 @@ def test_log_single_text():
     logger = lognflow(temp_dir)
     logger('This is a test for test_log_single_text')
     var = 2
-    logger.log_single('text_log', 'hello\n', save_as='txt', time_in_file_name = False)
-    logger.log_single('text_log', 'bye\n', save_as='txt', time_in_file_name = False)
-    logger.log_single('text_log', var, save_as='txt', time_in_file_name = False)
+    logger.log_single('text_log', 'hello\n', save_as='txt', time_tag = False)
+    logger.log_single('text_log', 'bye\n', save_as='txt', time_tag = False)
+    logger.log_single('text_log', var, save_as='txt', time_tag = False)
     
 if __name__ == '__main__':
     
-           
-    #--------DO-NOT-TOUCH-------#
+    #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
     
+    test_log_surface()
+    test_log_single()
     test_lognflow_conflict_in_names()
-    exit()
     test_log_plot()
     test_prepare_stack_of_images()
     test_logger()
@@ -273,7 +278,6 @@ if __name__ == '__main__':
     test_lognflow()
     test_log_var()
     test_log_animation()
-    test_log_single()
     test_log_hist()
     test_log_scatter3()
     test_log_plt()

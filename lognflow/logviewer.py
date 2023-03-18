@@ -183,7 +183,9 @@ class logviewer:
             else:
                 var_fname = var_dir.name
                 var_dir = var_dir.parent
-                flist = list(var_dir.glob(f'{var_fname}_*.{suffix}'))
+                patt = f'{var_fname}*.{suffix}'
+                patt = patt.replace('**', '*')
+                flist = list(var_dir.glob(patt))
         if flist:
             flist.sort()
             n_files = len(flist)
@@ -289,3 +291,9 @@ class logviewer:
                 fpath_new = flist[fcnt].parent / fname_new
                 self.logger(f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
+                
+    def __repr__(self):
+        return f'<logviewer(log_dir = {self.log_dir})>'
+
+    def __bool__(self):
+        return self.log_dir.is_dir()

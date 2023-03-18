@@ -4,7 +4,7 @@
 
 from setuptools import setup, find_packages
 
-_version = '0.5.2'
+__version__ = '0.5.3'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -26,7 +26,6 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
@@ -44,6 +43,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/arsadri/lognflow',
-    version=_version,
+    version=__version__,
     zip_safe=False,
 )

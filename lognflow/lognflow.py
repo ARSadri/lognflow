@@ -27,7 +27,7 @@ from   matplotlib import animation
 varinlog = namedtuple('varinlog',
                       ['data_array', 
                       'time_array', 
-                      'cur_index', 
+                      'curr_index', 
                       'file_start_time', 
                       'save_as',
                       'log_counter_limit'])
@@ -76,6 +76,15 @@ class lognflow:
             flushing, you can reduce network or HDD overhead.
         :type log_flush_period: int
                 
+        :param time_tag:
+            File names can carry time_tags in time.time() format. This 
+            is pretty much the most fundamental contribution of lognflow beside
+            carrying the folders around. By default all file names will stop
+            having time tag if you set it here to False here. Itherwise,
+            all file names will have time tag unless stated at each logging by
+            log_... functions.
+        :type time_tag: bool
+
         :param log_flush_period_increase_rate:
             we do not begin the timeout for the flush to be log_flush_period
             because it can happen that a code finishes very fast. Such a 
@@ -95,8 +104,10 @@ class lognflow:
                  print_text = True,
                  main_log_name = 'main_log',
                  log_flush_period = 60,
-                 log_flush_period_increase_rate = 4):
+                 log_flush_period_increase_rate = 4,
+                 time_tag = True):
         self._init_time = time.time()
+        self.time_tag = time_tag
 
         if(log_dir is None):
             if(logs_root is None):
@@ -137,7 +148,7 @@ class lognflow:
         self.log_flush_period_increase_rate = 4
         self.log_flush_period = log_flush_period
     
-    def rename(self, new_dir:str):
+    def rename(self, new_dir:str, time_tag = False):
         """ renaming the log directory
             It is possible to rename the log directory while logging is going
             on. This is particulary useful when at the end of an experiment,
@@ -151,12 +162,18 @@ class lognflow:
             :param new_dir: The new name of the directory (without parent path)
             :type new_dir: str
             
+            :param time_tag: keep the time tag for the folder. Default: False.
+            :type time_tag: bool
+            
         """
-        for log_name in self._loggers_dict.keys():
+        for log_name in self._loggers_dict:
             _logger, _, _, _ = self._loggers_dict[log_name]
             _logger.close()
-        self.log_dir = self.log_dir.rename(self.log_dir.parent / new_dir)
-        for log_name in self._loggers_dict.keys():
+        new_name = self.log_dir.parent / new_dir
+        if(time_tag):
+            new_name += new_name + '_' + self.log_dir
+        self.log_dir = self.log_dir.rename(new_name)
+        for log_name in self._loggers_dict:
             _logger, log_size_limit, log_size, log_file_id = \
                 self._loggers_dict[log_name]
             log_fpath = self.log_dir / log_file_id
@@ -168,15 +185,16 @@ class lognflow:
     
     def _log_text_handler(self, log_name = None, 
                          log_size_limit: int = int(1e+7),
-                         time_in_file_name = True):
-
-        if(log_name in self._loggers_dict.keys()):
+                         time_tag = None):
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        if(log_name in self._loggers_dict):
             _logger, log_size_limit, log_size, log_file_id = \
                 self._loggers_dict[log_name]
             _logger.close()
         
         log_size = 0
-        if(time_in_file_name):
+        if(time_tag):
             log_file_id = log_name + f'_{int(time.time()):d}.txt'
         else:
             log_file_id = log_name + '.txt'
@@ -187,10 +205,7 @@ class lognflow:
                                        log_size, 
                                        log_file_id]
 
-    def log_text_close(self, log_name = None,
-                       to_be_logged = 'EOF', 
-                       log_time_stamp = True,
-                       print_text = None,):
+    def log_text_close(self, log_name = None):
         """ Close a log text file
             You can close a log text file. You can let it write the last 
             text or not and give it a time stamp or not and let it print it
@@ -202,30 +217,19 @@ class lognflow:
                     examples: mylog or myscript/mylog
                     log_name can be just a name e.g. mylog, or could be a
                     pathlike name such as myscript/mylog.
-            :param to_be_logged : str, nd.array, list, dict
-                    the string to be logged, could be a list
-                    or numpy array or even a dictionary. It uses str(...).
-            :param log_time_stamp : bool
-                    Put time stamp for every entry of the log
-            :param print_text : bool
-                    if False, what is logged will not be printed.
         """
-        time_time = time.time() - self._init_time
-        self.log_text_flush()
+        self.log_text_flush(force_flush = True)
         if(log_name is None):
             log_name = self.log_name
         
-        if(log_name in self._loggers_dict.keys()):
-            _logger, log_size_limit, log_size, log_file_id = \
-                self._loggers_dict[log_name]
-            if(log_time_stamp):
-                _time_str = f'T:{time_time:>6.6f}| '
-                _logger.write(_time_str)
-            _logger.write(to_be_logged)
-            _logger.close()
-        
-            self._loggers_dict.pop(log_name)
-            return(1)
+        if(log_name in self._loggers_dict):
+            _logger, _, _, _ = self._loggers_dict[log_name]
+            try:
+                _logger.close()
+                self._loggers_dict.pop(log_name)
+                return(True)
+            except:
+                self.log_text(self.log_name, f'Could not close log {log_name}')
         
     def log_text_flush(self, force_flush = False):
         """ Flush the text logs
@@ -247,18 +251,18 @@ class lognflow:
             self.log_flush_period_var = self.log_flush_period
         if((time_time - self.last_log_flush_time > self.log_flush_period_var)
            | force_flush):
-            for log_name in self._loggers_dict.keys():
+            for log_name in self._loggers_dict:
                 _logger, _, _, _ = self._loggers_dict[log_name]
                 _logger.flush()
             self.last_log_flush_time = time_time
 
     def log_text(self, 
-                 log_name : str = None,
+                 log_name : str,
                  to_be_logged = '\n', 
                  log_time_stamp = True,
                  print_text = None,
                  log_size_limit: int = int(1e+7),
-                 time_in_file_name = True):
+                 time_tag = None):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
             Also you can pass a small numpy array. You can ask it to put time
@@ -281,15 +285,14 @@ class lognflow:
                     if False, what is logged will not be printed.
             :param log_size_limit : int
                     log size limit in bytes.
-            :param time_in_file_name : bool
+            :param time_tag : bool
                     put time stamp in file names.
             
         """
         time_time = time.time() - self._init_time
 
-        if(log_name is None):
-            log_name = self.log_name
-        
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+
         if((print_text is None) | (print_text is True)):
             print_text = self._print_text
         
@@ -298,10 +301,10 @@ class lognflow:
                 print(f'T:{time_time:>6.6f}| ', end='')
             print(to_be_logged)
                 
-        if not (log_name in self._loggers_dict.keys()):
+        if not (log_name in self._loggers_dict):
             self._log_text_handler(log_name, 
                                    log_size_limit = log_size_limit,
-                                   time_in_file_name = time_in_file_name)
+                                   time_tag = time_tag)
 
         _logger, log_size_limit, log_size, log_file_id = \
             self._loggers_dict[log_name]
@@ -431,43 +434,43 @@ class lognflow:
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
 
-        if(parameter_name in self._vars_dict.keys()):
+        if(parameter_name in self._vars_dict):
             _var = self._vars_dict[parameter_name]
-            data_array, time_array, cur_index, \
+            data_array, time_array, curr_index, \
                 file_start_time, save_as, log_counter_limit = _var
-            cur_index += 1
+            curr_index += 1
         else:
             file_start_time = time.time()
-            cur_index = 0
+            curr_index = 0
 
-        if(cur_index >= log_counter_limit):
+        if(curr_index >= log_counter_limit):
             self._log_var_save(parameter_name)
             file_start_time = time.time()
-            cur_index = 0
+            curr_index = 0
 
-        if(cur_index == 0):
+        if(curr_index == 0):
             data_array = np.zeros((log_counter_limit, ) + parameter_value.shape,
                                   dtype = parameter_value.dtype)
             time_array = np.zeros(log_counter_limit)
         
         try:
-            time_array[cur_index] = time_time
+            time_array[curr_index] = time_time
         except:
             self.log_text(
                 self.log_name,
-                f'current index {cur_index} cannot be used in the logger')
-        if(parameter_value.shape == data_array[cur_index].shape):
-            data_array[cur_index] = parameter_value
+                f'current index {curr_index} cannot be used in the logger')
+        if(parameter_value.shape == data_array[curr_index].shape):
+            data_array[curr_index] = parameter_value
         else:
             self.log_text(
                 self.log_name,
                 f'Shape of variable {parameter_name} cannot change '\
-                f'from {data_array[cur_index].shape} '\
+                f'from {data_array[curr_index].shape} '\
                 f'to {parameter_value.shape}. Coppying from the last time.')
-            data_array[cur_index] = data_array[cur_index - 1]
+            data_array[curr_index] = data_array[curr_index - 1]
         self._vars_dict[parameter_name] = varinlog(data_array, 
                                                   time_array, 
-                                                  cur_index,
+                                                  curr_index,
                                                   file_start_time,
                                                   save_as,
                                                   log_counter_limit)
@@ -494,12 +497,12 @@ class lognflow:
             arrays. It is called using log_size_limit for a variable and als
             when the code that made the logger ends.
         """
-        for parameter_name in self._vars_dict.keys():
+        for parameter_name in self._vars_dict:
             self._log_var_save(parameter_name)
     
     def _get_fpath(self, 
                    param_dir, param_name, 
-                   save_as, time_in_file_name):
+                   save_as, time_tag):
         time_time = time.time() - self._init_time
         if(save_as == 'mat'):
             if(len(param_name) == 0):
@@ -507,7 +510,7 @@ class lognflow:
         
         if(len(param_name) > 0):
             fname = f'{param_name}'
-            if(time_in_file_name):
+            if(time_tag):
                 fname += f'_{time_time}'
         else:
             fname = f'{time_time}'
@@ -516,9 +519,9 @@ class lognflow:
     
     def log_single(self, parameter_name : str, 
                          parameter_value,
-                         save_as = 'npy',
+                         save_as = None,
                          mat_field = None,
-                         time_in_file_name = True):
+                         time_tag = None):
         """log a single variable
             The most frequently used function would probably be this one.
             
@@ -540,19 +543,22 @@ class lognflow:
             :param mat_field : str
                     when saving as 'mat' file, the field can be set.
                     otherwise it will be the parameter_name
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        if ((save_as is None) & isinstance(parameter_value, dict)):
-            save_as = 'npz'
-        
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        if(save_as is None):
+            save_as = 'npy'
+            if (isinstance(parameter_value, dict)):
+                save_as = 'npz'
         save_as = save_as.strip()
         save_as = save_as.strip('.')
-        
+
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         fpath = self._get_fpath(param_dir, param_name, 
-                                save_as, time_in_file_name)
+                                save_as, time_tag)
             
         if(save_as == 'npy'):
             np.save(fpath, parameter_value)
@@ -574,7 +580,7 @@ class lognflow:
     def log_plt(self, 
                 parameter_name : str, 
                 image_format='jpeg', dpi=1200,
-                time_in_file_name = True,
+                time_tag = None,
                 close_plt = True):
         """log a single plt
             log a plt that you have on the screen.
@@ -585,13 +591,15 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         fpath = self._get_fpath(param_dir, param_name, 
-                                image_format, time_in_file_name)
+                                image_format, time_tag)
         
         try:
             plt.savefig(fpath, format=image_format, dpi=dpi)
@@ -626,8 +634,10 @@ class lognflow:
                                  parameter_value : np.ndarray,
                                  image_format='jpeg', 
                                  dpi=1200, 
-                                 time_in_file_name = True,
+                                 time_tag = None,
                                  **kwargs):
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         n_r, n_c, n_ch = parameter_value.shape
         n_ch_sq = int(np.ceil(n_ch ** 0.5))
         _, ax = plt.subplots(n_ch_sq,n_ch_sq)
@@ -638,13 +648,13 @@ class lognflow:
                 self.add_colorbar(im_ch)
         self.log_plt(parameter_name = parameter_name,
                      image_format=image_format, dpi=dpi,
-                     time_in_file_name = time_in_file_name)
+                     time_tag = time_tag)
 
     
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100,
-                         time_in_file_name = True):
+                         time_tag = None):
         
         """Make an animation from a stack of images
             
@@ -656,9 +666,14 @@ class lognflow:
                     path like name such as myscript/myvar.
             :param stack : np.array of shape n_f x n_r x n_c or n_f x n_r x n_c x 3
                     stack[cnt] needs to be plotable by plt.imshow()
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        fpath = self._get_fpath(param_dir, param_name, 'gif', time_tag)
+
         fig, ax = plt.subplots()
         ims = []
         for img in stack:    
@@ -668,9 +683,6 @@ class lognflow:
         ani = animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit,
             repeat_delay = repeat_delay)    
-
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        fpath = self._get_fpath(param_dir, param_name, 'gif', time_in_file_name)
         ani.save(fpath, dpi = dpi, 
                  writer = animation.PillowWriter(fps=int(1000/interval)))
         return fpath
@@ -679,7 +691,8 @@ class lognflow:
                        parameter_value_list,
                        x_values = None,
                        image_format='jpeg', dpi=1200,
-                       time_in_file_name = True):
+                       time_tag = None,
+                       **kwargs):
         """log a single plot
             If you have a numpy array or a list of arrays (or indexable by
             first dimension, an array of 1D arrays), use this to log a plot 
@@ -698,11 +711,12 @@ class lognflow:
                     or a list for each vector in y values where every element
                     of x-values list is the same as the y-values element in 
                     their list
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         try:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
@@ -721,17 +735,17 @@ class lognflow:
             
             for list_cnt, parameter_value in enumerate(parameter_value_list):
                 if(x_values is None):
-                    plt.plot(parameter_value, '-*')
+                    plt.plot(parameter_value, '-*', **kwargs)
                 else:
                     if(len(x_values) == len(parameter_value)):
-                        plt.plot(x_values[list_cnt], parameter_value)
+                        plt.plot(x_values[list_cnt], parameter_value, **kwargs)
                     else:
-                        plt.plot(x_values[0], parameter_value, '-*')
+                        plt.plot(x_values[0], parameter_value, '-*', **kwargs)
             
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
                         
             return fpath
         except:
@@ -744,7 +758,8 @@ class lognflow:
                        n_bins = 10,
                        alpha = 0.5,
                        image_format='jpeg', dpi=1200,
-                       time_in_file_name = True):
+                       time_tag = None, 
+                       **kwargs):
         """log a single histogram
             If you have a numpy array or a list of arrays (or indexable by
             first dimension, an array of 1D arrays), use this to log a hist
@@ -766,10 +781,12 @@ class lognflow:
                     the opacity of histograms, a flot between 0 and 1. If you
                     have multiple histograms on top of each other,
                     use 1/number_of_your_variables.
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         try:
             if not isinstance(parameter_value_list, list):
                 parameter_value_list = [parameter_value_list]
@@ -778,22 +795,21 @@ class lognflow:
                 bins, edges = np.histogram(parameter_value, n_bins)
                 plt.bar(edges[:-1], bins, 
                         width =np.diff(edges).mean(), alpha=alpha)
-                plt.plot(edges[:-1], bins)
+                plt.plot(edges[:-1], bins, **kwargs)
             
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
             return fpath
         except:
             self.log_text(self.log_name,
                 f'Cannot make the histogram for variable {parameter_name}.')
             return None
     
-    def log_scatter3(self, parameter_name : str, 
-                       parameter_value,
-                       image_format='jpeg', dpi=1200,
-                       time_in_file_name = True):
+    def log_scatter3(self, parameter_name : str,
+                       parameter_value, image_format='jpeg', dpi=1200,
+                       time_tag = None):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
@@ -805,10 +821,12 @@ class lognflow:
                     path like name such as myscript/myvar.
             :param parameter_value : np.array
                     An np array of size 3 x n, to sctter n data points in 3D
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         try:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -818,16 +836,53 @@ class lognflow:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
             return fpath
         except:
             self.log_text(self.log_name,
                 f'Cannot make the scatter3 for variable {parameter_name}.')
             return None
     
+    def log_surface(self, parameter_name : str,
+                       parameter_value, image_format='jpeg', dpi=1200,
+                       time_tag = None, **kwargs):
+        """log a surface in 3D
+            surface plotting in 3D exactly similar to imshow but in 3D
+            
+            Parameters
+            ----------
+            :param parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+            :param parameter_value : np.array
+                    An np array of size n x m, to plot surface in 3D
+            :param time_tag: bool
+                    Wheather if the time stamp is in the file name or not.
+            rest of the parameters (**kwargs) will be passed to plot_surface() 
+        """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        try:
+            # from mpl_toolkits.mplot3d import Axes3D
+            n_r, n_c = parameter_value.shape
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            X, Y = np.meshgrid(np.arange(n_r), np.arange(n_c))
+            ax.plot_surface(X, Y, parameter_value, **kwargs)
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_tag = time_tag)
+            return fpath
+        except:
+            self.log_text(self.log_name,
+                f'Cannot make the surface plot for variable {parameter_name}.')
+            return None
+        
     def log_hexbin(self, parameter_name : str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200,
-                   time_in_file_name = True):
+                   time_tag = None):
         """log a 2D histogram 
             The 2D histogram is made out of hexagonals
             
@@ -841,10 +896,12 @@ class lognflow:
                     An np array of size 2 x n, to make the 2D histogram
             :param gridsize : int
                     grid size is the number of bins in 2D
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
-        """        
+        """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+
         try:
             plt.figure()
             plt.hexbin(parameter_value[0], 
@@ -853,7 +910,7 @@ class lognflow:
             fpath = self.log_plt(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
-                    time_in_file_name = time_in_file_name)
+                    time_tag = time_tag)
             return fpath
         except:
             self.log_text(self.log_name,
@@ -863,7 +920,7 @@ class lognflow:
     def log_imshow(self, parameter_name : str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_in_file_name = True,
+                   time_tag = None,
                    **kwargs):
         """log an image
             The image is logged using plt.imshow
@@ -876,10 +933,12 @@ class lognflow:
                     path like name such as myscript/myvar.
             :param parameter_value : np.array
                     An np array of size n x m, to be shown by imshow
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         parameter_value = np.squeeze(parameter_value)
         parameter_value_shape = parameter_value.shape
         n_dims = len(parameter_value_shape)
@@ -913,7 +972,7 @@ class lognflow:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
             return fpath
         else:
             plt.close()
@@ -979,9 +1038,12 @@ class lognflow:
         canv = None
         if(len(stack.shape) == 2):
             canv = np.expand_dims(stack, axis=0)
-        elif(len(stack.shape) == 3):
-            canv = stack
-        elif((len(stack.shape) == 4) | (len(stack.shape) == 5)):
+        if(len(stack.shape) == 3):
+            if(stack.shape[2] == 3):
+                canv = np.expand_dims(stack, axis=0)
+            else:
+                canv = stack
+        if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
             canv = self.multichannel_to_square(stack, nan_borders = nan_borders)
         return canv
     
@@ -993,6 +1055,17 @@ class lognflow:
             of stacks of images where one element, has many channels.
             In that case, the channels can be tiled beside each other
             to make one image for showing. This is very useful for ML apps.
+    
+            Each element of the list can appear as either:
+            n_row x n_clm if only one image is in the list 
+                          for all elements of stack
+            n_clm x n_ros x 3 if one RGB image is given
+            n_frm x n_row x n_clm if there are n_frm images 
+                                  for all elements of stack
+            n_frm x n_row x n_clm x n_ch if there are multiple images to be
+                                         shown. 
+                                         Channels will be tiled into square
+            n_frm x n_row x n_clm x n_ch x 3 if channels are in RGB
     
             Parameters
             ----------
@@ -1022,17 +1095,25 @@ class lognflow:
                    image_format='jpeg', 
                    cmap = 'jet',
                    dpi=600,
-                   time_in_file_name = True):
+                   time_tag = None):
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
             element of the list is supposed to be iteratable by the first
-            dimension and all must have the same length.
+            dimension, which should be the same sie for all elements in the list.
             This function will start putting them in coloumns of a canvas.
             If you have an image with many channels, call 
             prepare_stack_of_images on the list to make a large single
             image by tiling the channels of that element beside each other.
             This is very useful when it comes to self-supervised ML.
+            
+            Each element of the list must appear as either:
+            n_frm x n_row x n_clm if there are n_frm images 
+                                  for all elements of stack
+            n_frm x n_row x n_clm x 3 if channels are in RGB
+            
+            if you have multiple images as channels such as the following,
+            call the prepare_stack_of_images.
             
             Parameters
             ----------
@@ -1052,10 +1133,12 @@ class lognflow:
                     on it.
             :param use_colorbar : bool
                     actual colorbar for each iamge will be shown
-            :param time_in_file_name: bool
+            :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
         try:
             _ = list_of_stacks.shape
             list_of_stacks = [list_of_stacks]
@@ -1130,7 +1213,7 @@ class lognflow:
         fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
         return fpath
 
     def log_confusion_matrix(self,
@@ -1142,7 +1225,7 @@ class lognflow:
                              figsize = None,
                              image_format = 'jpeg',
                              dpi = 1200,
-                             time_in_file_name = True):
+                             time_tag = False):
         """
             given a sklearn confusion matrix (cm), make a nice plot
         
@@ -1159,7 +1242,7 @@ class lognflow:
                               (http://matplotlib.org/examples/color/colormaps_reference.html)
                               plt.get_cmap('jet') or plt.cm.Blues
                 
-            :param time_in_file_name: if True, the file name will be stamped with time
+            :param time_tag: if True, the file name will be stamped with time
         
             Usage
             -----
@@ -1218,16 +1301,16 @@ class lognflow:
         fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_in_file_name = time_in_file_name)
+                time_tag = time_tag)
         return fpath
 
     def __call__(self, *args, **kwargs):
-        self.log_text(*args, **kwargs)
+        self.log_text(self.log_name, *args, **kwargs)
 
     def __del__(self):
         self.log_text_flush()
         self.log_var_flush()
-        _loggers_dict_keys = list(self._loggers_dict.keys())
+        _loggers_dict_keys = list(self._loggers_dict)
         for log_name in _loggers_dict_keys:
             self.log_text_close(log_name = log_name)
 

@@ -14,7 +14,7 @@ class printprogress:
     """
     def __init__(self, 
                  n_steps, 
-                 numTicks = 78,
+                 numTicks = 80,
                  title = None,
                  print_function = print):
         """
@@ -30,7 +30,6 @@ class printprogress:
                 print_function must be callable with a string and should not add
                 \n to the its input just because its been called.
         """
-        
         self.in_print_function = print_function
         
         if(n_steps != int(n_steps)):
@@ -59,7 +58,7 @@ class printprogress:
         self._print_func(' '*int((self.numTicks - len(title))/2), end='')
         self._print_func(title, end='')
         self._print_func(' '*int((self.numTicks - len(title))/2), end='')
-        self._print_func(' \\')
+        self._print_func('\\')
         
         self._print_func(' ', end = '')
     
