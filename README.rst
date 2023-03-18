@@ -35,7 +35,7 @@ The logviewer is also very useful.
 	from lognflow import logviewer
 	
 	logged = logviewer('c:\\test\\some_log\')
-	vec = logged.get_variable('vec')
+	vec = logged.get_single('vec')
 
 The printprogress makes a pretty nice progress bar.
 
