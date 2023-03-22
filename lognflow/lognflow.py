@@ -143,7 +143,7 @@ class lognflow:
         self.log_name = main_log_name
         self.log_flush_period = log_flush_period
     
-    def rename(self, new_dir:str, append = False):
+    def rename(self, new_name:str, append = False):
         """ renaming the log directory
             It is possible to rename the log directory while logging is going
             on. This is particulary useful when at the end of an experiment,
@@ -154,18 +154,18 @@ class lognflow:
 
             Parameters
             ----------
-            :param new_dir: The new name of the directory (without parent path)
-            :type new_dir: str
+            :param new_name: The new name of the directory (without parent path)
+            :type new_name: str
             
             :param append: keep the time tag for the folder. Default: False.
             :type append: bool
             
         """
         self.finilize()
-        new_name = self.log_dir.parent / new_dir
         if(append):
-            new_name += new_name + '_' + self.log_dir.name
-        self.log_dir = self.log_dir.rename(new_name)
+            new_name += '_' + self.log_dir.name
+        new_dir = self.log_dir.parent / new_name
+        self.log_dir = self.log_dir.rename(new_dir)
         for log_name in list(self._loggers_dict):
             curr_textinlog = self._loggers_dict[log_name]
             curr_textinlog.log_fpath = self.log_dir /curr_textinlog.log_fpath.name

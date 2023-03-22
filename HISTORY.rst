@@ -32,10 +32,14 @@ History
 * time_tag is True in the constructor, but could always be set to False
 * All tests passed!
 
-0.6.0 (2023-05-30)
+0.6.0 (2023-03-22)
 ------------------
 * This is a stable release
 * All text files are handled by thw with statement
 * Renaming bug is fixed
 * all tests run properly.
 * lognflow has all that logviewer has. We will check if dir exists at every use
+
+0.6.1 (2023-03-22)
+------------------
+* rename had a bug that is fixed
