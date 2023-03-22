@@ -27,22 +27,33 @@ def test_content(response):
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_lognflow_conflict_in_names():
-    logger1 = lognflow(temp_dir)
-    print(logger1.log_dir)
-    logger2 = lognflow(temp_dir)
-    print(logger2.log_dir)
-    
-
-def test_lognflow():
     logger = lognflow(temp_dir)
-    logger('This is a test for lognflow and log_var')    
-    for _ in range(10000):
-        logger(f'Log{_}'*200)
+    logger('This is a test for conflict in names')
+    logger1 = lognflow(logger.log_dir)
+    logger2 = lognflow(logger.log_dir)
+    print(logger1.log_dir)
+    print(logger2.log_dir)
+
+def test_log_text():
+    logger = lognflow(temp_dir)
+    logger('This is a test for log_text')    
+    for _ in range(1000000):
+        logger(f'{_}')
 
     logger.log_text('not_main_script',
            'This is a new log file for another script')
     logger.log_text('not_main_script',
                     'For other log files you need to mention the log_name')
+    logger.log_text('not_main_script3',
+           'This is a new log file for another script')
+    logger.log_text('not_main_script4',
+                    'For other log files you need to mention the log_name')
+    logger.log_text('not_main_script',
+           'This is a new log file for another script')
+    logger.log_text('not_main_script',
+                    'For other log files you need to mention the log_name')
+    for _ in range(1000000):
+        logger(f'{_}')
 
 def test_logger():
     ''' test the logger call funciton
@@ -112,7 +123,7 @@ def test_log_single():
     var1 = np.random.rand(100)
     
     logger = lognflow(temp_dir)
-    logger('This is a test for log_plot')    
+    logger('This is a test for log_single')    
     logger.log_single('var1',var1)
     a_dict = dict({'str_var': 'This is a string',
                    'var1': var1})
@@ -255,7 +266,7 @@ def test_rename():
     
 def test_log_single_text():
     logger = lognflow(temp_dir)
-    logger('This is a test for test_log_single_text')
+    logger('This is a test for test_log_single_text', flush = True)
     var = 2
     logger.log_single('text_log', 'hello\n', save_as='txt', time_tag = False)
     logger.log_single('text_log', 'bye\n', save_as='txt', time_tag = False)
@@ -267,15 +278,17 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     
+    test_log_text()
+    test_log_single_text()
     test_log_surface()
     test_log_single()
     test_lognflow_conflict_in_names()
+    test_rename()
     test_log_plot()
     test_prepare_stack_of_images()
     test_logger()
     test_log_flush_period()
     test_log_var_without_time_stamp()
-    test_lognflow()
     test_log_var()
     test_log_animation()
     test_log_hist()
@@ -285,5 +298,3 @@ if __name__ == '__main__':
     test_log_imshow()
     test_log_canvas()
     test_log_confusion_matrix()
-    test_rename()
-    test_log_single_text()

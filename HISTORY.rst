@@ -31,3 +31,11 @@ History
 * time_in_file_name has been changed to time_tag, sorry there! but early stages.
 * time_tag is True in the constructor, but could always be set to False
 * All tests passed!
+
+0.6.0 (2023-05-30)
+------------------
+* This is a stable release
+* All text files are handled by thw with statement
+* Renaming bug is fixed
+* all tests run properly.
+* lognflow has all that logviewer has. We will check if dir exists at every use

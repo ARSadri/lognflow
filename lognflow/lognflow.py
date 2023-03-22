@@ -16,21 +16,31 @@ then dump them when they reach a ceratin size. This reduces the network load.
 
 import pathlib
 import time
-import numpy as np
 import itertools
+from dataclasses import dataclass
 from   os import sep as os_sep
-from   collections import namedtuple
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
 
-varinlog = namedtuple('varinlog',
-                      ['data_array', 
-                      'time_array', 
-                      'curr_index', 
-                      'file_start_time', 
-                      'save_as',
-                      'log_counter_limit'])
+@dataclass
+class varinlog:
+    data_array        : np.ndarray      
+    time_array        : np.ndarray    
+    curr_index        : int
+    file_start_time   : float          
+    save_as           : str
+    log_counter_limit : int
+
+@dataclass
+class textinlog:
+    to_be_logged        : str   
+    log_fpath           : pathlib.Path         
+    log_size_limit      : int 
+    log_size            : int     
+    last_log_flush_time : float
+    log_flush_period    : int
 
 class lognflow:
     """Initialization
@@ -84,17 +94,6 @@ class lognflow:
             all file names will have time tag unless stated at each logging by
             log_... functions.
         :type time_tag: bool
-
-        :param log_flush_period_increase_rate:
-            we do not begin the timeout for the flush to be log_flush_period
-            because it can happen that a code finishes very fast. Such a 
-            code of course will flush everything when Python closes all
-            the files. We would like to flush at small intervals at first
-            and increase that timput over time. This is the rate. However,
-            when the log_flush_period reaches the given input, it will
-            not increase anymore.
-        :type log_flush_period_increase_rate: int
-    
     """
     
     def __init__(self, 
@@ -103,8 +102,7 @@ class lognflow:
                  exp_prename = None,
                  print_text = True,
                  main_log_name = 'main_log',
-                 log_flush_period = 60,
-                 log_flush_period_increase_rate = 4,
+                 log_flush_period = 10,
                  time_tag = True):
         self._init_time = time.time()
         self.time_tag = time_tag
@@ -143,12 +141,9 @@ class lognflow:
         self._single_var_call_cnt = 0
 
         self.log_name = main_log_name
-        self.last_log_flush_time = 0
-        self.log_flush_period_var = 0
-        self.log_flush_period_increase_rate = 4
         self.log_flush_period = log_flush_period
     
-    def rename(self, new_dir:str, time_tag = False):
+    def rename(self, new_dir:str, append = False):
         """ renaming the log directory
             It is possible to rename the log directory while logging is going
             on. This is particulary useful when at the end of an experiment,
@@ -162,203 +157,19 @@ class lognflow:
             :param new_dir: The new name of the directory (without parent path)
             :type new_dir: str
             
-            :param time_tag: keep the time tag for the folder. Default: False.
-            :type time_tag: bool
+            :param append: keep the time tag for the folder. Default: False.
+            :type append: bool
             
         """
-        for log_name in self._loggers_dict:
-            _logger, _, _, _ = self._loggers_dict[log_name]
-            _logger.close()
+        self.finilize()
         new_name = self.log_dir.parent / new_dir
-        if(time_tag):
-            new_name += new_name + '_' + self.log_dir
+        if(append):
+            new_name += new_name + '_' + self.log_dir.name
         self.log_dir = self.log_dir.rename(new_name)
-        for log_name in self._loggers_dict:
-            _logger, log_size_limit, log_size, log_file_id = \
-                self._loggers_dict[log_name]
-            log_fpath = self.log_dir / log_file_id
-            _logger = open(log_fpath, 'a')
-            self._loggers_dict[log_name] = [_logger, 
-                                       log_size_limit, 
-                                       log_size, 
-                                       log_file_id]
-    
-    def _log_text_handler(self, log_name = None, 
-                         log_size_limit: int = int(1e+7),
-                         time_tag = None):
-        time_tag = self.time_tag if (time_tag is None) else time_tag
+        for log_name in list(self._loggers_dict):
+            curr_textinlog = self._loggers_dict[log_name]
+            curr_textinlog.log_fpath = self.log_dir /curr_textinlog.log_fpath.name
             
-        if(log_name in self._loggers_dict):
-            _logger, log_size_limit, log_size, log_file_id = \
-                self._loggers_dict[log_name]
-            _logger.close()
-        
-        log_size = 0
-        if(time_tag):
-            log_file_id = log_name + f'_{int(time.time()):d}.txt'
-        else:
-            log_file_id = log_name + '.txt'
-        log_fpath = self.log_dir / log_file_id
-        _logger = open(log_fpath, 'w')
-        self._loggers_dict[log_name] = [_logger, 
-                                       log_size_limit, 
-                                       log_size, 
-                                       log_file_id]
-
-    def log_text_close(self, log_name = None):
-        """ Close a log text file
-            You can close a log text file. You can let it write the last 
-            text or not and give it a time stamp or not and let it print it
-            or not.
-            
-            Parameters
-            ----------
-            :param log_name : str
-                    examples: mylog or myscript/mylog
-                    log_name can be just a name e.g. mylog, or could be a
-                    pathlike name such as myscript/mylog.
-        """
-        self.log_text_flush(force_flush = True)
-        if(log_name is None):
-            log_name = self.log_name
-        
-        if(log_name in self._loggers_dict):
-            _logger, _, _, _ = self._loggers_dict[log_name]
-            try:
-                _logger.close()
-                self._loggers_dict.pop(log_name)
-                return(True)
-            except:
-                self.log_text(self.log_name, f'Could not close log {log_name}')
-        
-    def log_text_flush(self, force_flush = False):
-        """ Flush the text logs
-            Writing text to open(file, 'a') does not constantly happen on HDD.
-            There is an OS buffer in between. This funciton should be called
-            regularly. lognflow calls it once in a while when log_text is
-            called multiple times. but use needs to also call it once in a
-            while.
-            In later versions, a timer will be used to call it automatically.
-            
-            :param force_flush:
-                force the flush regardless of when the last time was.
-                default: False
-            :type force_flush: bool
-        """
-        time_time = time.time() - self._init_time
-        self.log_flush_period_var += self.log_flush_period_increase_rate
-        if(self.log_flush_period_var >  self.log_flush_period):
-            self.log_flush_period_var = self.log_flush_period
-        if((time_time - self.last_log_flush_time > self.log_flush_period_var)
-           | force_flush):
-            for log_name in self._loggers_dict:
-                _logger, _, _, _ = self._loggers_dict[log_name]
-                _logger.flush()
-            self.last_log_flush_time = time_time
-
-    def log_text(self, 
-                 log_name : str,
-                 to_be_logged = '\n', 
-                 log_time_stamp = True,
-                 print_text = None,
-                 log_size_limit: int = int(1e+7),
-                 time_tag = None):
-        """ log a string into a text file
-            You can shose a name for the log and give the text to put in it.
-            Also you can pass a small numpy array. You can ask it to put time
-            stamp in the log and in the log file name, you can disable
-            printing the text. You can set the log size limit to split it into
-            another file with a new time stamp.
-            
-            Parameters
-            ----------
-            :param log_name : str
-                    examples: mylog or myscript/mylog
-                    log_name can be just a name e.g. mylog, or could be a
-                    pathlike name such as myscript/mylog.
-            :param to_be_logged : str, nd.array, list, dict
-                    the string to be logged, could be a list
-                    or numpy array or even a dictionary. It uses str(...).
-            :param log_time_stamp : bool
-                    Put time stamp for every entry of the log
-            :param print_text : bool
-                    if False, what is logged will not be printed.
-            :param log_size_limit : int
-                    log size limit in bytes.
-            :param time_tag : bool
-                    put time stamp in file names.
-            
-        """
-        time_time = time.time() - self._init_time
-
-        time_tag = self.time_tag if (time_tag is None) else time_tag
-
-        if((print_text is None) | (print_text is True)):
-            print_text = self._print_text
-        
-        if(print_text):
-            if(log_time_stamp):
-                print(f'T:{time_time:>6.6f}| ', end='')
-            print(to_be_logged)
-                
-        if not (log_name in self._loggers_dict):
-            self._log_text_handler(log_name, 
-                                   log_size_limit = log_size_limit,
-                                   time_tag = time_tag)
-
-        _logger, log_size_limit, log_size, log_file_id = \
-            self._loggers_dict[log_name]
-        len_to_be_logged = 0
-        if(log_time_stamp):
-            _time_str = f'T:{time_time:>6.6f}| '
-            _logger.write(_time_str)
-            len_to_be_logged += len(_time_str)
-        if isinstance(to_be_logged, np.ndarray):
-            try:
-                _logger.write('numpy.ndarray')
-                len_to_be_logged += 10
-                if(to_be_logged.size()>100):
-                    _logger.write(', The first and last 50 elements:\n')
-                    len_to_be_logged += 30
-                    to_be_logged = to_be_logged.ravel()
-                    _logstr = np.array2string(to_be_logged[:50])
-                    len_to_be_logged += len(_logstr)
-                    _logger.write(_logstr)
-                    _logger.write(' ... ')
-                    _logstr = np.array2string(to_be_logged[-50:])
-                    _logger.write(_logstr)
-                    len_to_be_logged += len(_logstr)
-                else:
-                    _logstr = ':\n' + np.array2string(to_be_logged)
-                    len_to_be_logged += len(_logstr)
-                    _logger.write(_logstr)
-            except:
-                _logger.write(' not possible to log ' + log_name + '\n')
-                len_to_be_logged += 20
-        else:
-            if(isinstance(to_be_logged, list)):
-                for _ in to_be_logged:
-                    _tolog = str(_)
-                    len_to_be_logged += len(_tolog)
-                    _logger.write(_tolog)
-            else:
-                _tolog = str(to_be_logged)
-                _logger.write(_tolog)
-                len_to_be_logged += len(_tolog)
-            _logger.write('\n')
-        log_size += len_to_be_logged
-        self._loggers_dict[log_name] = [_logger, 
-                                       log_size_limit, 
-                                       log_size, 
-                                       log_file_id]
-
-        self.log_text_flush()        
-
-        if(log_size >= log_size_limit):
-            self._log_text_handler(log_name)
-            _, _, _, log_file_id = self._loggers_dict[log_name]
-        return log_file_id
-    
     def _prepare_param_dir(self, parameter_name):
         try:
             _ = parameter_name.split()
@@ -389,7 +200,181 @@ class lognflow:
             self.log_text(self.log_name,
                           f'Creating directory: {param_dir.absolute()}')
             param_dir.mkdir(parents = True, exist_ok = True)
-        return(param_dir, param_name)                    
+        return(param_dir, param_name)
+
+    def _get_fpath(self, param_dir, param_name, save_as, time_tag = None):
+        
+        time_time = time.time() - self._init_time
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+        
+        if(save_as == 'mat'):
+            if(len(param_name) == 0):
+                param_name = param_dir.name
+        
+        if(len(param_name) > 0):
+            fname = f'{param_name}'
+            if(time_tag):
+                fname += f'_{time_time:>6.6f}'
+        else:
+            fname = f'{time_time:>6.6f}'
+            
+        return(param_dir / f'{fname}.{save_as}')
+        
+    def _log_text_handler(self, log_name = None, 
+                         log_size_limit: int = int(1e+7),
+                         time_tag : bool = None,
+                         log_flush_period = None):
+        
+        if (log_flush_period is None):
+            log_flush_period = self.log_flush_period
+            
+        param_dir, param_name = self._prepare_param_dir(log_name)
+        fpath = self._get_fpath(param_dir, param_name, 'txt', time_tag)
+        self._loggers_dict[log_name] = textinlog(
+            to_be_logged=[],      
+            log_fpath=fpath,         
+            log_size_limit=log_size_limit,    
+            log_size=0,          
+            last_log_flush_time=0,
+            log_flush_period=log_flush_period)  
+
+    def log_text_flush(self, log_name = None, flush = False):
+        """
+        Keep str as a list of lines to be logged. This function must take the 
+        log name too. Then put the str in the log file.
+        """
+        """ Flush the text logs
+            Writing text to open(file, 'a') does not constantly happen on HDD.
+            There is an OS buffer in between. This funciton should be called
+            regularly. lognflow calls it once in a while when log_text is
+            called multiple times. but use needs to also call it once in a
+            while.
+            In later versions, a timer will be used to call it automatically.
+            
+            :param flush:
+                force the flush regardless of when the last time was.
+                default: False
+            :type flush: bool
+        """
+        time_time = time.time() - self._init_time
+
+        log_name = self.log_name if (log_name is None) else log_name
+        curr_textinlog = self._loggers_dict[log_name]
+        
+        if((time_time - curr_textinlog.last_log_flush_time \
+                                           > curr_textinlog.log_flush_period)
+           | flush):
+            
+            with open(curr_textinlog.log_fpath, 'a+') as f:
+                f.writelines(curr_textinlog.to_be_logged)
+                f.flush()
+            curr_textinlog.to_be_logged = []
+            curr_textinlog.last_log_flush_time = time_time
+
+    def log_text(self, 
+                 log_name : str = None,
+                 to_be_logged = '', 
+                 log_time_stamp = True,
+                 print_text = None,
+                 log_size_limit: int = int(1e+7),
+                 time_tag : bool = None,
+                 log_flush_period : int = None,
+                 flush = False,
+                 new_file = False):
+        """ log a string into a text file
+            You can shose a name for the log and give the text to put in it.
+            Also you can pass a small numpy array. You can ask it to put time
+            stamp in the log and in the log file name, you can disable
+            printing the text. You can set the log size limit to split it into
+            another file with a new time stamp.
+            
+            Parameters
+            ----------
+            :param log_name : str
+                    examples: mylog or myscript/mylog
+                    log_name can be just a name e.g. mylog, or could be a
+                    pathlike name such as myscript/mylog.
+            :param to_be_logged : str, nd.array, list, dict
+                    the string to be logged, could be a list
+                    or numpy array or even a dictionary. It uses str(...).
+            :param log_time_stamp : bool
+                    Put time stamp for every entry of the log
+            :param print_text : bool
+                    if False, what is logged will not be printed.
+            :param log_size_limit : int
+                    log size limit in bytes.
+            :param time_tag : bool
+                    put time stamp in file names.
+            :param flush : bool
+                    force flush into the log file
+            
+        """
+        time_time = time.time() - self._init_time
+
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+        log_flush_period = self.log_flush_period \
+            if (log_flush_period is None) else log_flush_period
+        log_name = self.log_name if (log_name is None) else log_name
+
+        if((print_text is None) | (print_text is True)):
+            print_text = self._print_text
+        if(print_text):
+            if(log_time_stamp):
+                print(f'T:{time_time:>6.6f}| ', end='')
+            print(to_be_logged)
+                
+        if ( (not (log_name in self._loggers_dict)) or new_file):
+            self._log_text_handler(log_name, 
+                                   log_size_limit = log_size_limit,
+                                   time_tag = time_tag)
+
+        ############################################
+        curr_textinlog = self._loggers_dict[log_name]
+        _logger = []
+        if(log_time_stamp):
+            _time_str = f'T:{time_time:>6.6f}| '
+            _logger.append(_time_str)
+        if isinstance(to_be_logged, np.ndarray):
+            try:
+                _logger.append('numpy.ndarray')
+                if(to_be_logged.size()>100):
+                    _logger.append(', The first and last 50 elements:\n')
+                    to_be_logged = to_be_logged.ravel()
+                    _logstr = np.array2string(to_be_logged[:50])
+                    _logger.append(_logstr)
+                    _logger.append(' ... ')
+                    _logstr = np.array2string(to_be_logged[-50:])
+                    _logger.append(_logstr)
+                else:
+                    _logstr = ':\n' + np.array2string(to_be_logged)
+                    _logger.append(_logstr)
+            except:
+                _logger.append(' not possible to log ' + log_name + '\n')
+        else:
+            if(isinstance(to_be_logged, list)):
+                for _ in to_be_logged:
+                    _tolog = str(_)
+                    _logger.append(_tolog)
+            else:
+                _tolog = str(to_be_logged)
+                _logger.append(_tolog)
+            _logger.append('\n')
+        log_size = 0
+        for _logger_el in _logger:
+            curr_textinlog.to_be_logged.append(_logger_el)
+            log_size += len(_logger_el)
+        curr_textinlog.log_size += log_size
+        ############################################
+        
+        self.log_text_flush(log_name, flush)        
+        ############################################
+        if(log_size >= curr_textinlog.log_size_limit):
+            self._log_text_handler(log_name, 
+                                   log_size_limit = curr_textinlog.log_size_limit,
+                                   time_tag = curr_textinlog.time_tag)
+            curr_textinlog = self._loggers_dict[log_name]
+        return curr_textinlog.log_fpath
+                        
 
     def _get_log_counter_limit(self, param, log_size_limit):
         cnt_limit = int(log_size_limit/(param.size*param.itemsize))
@@ -444,7 +429,7 @@ class lognflow:
             curr_index = 0
 
         if(curr_index >= log_counter_limit):
-            self._log_var_save(parameter_name)
+            self.log_var_flush(parameter_name)
             file_start_time = time.time()
             curr_index = 0
 
@@ -469,13 +454,22 @@ class lognflow:
                 f'to {parameter_value.shape}. Coppying from the last time.')
             data_array[curr_index] = data_array[curr_index - 1]
         self._vars_dict[parameter_name] = varinlog(data_array, 
-                                                  time_array, 
-                                                  curr_index,
-                                                  file_start_time,
-                                                  save_as,
-                                                  log_counter_limit)
+                                                   time_array, 
+                                                   curr_index,
+                                                   file_start_time,
+                                                   save_as,
+                                                   log_counter_limit)
 
-    def _log_var_save(self, parameter_name : str):
+    def log_var_flush(self, parameter_name : str):
+        """ Flush the buffered numpy arrays
+            If you have been using log_ver, this will flush all the buffered
+            arrays. It is called using log_size_limit for a variable and als
+            when the code that made the logger ends.
+        :param parameter_name : str
+            examples: myvar or myscript/myvar
+                parameter_name can be just a name e.g. myvar, or could be a
+                path like name such as myscript/myvar.
+        """
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         
         _var = self._vars_dict[parameter_name]
@@ -490,38 +484,12 @@ class lognflow:
             fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var.data_array)
         return fpath
-    
-    def log_var_flush(self):
-        """ Flush the buffered numpy arrays
-            If you have been using log_ver, this will flush all the buffered
-            arrays. It is called using log_size_limit for a variable and als
-            when the code that made the logger ends.
-        """
-        for parameter_name in self._vars_dict:
-            self._log_var_save(parameter_name)
-    
-    def _get_fpath(self, 
-                   param_dir, param_name, 
-                   save_as, time_tag):
-        time_time = time.time() - self._init_time
-        if(save_as == 'mat'):
-            if(len(param_name) == 0):
-                param_name = param_dir.name
         
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_tag):
-                fname += f'_{time_time}'
-        else:
-            fname = f'{time_time}'
-            
-        return(param_dir / f'{fname}.{save_as}')
-    
     def log_single(self, parameter_name : str, 
                          parameter_value,
                          save_as = None,
                          mat_field = None,
-                         time_tag = None):
+                         time_tag : bool = None):
         """log a single variable
             The most frequently used function would probably be this one.
             
@@ -557,8 +525,7 @@ class lognflow:
         save_as = save_as.strip('.')
 
         param_dir, param_name = self._prepare_param_dir(parameter_name)
-        fpath = self._get_fpath(param_dir, param_name, 
-                                save_as, time_tag)
+        fpath = self._get_fpath(param_dir, param_name, save_as, time_tag)
             
         if(save_as == 'npy'):
             np.save(fpath, parameter_value)
@@ -580,7 +547,7 @@ class lognflow:
     def log_plt(self, 
                 parameter_name : str, 
                 image_format='jpeg', dpi=1200,
-                time_tag = None,
+                time_tag : bool = None,
                 close_plt = True):
         """log a single plt
             log a plt that you have on the screen.
@@ -598,8 +565,7 @@ class lognflow:
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         param_dir, param_name = self._prepare_param_dir(parameter_name)
-        fpath = self._get_fpath(param_dir, param_name, 
-                                image_format, time_tag)
+        fpath = self._get_fpath(param_dir, param_name, image_format, time_tag)
         
         try:
             plt.savefig(fpath, format=image_format, dpi=dpi)
@@ -619,42 +585,60 @@ class lognflow:
             stackoverflow.com/questions/23876588/
                 matplotlib-colorbar-in-each-subplot
         """
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        last_axes = plt.gca()
         ax = mappable.axes
         fig = ax.figure
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = fig.colorbar(mappable, cax=cax)
-        plt.sca(last_axes)
-        return cbar
+        # cbar.ax.tick_params(size=0.01)
 
     def log_multichannel_by_subplots(self, 
-                                 parameter_name : str, 
-                                 parameter_value : np.ndarray,
-                                 image_format='jpeg', 
-                                 dpi=1200, 
-                                 time_tag = None,
-                                 **kwargs):
+        parameter_name : str, 
+        parameter_value : np.ndarray,
+        image_format='jpeg', 
+        dpi=1200, 
+        time_tag : bool = None,
+        add_colorbar = False,
+        remove_axis_ticks = True,
+        **kwargs):
+        """log multiple images as a tiled square
+            The image is logged using plt.imshow
+            
+            Parameters
+            ----------
+            :param parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+            :param parameter_value : np.array
+                    An np array of size n_r, n_c, n_ch, to be shown by imshow
+                    as a square tile of side length of n_ch**0.5
+            :param time_tag: bool
+                    Wheather if the time stamp is in the file name or not.
+                    
+        """
+        
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         n_r, n_c, n_ch = parameter_value.shape
         n_ch_sq = int(np.ceil(n_ch ** 0.5))
         _, ax = plt.subplots(n_ch_sq,n_ch_sq)
+        if(remove_axis_ticks):
+            plt.setp(ax, xticks=[], yticks=[])
         for rcnt in range(n_ch_sq):
             for ccnt in range(n_ch_sq):
                 im = parameter_value[:, :, ccnt + rcnt * n_ch_sq]
                 im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
-                self.add_colorbar(im_ch)
-        self.log_plt(parameter_name = parameter_name,
+                if(add_colorbar):
+                    self.add_colorbar(im_ch)
+        return self.log_plt(parameter_name = parameter_name,
                      image_format=image_format, dpi=dpi,
                      time_tag = time_tag)
-
-    
+            
     def log_animation(self, parameter_name : str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100,
-                         time_tag = None):
+                         time_tag : bool = None):
         
         """Make an animation from a stack of images
             
@@ -691,7 +675,7 @@ class lognflow:
                        parameter_value_list,
                        x_values = None,
                        image_format='jpeg', dpi=1200,
-                       time_tag = None,
+                       time_tag : bool = None,
                        **kwargs):
         """log a single plot
             If you have a numpy array or a list of arrays (or indexable by
@@ -758,7 +742,7 @@ class lognflow:
                        n_bins = 10,
                        alpha = 0.5,
                        image_format='jpeg', dpi=1200,
-                       time_tag = None, 
+                       time_tag : bool = None, 
                        **kwargs):
         """log a single histogram
             If you have a numpy array or a list of arrays (or indexable by
@@ -809,7 +793,7 @@ class lognflow:
     
     def log_scatter3(self, parameter_name : str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag = None):
+                       time_tag : bool = None):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
@@ -845,7 +829,7 @@ class lognflow:
     
     def log_surface(self, parameter_name : str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag = None, **kwargs):
+                       time_tag : bool = None, **kwargs):
         """log a surface in 3D
             surface plotting in 3D exactly similar to imshow but in 3D
             
@@ -882,7 +866,7 @@ class lognflow:
         
     def log_hexbin(self, parameter_name : str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200,
-                   time_tag = None):
+                   time_tag : bool = None):
         """log a 2D histogram 
             The 2D histogram is made out of hexagonals
             
@@ -920,7 +904,7 @@ class lognflow:
     def log_imshow(self, parameter_name : str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_tag = None,
+                   time_tag : bool = None,
                    **kwargs):
         """log an image
             The image is logged using plt.imshow
@@ -1094,8 +1078,8 @@ class lognflow:
                    use_colorbar = False,
                    image_format='jpeg', 
                    cmap = 'jet',
-                   dpi=600,
-                   time_tag = None):
+                   dpi=1200,
+                   time_tag : bool = None):
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
@@ -1304,16 +1288,286 @@ class lognflow:
                 time_tag = time_tag)
         return fpath
 
+        
+    def get_text(self, log_name='main_log'):
+        """ get text log files
+            Given the log_name, this function returns the text therein.
+
+            Parameters
+            ----------
+            :param log_name:
+                the log name. If not given then it is the main log.
+        """
+        flist = list(self.log_dir.glob(f'{log_name}*.txt'))
+        flist.sort()
+        n_files = len(flist)
+        if (n_files>0):
+            txt = []
+            for fcnt in range(n_files):
+                with open(flist[fcnt]) as f_txt:
+                    txt.append(f_txt.readlines())
+            if(n_files == 1):
+                txt = txt[0]
+            return txt
+
+    def get_single(self, var_name, single_shot_index = -1, 
+                     suffix = '.np*'):
+        """ get a single variable
+            return the value of a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param single_shot_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+                
+            .. note::
+                when reading a MATLAB file, the output is a dictionary.
+        """
+        var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
+            .replace('\r', '\\r').replace('\b', '\\b')
+        
+        suffix = suffix.strip('.')
+        assert single_shot_index == int(single_shot_index), \
+                    f'single_shot_index {single_shot_index} must be an integer'
+        flist = []            
+        if((self.log_dir / var_name).is_file()):
+            flist = [self.log_dir / var_name]
+        elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
+            flist = [self.log_dir / f'{var_name}.{suffix}']
+        else:
+            _var_name = (self.log_dir / var_name).name
+            _var_dir = (self.log_dir / var_name).parent
+            flist = list(_var_dir.glob(f'{_var_name}*.{suffix}'))
+            if(len(flist) == 0):
+                flist = list(_var_dir.glob(f'{_var_name}*.*'))
+                if(len(flist) > 0):
+                    self.logger('Can not find the file with the given suffix, '\
+                                +'but found some with a different suffix, '\
+                                +f'one file is: {flist[single_shot_index]}')
+                    
+        if(len(flist) > 0):
+            flist.sort()
+        else:
+            var_dir = self.log_dir / var_name
+            if(var_dir.is_dir()):
+                flist = list(var_dir.glob('*.*'))
+            if(len(flist) > 0):
+                flist.sort()
+            else:
+                self.logger('No such variable')
+                return
+        var_path = flist[single_shot_index]
+                
+        if(var_path.is_file()):
+            self.logger(f'Loading {var_path}')
+            if(var_path.suffix == '.npz'):
+                buf = np.load(var_path)
+                time_array = buf['time_array']
+                n_logs = (time_array > 0).sum()
+                time_array = time_array[:n_logs]
+                data_array = buf['data_array']
+                data_array = data_array[:n_logs]
+                return((time_array, data_array))
+            if(var_path.suffix == '.npy'):
+                return(np.load(var_path))
+            if(var_path.suffix == '.mat'):
+                return(loadmat(var_path))
+            if(var_path.suffix == '.txt'):
+                with open(var_path) as f_txt:
+                    return(f_txt.read())
+            if(var_path.suffix == '.torch'):      
+                from torch import load as torch_load 
+                return(torch_load(var_path))
+            try:
+                img = imread(var_path)
+                return(img)
+            except:
+                pass
+        else:
+            self.logger(f'{var_name} not found.')
+            return
+    
+    def get_stack_of_files(self, 
+        var_name = None, flist = [], suffix = '*',
+        return_data = False, return_flist = True):
+        
+        """ Get list or data of all files in a directory
+        
+            This function gives the list of paths of all files in a directory
+            for a single variable. 
+
+            Parameters
+            ----------
+            :param var_name:
+                The directory or variable name to look for the files
+            :type var_name: str
+            
+            :param flist:
+                list of Paths, if data is returned, this flist input can limit 
+                the data requested to this list.
+            :type flist: list
+            
+            :param suffix:
+                the suffix of files to look for, e.g. 'txt'
+            :type siffix: str
+            
+            :param return_data: 
+                    with flist you can limit the data that is returned.
+                    Otherwise the data for all files in the directory will be
+                    returned
+            :param return_flist
+                    Maybe you are only intrested in the flist.
+                    
+            Output
+            ----------
+            
+                It returns a tuple, (dataset, flist),
+                dataset will be a numpy array in case all files produce same
+                shape numpy arrays.
+                flist is type pathlib.Path
+            
+        """
+        suffix = suffix.strip('.')
+        if not flist:
+            assert var_name is not None, \
+                ' The file list is empty. Please provide the ' \
+                + 'variable name or a non-empty file list.'
+            var_dir = self.log_dir / var_name
+            if(var_dir.is_dir()):
+                var_fname = None
+                flist = list(var_dir.glob(f'*.{suffix}'))
+            else:
+                var_fname = var_dir.name
+                var_dir = var_dir.parent
+                patt = f'{var_fname}*.{suffix}'
+                patt = patt.replace('**', '*')
+                flist = list(var_dir.glob(patt))
+        if flist:
+            flist.sort()
+            n_files = len(flist)
+            if((not return_data) & return_flist):
+                return(flist)
+            data_type = None
+            if(data_type is None):
+                try:
+                    fdata = np.load(flist[0])
+                    data_type = 'numpy'
+                except:
+                    pass
+            if(data_type is None):
+                try:
+                    fdata = imread(flist[0])
+                    data_type = 'image'
+                except:
+                    pass
+            if(data_type is not None):
+                dataset = np.zeros((n_files, ) + fdata.shape, 
+                                   dtype=fdata.dtype)
+                for fcnt, fpath in enumerate(flist):
+                    if(data_type == 'numpy'):
+                        dataset[fcnt] = np.load(fpath)
+                    elif(data_type == 'image'):
+                        dataset[fcnt] = imread(fpath)
+                self.logger(f'shape is: {dataset.shape}')
+                if(return_flist):
+                    return(dataset, flist)
+                else:
+                    return(dataset)
+            else:
+                self.logger(f'File {flist[0].name} cannot be opened by '\
+                          + r'np.load() or plt.imread()')
+            
+    def get_common_files(self, var_name_A, var_name_B):
+        """ get common files in two directories
+        
+            It happens often in ML that there are two directories, A and B,
+            and we are interested to get the flist in both that is common 
+            between them. returns a tuple of two lists of files.
+            
+            Parameters
+            ----------
+            :param var_name_A:
+                directory A name
+            :param var_name_B:
+                directory B name
+        """
+        flist_A = self.get_stack_of_files(
+            var_name_A, return_data = False, return_flist = True)
+        flist_B = self.get_stack_of_files(
+            var_name_B, return_data = False, return_flist = True)
+        
+        suffix_A = flist_A[0].suffix
+        suffix_B = flist_B[0].suffix 
+        parent_A = flist_A[0].parent
+        parent_B = flist_B[0].parent
+        
+        fstems_A = [_fst.stem for _fst in flist_A]
+        fstems_B = [_fst.stem for _fst in flist_B]
+        
+        fstems_A_set = set(fstems_A)
+        fstems_B_set = set(fstems_B)
+        common_stems = list(fstems_A_set.intersection(fstems_B_set))
+
+        flist_A_new = [parent_A / (common_stem + suffix_A) \
+                          for common_stem in common_stems]
+        flist_B_new = [parent_B / (common_stem + suffix_B) \
+                          for common_stem in common_stems]
+
+        return(flist_A_new, flist_B_new)
+    
+    def replace_time_with_index(self, var_name):
+        """ index in file names
+            lognflow uses time stamps to make new log files for a variable.
+            That is done by putting _time_stamp after the name of the variable.
+            This function changes all of the time stamps, sorted ascendingly,
+            by indices.
+            
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+        """
+        var_dir = self.log_dir / var_name
+        if(var_dir.is_dir()):
+            var_fname = None
+            flist = list(var_dir.glob(f'*.*'))
+        else:
+            var_fname = var_dir.name
+            var_dir = var_dir.parent
+            flist = list(var_dir.glob(f'{var_fname}_*.*'))
+        if flist:
+            flist.sort()
+            fcnt_width = len(str(len(flist)))
+            for fcnt, fpath in enumerate(flist):
+                self.logger(f'Changing {flist[fcnt].name}')
+                fname_new = ''
+                if(var_fname is not None):
+                    fname_new = var_fname + '_'
+                fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
+                fpath_new = flist[fcnt].parent / fname_new
+                self.logger(f'To {fpath_new.name}')
+                flist[fcnt].rename(fpath_new)
+                
+
     def __call__(self, *args, **kwargs):
         self.log_text(self.log_name, *args, **kwargs)
 
-    def __del__(self):
-        self.log_text_flush()
-        self.log_var_flush()
-        _loggers_dict_keys = list(self._loggers_dict)
-        for log_name in _loggers_dict_keys:
-            self.log_text_close(log_name = log_name)
+    def finilize(self):
+        for log_name in list(self._loggers_dict):
+            self.log_text_flush(log_name, flush = True)
+        for parameter_name in list(self._vars_dict):
+            self.log_var_flush(parameter_name)
 
+    def __del__(self):
+        self.finilize()
+        
     def __repr__(self):
         return f'<lognflow(log_dir = {self.log_dir})>'
 
