@@ -43,3 +43,9 @@ History
 0.6.1 (2023-03-22)
 ------------------
 * rename had a bug that is fixed
+
+0.6.2 (2023-04-01)
+------------------
+* made it possible to flush_all()
+* We support Python 3.7+ because of dataclasses
+* printprogress now can disable printing anything and return ETA at the __call__

@@ -16,22 +16,34 @@ class printprogress:
                  n_steps, 
                  numTicks = 80,
                  title = None,
-                 print_function = print):
+                 print_function = print,
+                 method = 'linear'):
         """
             n_steps: int
-                usually the number of iterations in the for loop
+                Number of iterations in the for loop
             numTicks: int
                 The number of charachters in a row of the screen - 2
-                default: 78
+                default: 78 for old screens that have 80 coloumns
             title : str 
                 The title of progress bar.
                 default: f'Progress bar for {n_steps} steps in {numTicks} ticks'
             print_function:
                 print_function must be callable with a string and should not add
-                \n to the its input just because its been called.
+                \n to the its input.
+                If you pass None as the print_function, nothing will be printed.
+                yet the output of the __call__ will be the remaining time in
+                seconds.
+            method: options how to calculate the remaining time are
+                'linear':
+                       p                   x      
+                |-----------|--------------------------|
+                           ck                       n_steps
+                As such  x/(n-c) = p/c => x = p(n/c - 1)
+                more options to come
         """
+        assert method in ['linear', 'linear_robust']
+        self.method = method
         self.in_print_function = print_function
-        
         if(n_steps != int(n_steps)):
             self._print_func('textProgBar takes integers no less than 2 ')
             n_steps = int(n_steps)
@@ -58,24 +70,34 @@ class printprogress:
         self._print_func(' '*int((self.numTicks - len(title))/2), end='')
         self._print_func(title, end='')
         self._print_func(' '*int((self.numTicks - len(title))/2), end='')
-        self._print_func('\\')
+        self._print_func(' \\')
         
         self._print_func(' ', end = '')
     
     def _print_func(self, text, end='\n'):
-        if (self.in_print_function == print):
-            print(text, end = end, flush = True)
-        else:
-            self.in_print_function(text)
+        if (self.in_print_function is not None):
+            if (self.in_print_function == print):
+                print(text, end = end, flush = True)
+            else:
+                self.in_print_function(text)
         
+    def _calc_ETA(self):
+        if(self.method == 'linear'):
+            passedTime = time() - self.startTime
+            remTimeS = passedTime * ( self.n_steps / self.ck - 1)
+        
+        return remTimeS
+    
     def __call__(self, ck=1):
         """ ticking the progress bar
-            just call the object and the progress bar moves one agead.
-                   p                   x      
-            |-----------|--------------------------|
-                       ck                       n_steps
-            As such  x/(n-c) = p/c => x = p(n/c - 1)
+            just call the object and the progress bar moves one ahead when ready.
+            
+            output
+            ~~~~~~
+            :param ETA:
+                the remaining time in seconds will be provided at the output
         """
+        remTimeS = 0
         if(self.FLAG_ended):
             if(not self.FLAG_warning):
                 self.FLAG_warning = True
@@ -89,8 +111,7 @@ class printprogress:
                 #3: because 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
-                    passedTime = time() - self.startTime
-                    remTimeS = passedTime * ( self.n_steps / self.ck - 1)
+                    remTimeS = self._calc_ETA()
                     if(remTimeS>=5940):
                         progStr = "%02d" % int(ceil(remTimeS/3600))
                         self._print_func(progStr, end='')
@@ -105,6 +126,7 @@ class printprogress:
                         self._print_func('s', end='')
                     else:
                         self.end()
+        return remTimeS
     def end(self):
         if(not self.FLAG_ended):
             self._print_func('')

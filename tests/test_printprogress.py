@@ -23,7 +23,7 @@ def test_content(response):
     # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_printprogress():
-    N = 10000000
+    N = 15000000
     pprog = printprogress(N)
     for _ in range(N):
         pprog()

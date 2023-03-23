@@ -3,21 +3,41 @@
 lognflow makes logging and vieweing the logs easy in Python. It is so simple
 you can code it yourself, so, why would you?!
 
-First you give it a root to make the log directory in it or give it the
-directory itself. Then start dumping data by giving the variable name and the
-data with the type and you are set. 
+lognflow logs all files into os directory. As such what is facilitates is
+exactly that, taking care of folder and file names. This saves you a lot of 
+coding and makes you code readable when you say:
 
-Multiple processes in parallel can make as many instances as they want and
-the logviewer can be accessed via HTTP. Because the logs are on a HDD.
+logger = lognflow(logs_root = 'root_for_all_logs')
+logger.log_single('variables/variable1', variable1)
+logger('I just logged a variable.')
+
+The logger will use time.time() to create a log_dir in logs_root for logging.
+The next syntax is an easy way of just logging a numpy array. It will make
+a new directory within the log_dir, called variables and make a npy file
+named variable1 and put variable1 in it. The third line of the code above
+prints the given text to the __call__ routine in the main txt file made in 
+the log_dir.
+
+As you can see, first you give it a root (logs_root) to make 
+a log directory in it or give it the directory itself (log_dir). 
+Then start dumping data by giving the variable name and the data with 
+the type and you are set. 
+
+Multiple processes in parallel can make as many instances as they want.
 
 There is an option to keep the logged variables in memory for a long time and
 then dump them when they reach a ceratin size. This reduces the network load.
+
+for this the txt logs can be buffered for a chosable amount of time and 
+numpy variables that don't change size can be buffered up to a certain size
+before storing into the directory using log_var(name, var).
+
 """
 
 import pathlib
 import time
 import itertools
-from dataclasses import dataclass
+from   dataclasses import dataclass
 from   os import sep as os_sep
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,11 +65,17 @@ class textinlog:
 class lognflow:
     """Initialization
         
-        The lognflow is an easy way to log your variables into a directory.
-        This directory is assumed to be local but it can be a map to a network
-        location. It will also size up files when they get too large.
-        It also can save np.arrays in npz format which is better than 
-        other formats.
+        lognflow creates a directory/attribute called log_dir and puts all 
+        stored data in there, if logs_root is given. Otherwise give it log_dir
+        to use. If you type
+        
+        logger = lognflow()
+        
+        it will try to open a dialog to select a directory, except, it will
+        get a temp directory from the os and continue. 
+        
+        The lognflow construction can allow setting global settings that can
+        be overridden later by calling each of its methods as follows.
         
         Parameters
         ----------
@@ -69,7 +95,7 @@ class lognflow:
         :type log_dir: pathlib.Path
     
         :param exp_prename:
-            this string will be put before the time stamp for log_dir, when
+            this string will be put before the time tag for log_dir, when
             only logs_root is given.
         :type exp_prename: str
         
@@ -97,13 +123,13 @@ class lognflow:
     """
     
     def __init__(self, 
-                 logs_root : pathlib.Path = None,
-                 log_dir : pathlib.Path = None,
-                 exp_prename = None,
-                 print_text = True,
-                 main_log_name = 'main_log',
-                 log_flush_period = 10,
-                 time_tag = True):
+                 logs_root        : pathlib.Path = None,
+                 log_dir          : pathlib.Path = None,
+                 exp_prename      : str          = None,
+                 print_text       : bool         = True,
+                 main_log_name    : str          = 'main_log',
+                 log_flush_period : int          = 10,
+                 time_tag         : bool         = True):
         self._init_time = time.time()
         self.time_tag = time_tag
 
@@ -161,15 +187,24 @@ class lognflow:
             :type append: bool
             
         """
-        self.finilize()
+        self.flush_all()
         if(append):
             new_name += '_' + self.log_dir.name
         new_dir = self.log_dir.parent / new_name
-        self.log_dir = self.log_dir.rename(new_dir)
-        for log_name in list(self._loggers_dict):
-            curr_textinlog = self._loggers_dict[log_name]
-            curr_textinlog.log_fpath = self.log_dir /curr_textinlog.log_fpath.name
-            
+        try:
+            self.log_dir = self.log_dir.rename(new_dir)
+            for log_name in list(self._loggers_dict):
+                curr_textinlog = self._loggers_dict[log_name]
+                curr_textinlog.log_fpath = \
+                    self.log_dir /curr_textinlog.log_fpath.name
+        except:
+            self.log_text(None, 'Could not rename the log_dir from:')
+            self.log_text(None, f'{self.log_dir.name}')
+            self.log_text(None, 'into:')
+            self.log_text(None, f'{new_name}')
+            self.log_text(None, 'Most probably a file was open.')
+        return self.log_dir
+    
     def _prepare_param_dir(self, parameter_name):
         try:
             _ = parameter_name.split()
@@ -422,7 +457,9 @@ class lognflow:
         if(parameter_name in self._vars_dict):
             _var = self._vars_dict[parameter_name]
             data_array, time_array, curr_index, \
-                file_start_time, save_as, log_counter_limit = _var
+                file_start_time, save_as, log_counter_limit = \
+                (_var.data_array, _var.time_array, _var.curr_index, \
+                    _var.file_start_time, _var.save_as, _var.log_counter_limit)
             curr_index += 1
         else:
             file_start_time = time.time()
@@ -982,6 +1019,11 @@ class lognflow:
                 Remember if you have N images to put into a square, you only
                 have n_f = 1 image with n_ch = N, you do not have N images
                 and the shape of the ndarray will be 1 x n_r x n_c x N
+                
+            output
+            ---------
+                it produces an np.array of shape n_f x n_r x n_c or
+                n_f x n_r x n_c x 3 in case of RGB input.
         """
         if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
             if(len(stack.shape) == 4):
@@ -1222,9 +1264,9 @@ class lognflow:
             
             :param title:        the text to display at the top of the matrix
             
-            :param cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
-                              (http://matplotlib.org/examples/color/colormaps_reference.html)
-                              plt.get_cmap('jet') or plt.cm.Blues
+            :param cmap: the gradient of the values displayed from matplotlib.pyplot.cm
+                         (http://matplotlib.org/examples/color/colormaps_reference.html)
+                         plt.get_cmap('jet') or plt.cm.Blues
                 
             :param time_tag: if True, the file name will be stamped with time
         
@@ -1288,7 +1330,6 @@ class lognflow:
                 time_tag = time_tag)
         return fpath
 
-        
     def get_text(self, log_name='main_log'):
         """ get text log files
             Given the log_name, this function returns the text therein.
@@ -1557,19 +1598,32 @@ class lognflow:
                 
 
     def __call__(self, *args, **kwargs):
+        """calling the object
+        
+            In the case of the following code:
+            
+            logger = lognflow()
+            logger('Hello lognflow')
+            
+            The text (str(...)) will be passed to the main log text file.
+        
+        """
         self.log_text(self.log_name, *args, **kwargs)
 
-    def finilize(self):
+    def flush_all(self):
         for log_name in list(self._loggers_dict):
             self.log_text_flush(log_name, flush = True)
         for parameter_name in list(self._vars_dict):
             self.log_var_flush(parameter_name)
 
     def __del__(self):
-        self.finilize()
+        try:
+            self.flush_all()
+        except:
+            pass
         
     def __repr__(self):
-        return f'<lognflow(log_dir = {self.log_dir})>'
+        return f'{self.log_dir}'
 
     def __bool__(self):
         return self.log_dir.is_dir()
@@ -1589,7 +1643,7 @@ def select_directory(default_directory = './'):
         None, "Select a directory", default_directory, QFileDialog.ShowDirsOnly)
     return(log_dir)
 
-def open_file():
+def select_file():
     """ Open dialog to select a file
         It works for windows and Linux using PyQt5.
     """

@@ -4,7 +4,7 @@
 
 from setuptools import setup, find_packages
 
-__version__ = '0.6.1'
+from lognflow import __author__, __email__, __version__
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -17,9 +17,9 @@ requirements = ['numpy', 'matplotlib']
 test_requirements = ['pytest>=3', ]
 
 setup(
-    author="Alireza Sadri",
-    author_email='arsadri@gmail.com',
-    python_requires='>=3.6',
+    author=__author__,
+    author_email=__email__,
+    python_requires='>=3.7',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -29,7 +29,8 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10'
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11'
     ],
     description="Log and Flow tracking made easy with Python",
     install_requires=requirements,
