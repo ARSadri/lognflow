@@ -4,7 +4,9 @@
 
 from setuptools import setup, find_packages
 
-from lognflow import __author__, __email__, __version__
+__author__ = 'Alireza Sadri'
+__email__ = 'arsadri@gmail.com'
+__version__ = '0.6.2'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
