@@ -1,17 +1,19 @@
 """ lognflow
 
-lognflow makes logging and vieweing the logs easy in Python. It is so simple
-you can code it yourself, so, why would you?!
+lognflow makes logging easy in Python. It is so simple you can code it 
+yourself, so, why would you?!
 
-lognflow logs all files into os directory. As such what is facilitates is
-exactly that, taking care of folder and file names. This saves you a lot of 
-coding and makes you code readable when you say:
+lognflow logs all files into a directory by taking care of directories and 
+files names. This saves you a lot of coding and makes your code readable
+ when you say::
 
-logger = lognflow(logs_root = 'root_for_all_logs')
-logger.log_single('variables/variable1', variable1)
-logger('I just logged a variable.')
+    logger = lognflow(logs_root = 'root_for_time_tagged_log_directories')
+    logger.log_single('variables/variable1', variable1)
+    logger('I just logged a variable.')
+    
+    another_logger = lognflow(log_dir = 'specific_dir')
+    another_logger.log_plot('final_plot', final_plot_is_a_np_1d_array)
 
-The logger will use time.time() to create a log_dir in logs_root for logging.
 The next syntax is an easy way of just logging a numpy array. It will make
 a new directory within the log_dir, called variables and make a npy file
 named variable1 and put variable1 in it. The third line of the code above
@@ -672,42 +674,6 @@ class lognflow:
                      image_format=image_format, dpi=dpi,
                      time_tag = time_tag)
             
-    def log_animation(self, parameter_name : str, stack, 
-                         interval=50, blit=False, 
-                         repeat_delay = None, dpi=100,
-                         time_tag : bool = None):
-        
-        """Make an animation from a stack of images
-            
-            Parameters
-            ----------
-            :param parameter_name : str
-                    examples: myvar or myscript/myvar
-                    parameter_name can be just a name e.g. myvar, or could be a
-                    path like name such as myscript/myvar.
-            :param stack : np.array of shape n_f x n_r x n_c or n_f x n_r x n_c x 3
-                    stack[cnt] needs to be plotable by plt.imshow()
-            :param time_tag: bool
-                    Wheather if the time stamp is in the file name or not.
-        """
-        time_tag = self.time_tag if (time_tag is None) else time_tag
-            
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        fpath = self._get_fpath(param_dir, param_name, 'gif', time_tag)
-
-        fig, ax = plt.subplots()
-        ims = []
-        for img in stack:    
-            im = ax.imshow(img, animated=True)
-            plt.xticks([]),plt.yticks([])
-            ims.append([im])
-        ani = animation.ArtistAnimation(\
-            fig, ims, interval = interval, blit = blit,
-            repeat_delay = repeat_delay)    
-        ani.save(fpath, dpi = dpi, 
-                 writer = animation.PillowWriter(fps=int(1000/interval)))
-        return fpath
-
     def log_plot(self, parameter_name : str, 
                        parameter_value_list,
                        x_values = None,
@@ -1330,6 +1296,43 @@ class lognflow:
                 time_tag = time_tag)
         return fpath
 
+    def log_animation(self, parameter_name : str, stack, 
+                         interval=50, blit=False, 
+                         repeat_delay = None, dpi=100,
+                         time_tag : bool = None):
+        
+        """Make an animation from a stack of images
+            
+            Parameters
+            ----------
+            :param parameter_name : str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+            :param stack : np.array of shape 
+                    n_f x n_r x n_c or n_f x n_r x n_c x 3
+                    stack[cnt] needs to be plotable by plt.imshow()
+            :param time_tag: bool
+                    Wheather if the time stamp is in the file name or not.
+        """
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        fpath = self._get_fpath(param_dir, param_name, 'gif', time_tag)
+
+        fig, ax = plt.subplots()
+        ims = []
+        for img in stack:    
+            im = ax.imshow(img, animated=True)
+            plt.xticks([]),plt.yticks([])
+            ims.append([im])
+        ani = animation.ArtistAnimation(\
+            fig, ims, interval = interval, blit = blit,
+            repeat_delay = repeat_delay)    
+        ani.save(fpath, dpi = dpi, 
+                 writer = animation.PillowWriter(fps=int(1000/interval)))
+        return fpath
+
     def get_text(self, log_name='main_log'):
         """ get text log files
             Given the log_name, this function returns the text therein.
@@ -1389,9 +1392,10 @@ class lognflow:
             if(len(flist) == 0):
                 flist = list(_var_dir.glob(f'{_var_name}*.*'))
                 if(len(flist) > 0):
-                    self.logger('Can not find the file with the given suffix, '\
-                                +'but found some with a different suffix, '\
-                                +f'one file is: {flist[single_shot_index]}')
+                    self.log_text(None, 
+                        'Can not find the file with the given suffix, '\
+                        +'but found some with a different suffix, '\
+                        +f'one file is: {flist[single_shot_index]}')
                     
         if(len(flist) > 0):
             flist.sort()
@@ -1402,12 +1406,12 @@ class lognflow:
             if(len(flist) > 0):
                 flist.sort()
             else:
-                self.logger('No such variable')
+                self.log_text(None, 'No such variable')
                 return
         var_path = flist[single_shot_index]
                 
         if(var_path.is_file()):
-            self.logger(f'Loading {var_path}')
+            self.log_text(None, f'Loading {var_path}')
             if(var_path.suffix == '.npz'):
                 buf = np.load(var_path)
                 time_array = buf['time_array']
@@ -1432,7 +1436,7 @@ class lognflow:
             except:
                 pass
         else:
-            self.logger(f'{var_name} not found.')
+            self.log_text(None, f'{var_name} not found.')
             return
     
     def get_stack_of_files(self, 
@@ -1516,14 +1520,14 @@ class lognflow:
                         dataset[fcnt] = np.load(fpath)
                     elif(data_type == 'image'):
                         dataset[fcnt] = imread(fpath)
-                self.logger(f'shape is: {dataset.shape}')
+                self.log_text(None, f'shape is: {dataset.shape}')
                 if(return_flist):
                     return(dataset, flist)
                 else:
                     return(dataset)
             else:
-                self.logger(f'File {flist[0].name} cannot be opened by '\
-                          + r'np.load() or plt.imread()')
+                self.log_text(None, f'File {flist[0].name} cannot be opened'\
+                          + r' by np.load() or plt.imread()')
             
     def get_common_files(self, var_name_A, var_name_B):
         """ get common files in two directories
@@ -1587,13 +1591,13 @@ class lognflow:
             flist.sort()
             fcnt_width = len(str(len(flist)))
             for fcnt, fpath in enumerate(flist):
-                self.logger(f'Changing {flist[fcnt].name}')
+                self.log_text(None, f'Changing {flist[fcnt].name}')
                 fname_new = ''
                 if(var_fname is not None):
                     fname_new = var_fname + '_'
                 fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
                 fpath_new = flist[fcnt].parent / fname_new
-                self.logger(f'To {fpath_new.name}')
+                self.log_text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
                 
 

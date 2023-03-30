@@ -44,8 +44,13 @@ History
 ------------------
 * rename had a bug that is fixed
 
-0.6.2 (2023-04-01)
+0.6.2 (2023-03-25)
 ------------------
 * made it possible to flush_all()
 * We support Python 3.7+ because of dataclasses
 * printprogress now can disable printing anything and return ETA at the __call__
+
+0.6.3 (2023-04-01)
+------------------
+* lognflow class does all logviewer does. Maybe it is time to remove logviewer.
+
