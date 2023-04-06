@@ -54,3 +54,7 @@ History
 ------------------
 * lognflow class does all logviewer does. Maybe it is time to remove logviewer.
 
+0.6.4 (2023-04-10)
+------------------
+* Better documentation and examples for readme
+* get_var is added to lognflow

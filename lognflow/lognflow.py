@@ -171,7 +171,7 @@ class lognflow:
         self.log_name = main_log_name
         self.log_flush_period = log_flush_period
     
-    def rename(self, new_name:str, append = False):
+    def rename(self, new_name:str, append : bool = False):
         """ renaming the log directory
             It is possible to rename the log directory while logging is going
             on. This is particulary useful when at the end of an experiment,
@@ -207,7 +207,7 @@ class lognflow:
             self.log_text(None, 'Most probably a file was open.')
         return self.log_dir
     
-    def _prepare_param_dir(self, parameter_name):
+    def _prepare_param_dir(self, parameter_name : str):
         try:
             _ = parameter_name.split()
         except:
@@ -239,7 +239,8 @@ class lognflow:
             param_dir.mkdir(parents = True, exist_ok = True)
         return(param_dir, param_name)
 
-    def _get_fpath(self, param_dir, param_name, save_as, time_tag = None):
+    def _get_fpath(self, param_dir : pathlib.Path, param_name : str, 
+                   save_as : str, time_tag : bool = None) -> pathlib.Path:
         
         time_time = time.time() - self._init_time
         time_tag = self.time_tag if (time_tag is None) else time_tag
@@ -523,7 +524,25 @@ class lognflow:
             fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var.data_array)
         return fpath
+    
+    def get_var(self, parameter_name : str):
+        """ Get the buffered numpy arrays
+            If you need the buffered variable back.
+        :param parameter_name : str
+            examples: myvar or myscript/myvar
+                parameter_name can be just a name e.g. myvar, or could be a
+                path like name such as myscript/myvar.
         
+        :return: A tuple including two np.ndarray. The first on is 1d time
+            and the second one is nd buffered data.
+        :rtype: tuple of two nd.arrays
+        
+        """
+        _var = self._vars_dict[parameter_name]
+        data_array = _var.data_array[_var.time_array>0].copy()
+        time_array = _var.time_array[_var.time_array>0].copy()
+        return(time_array, data_array)
+
     def log_single(self, parameter_name : str, 
                          parameter_value,
                          save_as = None,
@@ -1392,10 +1411,11 @@ class lognflow:
             if(len(flist) == 0):
                 flist = list(_var_dir.glob(f'{_var_name}*.*'))
                 if(len(flist) > 0):
-                    self.log_text(None, 
-                        'Can not find the file with the given suffix, '\
-                        +'but found some with a different suffix, '\
-                        +f'one file is: {flist[single_shot_index]}')
+                    # self.log_text(None, 
+                    #     'Can not find the file with the given suffix, '\
+                    #     +'but found some with a different suffix, '\
+                    #     +f'one file is: {flist[single_shot_index]}')
+                    pass
                     
         if(len(flist) > 0):
             flist.sort()
@@ -1406,20 +1426,23 @@ class lognflow:
             if(len(flist) > 0):
                 flist.sort()
             else:
-                self.log_text(None, 'No such variable')
+                # self.log_text(None, 'No such variable')
                 return
         var_path = flist[single_shot_index]
                 
         if(var_path.is_file()):
-            self.log_text(None, f'Loading {var_path}')
+            # self.log_text(None, f'Loading {var_path}')
             if(var_path.suffix == '.npz'):
                 buf = np.load(var_path)
-                time_array = buf['time_array']
-                n_logs = (time_array > 0).sum()
-                time_array = time_array[:n_logs]
-                data_array = buf['data_array']
-                data_array = data_array[:n_logs]
-                return((time_array, data_array))
+                try:
+                    time_array = buf['time_array']
+                    n_logs = (time_array > 0).sum()
+                    time_array = time_array[:n_logs]
+                    data_array = buf['data_array']
+                    data_array = data_array[:n_logs]
+                    return((time_array, data_array))
+                except:
+                    return buf
             if(var_path.suffix == '.npy'):
                 return(np.load(var_path))
             if(var_path.suffix == '.mat'):
@@ -1436,7 +1459,7 @@ class lognflow:
             except:
                 pass
         else:
-            self.log_text(None, f'{var_name} not found.')
+            # self.log_text(None, f'{var_name} not found.')
             return
     
     def get_stack_of_files(self, 
@@ -1520,14 +1543,15 @@ class lognflow:
                         dataset[fcnt] = np.load(fpath)
                     elif(data_type == 'image'):
                         dataset[fcnt] = imread(fpath)
-                self.log_text(None, f'shape is: {dataset.shape}')
+                # self.log_text(None, f'shape is: {dataset.shape}')
                 if(return_flist):
                     return(dataset, flist)
                 else:
                     return(dataset)
             else:
-                self.log_text(None, f'File {flist[0].name} cannot be opened'\
-                          + r' by np.load() or plt.imread()')
+                # self.log_text(None, f'File {flist[0].name} cannot be opened'\
+                #           + r' by np.load() or plt.imread()')
+                pass
             
     def get_common_files(self, var_name_A, var_name_B):
         """ get common files in two directories
@@ -1591,34 +1615,33 @@ class lognflow:
             flist.sort()
             fcnt_width = len(str(len(flist)))
             for fcnt, fpath in enumerate(flist):
-                self.log_text(None, f'Changing {flist[fcnt].name}')
+                # self.log_text(None, f'Changing {flist[fcnt].name}')
                 fname_new = ''
                 if(var_fname is not None):
                     fname_new = var_fname + '_'
                 fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
                 fpath_new = flist[fcnt].parent / fname_new
-                self.log_text(None, f'To {fpath_new.name}')
+                # self.log_text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
                 
-
-    def __call__(self, *args, **kwargs):
-        """calling the object
-        
-            In the case of the following code:
-            
-            logger = lognflow()
-            logger('Hello lognflow')
-            
-            The text (str(...)) will be passed to the main log text file.
-        
-        """
-        self.log_text(self.log_name, *args, **kwargs)
-
     def flush_all(self):
         for log_name in list(self._loggers_dict):
             self.log_text_flush(log_name, flush = True)
         for parameter_name in list(self._vars_dict):
             self.log_var_flush(parameter_name)
+
+    def __call__(self, *args, **kwargs):
+        """calling the object
+        
+            In the case of the following code::
+            
+                logger = lognflow()
+                logger('Hello lognflow')
+            
+            The text (str(...)) will be passed to the main log text file.
+        
+        """
+        self.log_text(None, *args, **kwargs)
 
     def __del__(self):
         try:
