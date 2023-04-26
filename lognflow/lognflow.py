@@ -96,10 +96,10 @@ class lognflow:
             This is the final directory path for the log files. 
         :type log_dir: pathlib.Path
     
-        :param exp_prename:
+        :param log_prefix:
             this string will be put before the time tag for log_dir, when
             only logs_root is given.
-        :type exp_prename: str
+        :type log_prefix: str
         
         :param print_text: 
             If True, everything that is logged as text will be printed as well
@@ -127,7 +127,7 @@ class lognflow:
     def __init__(self, 
                  logs_root        : pathlib.Path = None,
                  log_dir          : pathlib.Path = None,
-                 exp_prename      : str          = None,
+                 log_prefix       : str          = None,
                  print_text       : bool         = True,
                  main_log_name    : str          = 'main_log',
                  log_flush_period : int          = 10,
@@ -147,8 +147,8 @@ class lognflow:
             new_log_dir_found = False
             while(not new_log_dir_found):
                 log_dir_name = ''
-                if(exp_prename is not None):
-                    log_dir_name = str(exp_prename)
+                if(log_prefix is not None):
+                    log_dir_name = str(log_prefix)
                 log_dir_name += f'{self._init_time}/'
                 self.log_dir = \
                     pathlib.Path(logs_root) / log_dir_name
@@ -276,7 +276,8 @@ class lognflow:
             last_log_flush_time=0,
             log_flush_period=log_flush_period)  
 
-    def log_text_flush(self, log_name = None, flush = False):
+    def log_text_flush(self, log_name = None, 
+                       flush = False):
         """
         Keep str as a list of lines to be logged. This function must take the 
         log name too. Then put the str in the log file.
@@ -318,6 +319,7 @@ class lognflow:
                  time_tag : bool = None,
                  log_flush_period : int = None,
                  flush = False,
+                 end = '\n',
                  new_file = False):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
@@ -343,9 +345,18 @@ class lognflow:
                     log size limit in bytes.
             :param time_tag : bool
                     put time stamp in file names.
+            :param log_flush_period : int
+                    How often flush the log in seconds, if time passes this
+                    given period, it will flush the first time a text is logged,
+                    or if the logger is finilized.
             :param flush : bool
                     force flush into the log file
-            
+            :param end: str
+                    The last charachter for this call.
+            :param new_file: bool
+                    if a new file is needed. If time_tag is True, it will make
+                    a new file with a new name that has a time tag. If False,
+                    it closees the current text file and overwrites on it.
         """
         time_time = time.time() - self._init_time
 
@@ -366,46 +377,28 @@ class lognflow:
                                    log_size_limit = log_size_limit,
                                    time_tag = time_tag)
 
-        ############################################
         curr_textinlog = self._loggers_dict[log_name]
         _logger = []
         if(log_time_stamp):
             _time_str = f'T:{time_time:>6.6f}| '
             _logger.append(_time_str)
-        if isinstance(to_be_logged, np.ndarray):
-            try:
-                _logger.append('numpy.ndarray')
-                if(to_be_logged.size()>100):
-                    _logger.append(', The first and last 50 elements:\n')
-                    to_be_logged = to_be_logged.ravel()
-                    _logstr = np.array2string(to_be_logged[:50])
-                    _logger.append(_logstr)
-                    _logger.append(' ... ')
-                    _logstr = np.array2string(to_be_logged[-50:])
-                    _logger.append(_logstr)
-                else:
-                    _logstr = ':\n' + np.array2string(to_be_logged)
-                    _logger.append(_logstr)
-            except:
-                _logger.append(' not possible to log ' + log_name + '\n')
-        else:
-            if(isinstance(to_be_logged, list)):
-                for _ in to_be_logged:
-                    _tolog = str(_)
-                    _logger.append(_tolog)
-            else:
-                _tolog = str(to_be_logged)
+        if(isinstance(to_be_logged, list)):
+            for _ in to_be_logged:
+                _tolog = str(_)
                 _logger.append(_tolog)
-            _logger.append('\n')
+        else:
+            _tolog = str(to_be_logged)
+            _logger.append(_tolog)
+        if(_logger[-1][-1] != end):
+            _logger.append(end)
         log_size = 0
         for _logger_el in _logger:
             curr_textinlog.to_be_logged.append(_logger_el)
             log_size += len(_logger_el)
         curr_textinlog.log_size += log_size
-        ############################################
         
         self.log_text_flush(log_name, flush)        
-        ############################################
+
         if(log_size >= curr_textinlog.log_size_limit):
             self._log_text_handler(log_name, 
                                    log_size_limit = curr_textinlog.log_size_limit,
@@ -513,16 +506,18 @@ class lognflow:
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         
         _var = self._vars_dict[parameter_name]
+        _var_data_array = _var.data_array[_var.time_array > 0]
+        _var_time_array = _var.time_array[_var.time_array > 0]
         if(_var.save_as == 'npz'):
             fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
-                time_array = _var.time_array,
-                data_array = _var.data_array)
+                time_array = _var_time_array,
+                data_array = _var_data_array)
         elif(_var.save_as == 'txt'):
             fpath = param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
-            np.savetxt(fpath, _var.time_array)
+            np.savetxt(fpath, _var_time_array)
             fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
-            np.savetxt(fpath, _var.data_array)
+            np.savetxt(fpath, _var_data_array)
         return fpath
     
     def get_var(self, parameter_name : str):
@@ -926,7 +921,7 @@ class lognflow:
     def log_imshow(self, parameter_name : str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_tag : bool = None,
+                   time_tag : bool = None, nan_borders = np.nan,
                    **kwargs):
         """log an image
             The image is logged using plt.imshow
@@ -938,41 +933,45 @@ class lognflow:
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
             :param parameter_value : np.array
-                    An np array of size n x m, to be shown by imshow
+                    An np array of shape amongst the following:
+                    * (n, m) 
+                    * (n, m, 3)
+                    * (n, m, ch)
+                    * (1, n, m, ch)
+                    * (n, m, 3, ch)
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        parameter_value = np.squeeze(parameter_value)
+        parameter_value = parameter_value.squeeze()
         parameter_value_shape = parameter_value.shape
         n_dims = len(parameter_value_shape)
         
         FLAG_img_ready = False
+        use_multichannel_to_square = False
         if(n_dims == 2):
             FLAG_img_ready = True
         elif(n_dims == 3):
             if(parameter_value_shape[2] == 3):
                 FLAG_img_ready = True
-        elif(n_dims == 4):
-            parameter_value = parameter_value.swapaxes(1,2)
-            new_shape = parameter_value.shape
-            parameter_value = \
-                parameter_value.reshape(new_shape[0] * new_shape[1],
-                                        new_shape[2] * new_shape[3])
-            FLAG_img_ready = True
-        elif(n_dims == 5):
-            if(parameter_value_shape[4] == 3):
-                parameter_value = parameter_value.swapaxes(1,2)
-                new_shape = parameter_value.shape
-                parameter_value = parameter_value.reshape(\
-                    new_shape[0] * new_shape[1],
-                    new_shape[2] * new_shape[3],
-                    new_shape[4])
+            else:
                 FLAG_img_ready = True
+                use_multichannel_to_square = True
+        elif(n_dims == 4):
+            if(parameter_value_shape[2] == 3):
+                FLAG_img_ready = True
+                use_multichannel_to_square = True
+            elif(parameter_value_shape[0] == 1):
+                FLAG_img_ready = True
+                use_multichannel_to_square = True
         
+        if(use_multichannel_to_square):
+            parameter_value = self. multichannel_to_square(
+                parameter_value, nan_borders = nan_borders)
         if(FLAG_img_ready):
+            plt.figure()
             plt.imshow(parameter_value, cmap = cmap, **kwargs)
             plt.colorbar()
             fpath = self.log_plt(
@@ -981,7 +980,6 @@ class lognflow:
                 time_tag = time_tag)
             return fpath
         else:
-            plt.close()
             self.log_text(
                 self.log_name,
                 f'Cannot plot variable {parameter_name} with shape' + \
@@ -997,19 +995,32 @@ class lognflow:
             ----------
             :param stack : np.ndarray
                     It must have the shape of either
+                    n_r x n_c x n_ch
+                    n_r x n_c x  3  x n_ch
                     n_f x n_r x n_c x n_ch
-                    n_f x n_r x n_c x 3 x n_ch
+                    n_f x n_r x n_c x  3  x n_ch
                     
-                In both cases n_ch will be turned into square tile
-                Remember if you have N images to put into a square, you only
-                have n_f = 1 image with n_ch = N, you do not have N images
-                and the shape of the ndarray will be 1 x n_r x n_c x N
+                In both cases n_ch will be turned into a square tile
+                Remember if you have N images to put into a square, the input
+                shape should be 1 x n_r x n_c x N
+            :param nan_borders: literal or np.inf or np.nan
+                When plotting images with matplotlib.pyplot.imshow, there
+                needs to be a border between them. This is the value for the 
+                border elements.
                 
             output
             ---------
-                it produces an np.array of shape n_f x n_r x n_c or
-                n_f x n_r x n_c x 3 in case of RGB input.
+                Since we have N channels to be laid into a square, the side
+                length woul be ceil(N**0.5)
+                it produces an np.array of shape n_f x n_r * S x n_c * S or
+                n_f x n_r * S x n_c * S x 3 in case of RGB input.
         """
+        if(len(stack.shape) == 4):
+            if(stack.shape[3] == 3):
+                stack = np.array([stack])
+        if(len(stack.shape) == 3):
+            stack = np.array([stack])
+        
         if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
             if(len(stack.shape) == 4):
                 n_imgs, n_R, n_C, n_ch = stack.shape

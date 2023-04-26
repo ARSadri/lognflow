@@ -47,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'lognflow'
-copyright = "2022, Alireza Sadri"
+copyright = "2023, Alireza Sadri"
 author = "Alireza Sadri"
 
 # The version info for the project you're documenting, acts as replacement

@@ -35,7 +35,7 @@ History
 0.6.0 (2023-03-22)
 ------------------
 * This is a stable release
-* All text files are handled by thw with statement
+* All text files are handled by the with statement
 * Renaming bug is fixed
 * all tests run properly.
 * lognflow has all that logviewer has. We will check if dir exists at every use
@@ -54,7 +54,13 @@ History
 ------------------
 * lognflow class does all logviewer does. Maybe it is time to remove logviewer.
 
-0.6.4 (2023-04-10)
+0.6.4 (2023-04-06)
 ------------------
 * Better documentation and examples for readme
-* get_var is added to lognflow
+* get_var is added to lognflow to get buffered variables logged by log_var
+
+0.6.5 (2023-04-26)
+------------------
+* Fixed a bug in the docs to allow sphinx compile it.
+* log_var will log only the valid time stamps.
+* added end keyword argument to log_text

@@ -83,7 +83,7 @@ def test_get_images_as_stack():
         dataset_B = logged.get_stack_of_files(flist = flist_B_AB, return_data = True, return_flist = False)
         
         logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
-        _ = logger._loggers_dict['main_log'][2]
+        _ = logger._loggers_dict['main_log'].log_size
         logger('Size of the log file in bytes is: ' \
                + f'{_}')
 
