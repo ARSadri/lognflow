@@ -79,9 +79,6 @@ class lognflow:
         The lognflow construction can allow setting global settings that can
         be overridden later by calling each of its methods as follows.
         
-        Parameters
-        ----------
-    
         .. note::
             One of the variables ``logs_root`` or ``log_dir`` must be given.
             if ``log_dir`` is given, ``logs_root`` is disregarded.
@@ -149,6 +146,9 @@ class lognflow:
                 log_dir_name = ''
                 if(log_prefix is not None):
                     log_dir_name = str(log_prefix)
+                    if len(log_dir_name) > 0:
+                        if log_dir_name[-1] != '_':
+                            log_dir_name += '_'
                 log_dir_name += f'{self._init_time}/'
                 self.log_dir = \
                     pathlib.Path(logs_root) / log_dir_name
@@ -171,7 +171,7 @@ class lognflow:
         self.log_name = main_log_name
         self.log_flush_period = log_flush_period
     
-    def rename(self, new_name:str, append : bool = False):
+    def rename(self, new_name:str, append: bool = False):
         """ renaming the log directory
             It is possible to rename the log directory while logging is going
             on. This is particulary useful when at the end of an experiment,
@@ -180,8 +180,6 @@ class lognflow:
             
             There is only one input and that is the new name of the directory.
 
-            Parameters
-            ----------
             :param new_name: The new name of the directory (without parent path)
             :type new_name: str
             
@@ -207,19 +205,20 @@ class lognflow:
             self.log_text(None, 'Most probably a file was open.')
         return self.log_dir
     
-    def _prepare_param_dir(self, parameter_name : str):
+    def _prepare_param_dir(self, parameter_name: str):
         try:
             _ = parameter_name.split()
         except:
             self.log_text(
                 self.log_name,
-                'The parameter name is not a string. ' \
-                + f'Its type is {type(parameter_name)}. It is {parameter_name}')
+                f'The parameter name {parameter_name} is not a string.' \
+                + f' Its type is {type(parameter_name)}.')
         assert len(parameter_name.split()) == 1, \
             self.log_text(self.log_name,\
-                  f'The variable name {parameter_name} you chose is splitable' \
+                  f'The variable name {parameter_name} you chose, is splitable'\
                 + f' I can split it into {parameter_name.split()}'             \
-                + ' Make sure you dont use space, tab, or ....'                \
+                + ' Make sure you dont use space, tab, or backslash with known'\
+                + ' small letters such as f, t, ...'                           \
                 + ' If you are using single backslash, e.g. for windows'       \
                 + ' folders, replace it with \\ or make it a literal string'   \
                 + ' by putting an r before the variable name.')
@@ -239,8 +238,8 @@ class lognflow:
             param_dir.mkdir(parents = True, exist_ok = True)
         return(param_dir, param_name)
 
-    def _get_fpath(self, param_dir : pathlib.Path, param_name : str, 
-                   save_as : str, time_tag : bool = None) -> pathlib.Path:
+    def _get_fpath(self, param_dir: pathlib.Path, param_name: str, 
+                   save_as: str, time_tag: bool = None) -> pathlib.Path:
         
         time_time = time.time() - self._init_time
         time_tag = self.time_tag if (time_tag is None) else time_tag
@@ -260,7 +259,7 @@ class lognflow:
         
     def _log_text_handler(self, log_name = None, 
                          log_size_limit: int = int(1e+7),
-                         time_tag : bool = None,
+                         time_tag: bool = None,
                          log_flush_period = None):
         
         if (log_flush_period is None):
@@ -278,10 +277,6 @@ class lognflow:
 
     def log_text_flush(self, log_name = None, 
                        flush = False):
-        """
-        Keep str as a list of lines to be logged. This function must take the 
-        log name too. Then put the str in the log file.
-        """
         """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
@@ -289,7 +284,6 @@ class lognflow:
             called multiple times. but use needs to also call it once in a
             while.
             In later versions, a timer will be used to call it automatically.
-            
             :param flush:
                 force the flush regardless of when the last time was.
                 default: False
@@ -311,13 +305,13 @@ class lognflow:
             curr_textinlog.last_log_flush_time = time_time
 
     def log_text(self, 
-                 log_name : str = None,
+                 log_name: str = None,
                  to_be_logged = '', 
                  log_time_stamp = True,
                  print_text = None,
                  log_size_limit: int = int(1e+7),
-                 time_tag : bool = None,
-                 log_flush_period : int = None,
+                 time_tag: bool = None,
+                 log_flush_period: int = None,
                  flush = False,
                  end = '\n',
                  new_file = False):
@@ -328,35 +322,33 @@ class lognflow:
             printing the text. You can set the log size limit to split it into
             another file with a new time stamp.
             
-            Parameters
-            ----------
-            :param log_name : str
-                    examples: mylog or myscript/mylog
-                    log_name can be just a name e.g. mylog, or could be a
-                    pathlike name such as myscript/mylog.
-            :param to_be_logged : str, nd.array, list, dict
-                    the string to be logged, could be a list
-                    or numpy array or even a dictionary. It uses str(...).
-            :param log_time_stamp : bool
-                    Put time stamp for every entry of the log
-            :param print_text : bool
-                    if False, what is logged will not be printed.
-            :param log_size_limit : int
-                    log size limit in bytes.
-            :param time_tag : bool
-                    put time stamp in file names.
-            :param log_flush_period : int
-                    How often flush the log in seconds, if time passes this
-                    given period, it will flush the first time a text is logged,
-                    or if the logger is finilized.
-            :param flush : bool
-                    force flush into the log file
+            :param log_name: str
+                   examples: mylog or myscript/mylog
+                   log_name can be just a name e.g. mylog, or could be a
+                   pathlike name such as myscript/mylog.
+            :param to_be_logged: str, nd.array, list, dict
+                   the string to be logged, could be a list
+                   or numpy array or even a dictionary. It uses str(...).
+            :param log_time_stamp: bool
+                   Put time stamp for every entry of the log
+            :param print_text: bool
+                   if False, what is logged will not be printed.
+            :param log_size_limit: int
+                   log size limit in bytes.
+            :param time_tag: bool
+                   put time stamp in file names.
+            :param log_flush_period: int
+                   How often flush the log in seconds, if time passes this
+                   given period, it will flush the first time a text is logged,
+                   or if the logger is finilized.
+            :param flush: bool
+                   force flush into the log file
             :param end: str
-                    The last charachter for this call.
+                   The last charachter for this call.
             :param new_file: bool
-                    if a new file is needed. If time_tag is True, it will make
-                    a new file with a new name that has a time tag. If False,
-                    it closees the current text file and overwrites on it.
+                   if a new file is needed. If time_tag is True, it will make
+                   a new file with a new name that has a time tag. If False,
+                   it closees the current text file and overwrites on it.
         """
         time_time = time.time() - self._init_time
 
@@ -411,7 +403,7 @@ class lognflow:
         cnt_limit = int(log_size_limit/(param.size*param.itemsize))
         return cnt_limit
 
-    def log_var(self, parameter_name : str, parameter_value, 
+    def log_var(self, parameter_name: str, parameter_value, 
                 save_as='npz', log_size_limit: int = int(1e+7)):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
@@ -425,18 +417,16 @@ class lognflow:
             does not use the connection to the directoy all time and if that is
             on a network, there will be less overhead.
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array whose size doesn't change
-            :param save_as : str
+            :param save_as: str
                     can be 'npz' or 'txt' which will save it as text.
             :param log_size_limit: int
-                    log_size_limit in bytes, default : 1e+7.
+                    log_size_limit in bytes, default: 1e+7.
                     
         """
         
@@ -493,15 +483,15 @@ class lognflow:
                                                    save_as,
                                                    log_counter_limit)
 
-    def log_var_flush(self, parameter_name : str):
+    def log_var_flush(self, parameter_name: str):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
             when the code that made the logger ends.
-        :param parameter_name : str
-            examples: myvar or myscript/myvar
-                parameter_name can be just a name e.g. myvar, or could be a
-                path like name such as myscript/myvar.
+            :param parameter_name: str
+                examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
         """
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         
@@ -520,17 +510,19 @@ class lognflow:
             np.savetxt(fpath, _var_data_array)
         return fpath
     
-    def get_var(self, parameter_name : str):
+    def get_var(self, parameter_name: str) -> tuple:
         """ Get the buffered numpy arrays
             If you need the buffered variable back.
-        :param parameter_name : str
-            examples: myvar or myscript/myvar
-                parameter_name can be just a name e.g. myvar, or could be a
-                path like name such as myscript/myvar.
-        
-        :return: A tuple including two np.ndarray. The first on is 1d time
-            and the second one is nd buffered data.
-        :rtype: tuple of two nd.arrays
+            :param parameter_name: str
+                examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+            
+            :return: 
+                A tuple including two np.ndarray. The first on is 1d time
+                and the second one is nd buffered data.
+            :rtype: 
+                tuple of two nd.arrays
         
         """
         _var = self._vars_dict[parameter_name]
@@ -538,11 +530,11 @@ class lognflow:
         time_array = _var.time_array[_var.time_array>0].copy()
         return(time_array, data_array)
 
-    def log_single(self, parameter_name : str, 
+    def log_single(self, parameter_name: str, 
                          parameter_value,
                          save_as = None,
                          mat_field = None,
-                         time_tag : bool = None):
+                         time_tag: bool = None):
         """log a single variable
             The most frequently used function would probably be this one.
             
@@ -550,18 +542,16 @@ class lognflow:
             name and something to be logged, the __call__ referes to this
             function.
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array whose size doesn't change
-            :param save_as : str
+            :param save_as: str
                     can be 'npz', 'npy', 'mat', 'torch' for pytorch models
                     or 'txt' which will save it as text.
-            :param mat_field : str
+            :param mat_field: str
                     when saving as 'mat' file, the field can be set.
                     otherwise it will be the parameter_name
             :param time_tag: bool
@@ -584,6 +574,9 @@ class lognflow:
             np.save(fpath, parameter_value)
         elif(save_as == 'npz'):
             np.savez(fpath, **parameter_value)
+        elif((save_as == '.tif') | (save_as == '.tiff')):
+            from tifffile import imwrite
+            imwrite(fpath, parameter_value)
         elif(save_as == 'txt'):
             with open(fpath,'a') as fdata: 
                 fdata.write(str(parameter_value))
@@ -591,23 +584,21 @@ class lognflow:
             from scipy.io import savemat
             if(mat_field is None):
                 mat_field = param_name
-            savemat(fpath, {f'{mat_field}' :parameter_value})
+            savemat(fpath, {f'{mat_field}':parameter_value})
         elif(save_as == 'torch'):
             from torch import save as torch_save
             torch_save(parameter_value.state_dict(), fpath)
         return fpath
     
     def log_plt(self, 
-                parameter_name : str, 
+                parameter_name: str, 
                 image_format='jpeg', dpi=1200,
-                time_tag : bool = None,
+                time_tag: bool = None,
                 close_plt = True):
         """log a single plt
             log a plt that you have on the screen.
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
@@ -646,24 +637,22 @@ class lognflow:
         # cbar.ax.tick_params(size=0.01)
 
     def log_multichannel_by_subplots(self, 
-        parameter_name : str, 
-        parameter_value : np.ndarray,
+        parameter_name: str, 
+        parameter_value: np.ndarray,
         image_format='jpeg', 
         dpi=1200, 
-        time_tag : bool = None,
+        time_tag: bool = None,
         add_colorbar = False,
         remove_axis_ticks = True,
         **kwargs):
         """log multiple images as a tiled square
             The image is logged using plt.imshow
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array of size n_r, n_c, n_ch, to be shown by imshow
                     as a square tile of side length of n_ch**0.5
             :param time_tag: bool
@@ -680,7 +669,7 @@ class lognflow:
             plt.setp(ax, xticks=[], yticks=[])
         for rcnt in range(n_ch_sq):
             for ccnt in range(n_ch_sq):
-                im = parameter_value[:, :, ccnt + rcnt * n_ch_sq]
+                im = parameter_value[:,:, ccnt + rcnt * n_ch_sq]
                 im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
                 if(add_colorbar):
                     self.add_colorbar(im_ch)
@@ -688,26 +677,24 @@ class lognflow:
                      image_format=image_format, dpi=dpi,
                      time_tag = time_tag)
             
-    def log_plot(self, parameter_name : str, 
+    def log_plot(self, parameter_name: str, 
                        parameter_value_list,
                        x_values = None,
                        image_format='jpeg', dpi=1200,
-                       time_tag : bool = None,
+                       time_tag: bool = None,
                        **kwargs):
         """log a single plot
             If you have a numpy array or a list of arrays (or indexable by
             first dimension, an array of 1D arrays), use this to log a plot 
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value_list : np.array
+            :param parameter_value_list: np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-            :param x_values : np.array
+            :param x_values: np.array
                     if set, must be an np.array of same size of all y values
                     or a list for each vector in y values where every element
                     of x-values list is the same as the y-values element in 
@@ -754,12 +741,12 @@ class lognflow:
                           f'Cannot plot variable {parameter_name}.')
             return None
     
-    def log_hist(self, parameter_name : str, 
+    def log_hist(self, parameter_name: str, 
                        parameter_value_list,
                        n_bins = 10,
                        alpha = 0.5,
                        image_format='jpeg', dpi=1200,
-                       time_tag : bool = None, 
+                       time_tag: bool = None, 
                        **kwargs):
         """log a single histogram
             If you have a numpy array or a list of arrays (or indexable by
@@ -767,18 +754,16 @@ class lognflow:
             if multiple inputs are given they will be plotted on top of each
             other using the alpha opacity. 
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value_list : np.array
+            :param parameter_value_list: np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-            :param n_bins : number or np.array
+            :param n_bins: number or np.array
                     used to set the bins for making of the histogram
-            :param alpha : float 
+            :param alpha: float 
                     the opacity of histograms, a flot between 0 and 1. If you
                     have multiple histograms on top of each other,
                     use 1/number_of_your_variables.
@@ -808,19 +793,17 @@ class lognflow:
                 f'Cannot make the histogram for variable {parameter_name}.')
             return None
     
-    def log_scatter3(self, parameter_name : str,
+    def log_scatter3(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag : bool = None):
+                       time_tag: bool = None):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array of size 3 x n, to sctter n data points in 3D
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -844,19 +827,17 @@ class lognflow:
                 f'Cannot make the scatter3 for variable {parameter_name}.')
             return None
     
-    def log_surface(self, parameter_name : str,
+    def log_surface(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag : bool = None, **kwargs):
+                       time_tag: bool = None, **kwargs):
         """log a surface in 3D
             surface plotting in 3D exactly similar to imshow but in 3D
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array of size n x m, to plot surface in 3D
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -881,21 +862,19 @@ class lognflow:
                 f'Cannot make the surface plot for variable {parameter_name}.')
             return None
         
-    def log_hexbin(self, parameter_name : str, parameter_value,
+    def log_hexbin(self, parameter_name: str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200,
-                   time_tag : bool = None):
+                   time_tag: bool = None):
         """log a 2D histogram 
             The 2D histogram is made out of hexagonals
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array of size 2 x n, to make the 2D histogram
-            :param gridsize : int
+            :param gridsize: int
                     grid size is the number of bins in 2D
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -918,21 +897,19 @@ class lognflow:
                 f'Cannot make the hexbin for variable {parameter_name}.')
             return None
         
-    def log_imshow(self, parameter_name : str, 
+    def log_imshow(self, parameter_name: str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_tag : bool = None, nan_borders = np.nan,
+                   time_tag: bool = None, nan_borders = np.nan,
                    **kwargs):
         """log an image
             The image is logged using plt.imshow
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value : np.array
+            :param parameter_value: np.array
                     An np array of shape amongst the following:
                     * (n, m) 
                     * (n, m, 3)
@@ -991,9 +968,7 @@ class lognflow:
             This is very useful when lots of images need to be tiled
             against each other.
         
-            Parameters
-            ----------
-            :param stack : np.ndarray
+            :param stack: np.ndarray
                     It must have the shape of either
                     n_r x n_c x n_ch
                     n_r x n_c x  3  x n_ch
@@ -1048,8 +1023,8 @@ class lognflow:
                 for ccnt in range(square_side):
                     ch_cnt = rcnt + square_side*ccnt
                     if (ch_cnt<n_ch):
-                        canv[:, rcnt*n_R : (rcnt + 1)*n_R,
-                                ccnt*n_C : (ccnt + 1)*n_C] = \
+                        canv[:, rcnt*n_R: (rcnt + 1)*n_R,
+                                ccnt*n_C: (ccnt + 1)*n_C] = \
                             stack[..., used_ch_cnt]
                         used_ch_cnt += 1
         else:
@@ -1089,12 +1064,10 @@ class lognflow:
                                          Channels will be tiled into square
             n_frm x n_row x n_clm x n_ch x 3 if channels are in RGB
     
-            Parameters
-            ----------
             :param list_of_stacks
                     list_of_stacks would include arrays iteratable by their
                     first dimension.
-            :param nan_borders : float
+            :param nan_borders: float
                     borders between tiles will be filled with this variable
                     default: np.nan
         """        
@@ -1108,8 +1081,8 @@ class lognflow:
         return(list_of_stacks)
 
     def log_canvas(self, 
-                   parameter_name : str,
-                   list_of_stacks : list,
+                   parameter_name: str,
+                   list_of_stacks: list,
                    list_of_masks = None,
                    figsize_ratio = 1,
                    text_as_colorbar = False,
@@ -1117,7 +1090,7 @@ class lognflow:
                    image_format='jpeg', 
                    cmap = 'jet',
                    dpi=1200,
-                   time_tag : bool = None):
+                   time_tag: bool = None):
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
@@ -1137,23 +1110,21 @@ class lognflow:
             if you have multiple images as channels such as the following,
             call the prepare_stack_of_images.
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param list_of_stacks : list
+            :param list_of_stacks: list
                     List of stack of images, each of which can be a
                     n_F x n_r x n_c. Notice that n_F should be the same for all
                     elements of the list.
-            :param list_of_masks : list
+            :param list_of_masks: list
                     the same as the list_of_stacks and will be used to make
                     accurate colorbars
-            :param text_as_colorbar : bool
+            :param text_as_colorbar: bool
                     if True, max and mean and min of each image will be written
                     on it.
-            :param use_colorbar : bool
+            :param use_colorbar: bool
                     actual colorbar for each iamge will be shown
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -1239,7 +1210,7 @@ class lognflow:
         return fpath
 
     def log_confusion_matrix(self,
-                             parameter_name : str,
+                             parameter_name: str,
                              cm,
                              target_names = None,
                              title='Confusion matrix',
@@ -1248,30 +1219,29 @@ class lognflow:
                              image_format = 'jpeg',
                              dpi = 1200,
                              time_tag = False):
-        """
+        """log a confusion matrix
             given a sklearn confusion matrix (cm), make a nice plot
         
-            Parameters
-            ---------
-            :param cm:           confusion matrix from sklearn.metrics.confusion_matrix
+            :param cm:
+                confusion matrix from sklearn.metrics.confusion_matrix
             
-            :param target_names: given classification classes such as [0, 1, 2]
-                              the class names, for example: ['high', 'medium', 'low']
+            :param target_names: 
+                given classification classes such as [0, 1, 2]
+                the class names, for example: ['high', 'medium', 'low']
             
-            :param title:        the text to display at the top of the matrix
+            :param title:        
+                the text to display at the top of the matrix
             
-            :param cmap: the gradient of the values displayed from matplotlib.pyplot.cm
-                         (http://matplotlib.org/examples/color/colormaps_reference.html)
-                         plt.get_cmap('jet') or plt.cm.Blues
+            :param cmap: 
+                the gradient of the values displayed from matplotlib.pyplot.cm
+                (http://matplotlib.org/examples/color/colormaps_reference.html)
+                plt.get_cmap('jet') or plt.cm.Blues
                 
-            :param time_tag: if True, the file name will be stamped with time
+            :param time_tag: 
+                if True, the file name will be stamped with time
         
-            Usage
+            Usage::
             -----
-            .. highlight:: python
-               :linenothreshold: 5
-               
-            .. code-block:: python
                 from lognflow import lognflow
                 logger = lognflow(log_roots or log_dir)
                 logger.plot_confusion_matrix(\
@@ -1281,10 +1251,9 @@ class lognflow:
                     title        = best_estimator_name) # title of graph
                         
         
-            Citiation
-            ---------
-            http://scikit-learn.org/stable/auto_examples/model_selection/
-                                                           plot_confusion_matrix.html
+            Credit
+            ------
+                http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
     
         """
         accuracy = np.trace(cm) / np.sum(cm).astype('float')
@@ -1326,20 +1295,18 @@ class lognflow:
                 time_tag = time_tag)
         return fpath
 
-    def log_animation(self, parameter_name : str, stack, 
+    def log_animation(self, parameter_name: str, stack, 
                          interval=50, blit=False, 
                          repeat_delay = None, dpi=100,
-                         time_tag : bool = None):
+                         time_tag: bool = None):
         
         """Make an animation from a stack of images
             
-            Parameters
-            ----------
-            :param parameter_name : str
+            :param parameter_name: str
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param stack : np.array of shape 
+            :param stack: np.array of shape 
                     n_f x n_r x n_c or n_f x n_r x n_c x 3
                     stack[cnt] needs to be plotable by plt.imshow()
             :param time_tag: bool
@@ -1389,8 +1356,6 @@ class lognflow:
         """ get a single variable
             return the value of a saved variable.
 
-            Parameters
-            ----------
             :param var_name:
                 variable name
             :param single_shot_index:
@@ -1461,6 +1426,9 @@ class lognflow:
             if(var_path.suffix == '.txt'):
                 with open(var_path) as f_txt:
                     return(f_txt.read())
+            if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
+                from tifffile import imread
+                return(imread(var_path))                
             if(var_path.suffix == '.torch'):      
                 from torch import load as torch_load 
                 return(torch_load(var_path))
@@ -1469,21 +1437,16 @@ class lognflow:
                 return(img)
             except:
                 pass
-        else:
-            # self.log_text(None, f'{var_name} not found.')
-            return
     
     def get_stack_of_files(self, 
         var_name = None, flist = [], suffix = '*',
-        return_data = False, return_flist = True):
+        return_data = False, return_flist = True) -> tuple:
         
         """ Get list or data of all files in a directory
         
             This function gives the list of paths of all files in a directory
             for a single variable. 
 
-            Parameters
-            ----------
             :param var_name:
                 The directory or variable name to look for the files
             :type var_name: str
@@ -1504,13 +1467,13 @@ class lognflow:
             :param return_flist
                     Maybe you are only intrested in the flist.
                     
-            Output
-            ----------
-            
+            :return:
                 It returns a tuple, (dataset, flist),
                 dataset will be a numpy array in case all files produce same
                 shape numpy arrays.
                 flist is type pathlib.Path
+            :rtype: tuple
+            
             
         """
         suffix = suffix.strip('.')
@@ -1571,8 +1534,6 @@ class lognflow:
             and we are interested to get the flist in both that is common 
             between them. returns a tuple of two lists of files.
             
-            Parameters
-            ----------
             :param var_name_A:
                 directory A name
             :param var_name_B:
@@ -1609,8 +1570,6 @@ class lognflow:
             This function changes all of the time stamps, sorted ascendingly,
             by indices.
             
-            Parameters
-            ----------
             :param var_name:
                 variable name
         """
@@ -1670,9 +1629,7 @@ def select_directory(default_directory = './'):
     """ Open dialog to select a directory
         It works for windows and Linux using PyQt5.
     
-        Parameters
-        ----------
-        :param default_directory: pathlib.Path
+       :param default_directory: pathlib.Path
                 When dialog opens, it starts from this default directory.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication

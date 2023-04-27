@@ -64,3 +64,8 @@ History
 * Fixed a bug in the docs to allow sphinx compile it.
 * log_var will log only the valid time stamps.
 * added end keyword argument to log_text
+
+0.6.6 (2023-05-01)
+------------------
+* Better documentation
+* added tifffile imread to logviewer and imwrite to lognflow

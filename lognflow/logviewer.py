@@ -119,6 +119,9 @@ class logviewer:
             if(var_path.suffix == '.txt'):
                 with open(var_path) as f_txt:
                     return(f_txt.read())
+            if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
+                from tifffile import imread
+                return(imread(var_path))
             if(var_path.suffix == '.torch'):      
                 from torch import load as torch_load 
                 return(torch_load(var_path))
