@@ -574,7 +574,7 @@ class lognflow:
             np.save(fpath, parameter_value)
         elif(save_as == 'npz'):
             np.savez(fpath, **parameter_value)
-        elif((save_as == '.tif') | (save_as == '.tiff')):
+        elif((save_as == 'tif') | (save_as == 'tiff')):
             from tifffile import imwrite
             imwrite(fpath, parameter_value)
         elif(save_as == 'txt'):
@@ -588,6 +588,8 @@ class lognflow:
         elif(save_as == 'torch'):
             from torch import save as torch_save
             torch_save(parameter_value.state_dict(), fpath)
+        else:
+            fpath = None
         return fpath
     
     def log_plt(self, 

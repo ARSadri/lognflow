@@ -65,7 +65,11 @@ History
 * log_var will log only the valid time stamps.
 * added end keyword argument to log_text
 
-0.6.6 (2023-05-01)
+0.6.6 (2023-04-27)
 ------------------
 * Better documentation
 * added tifffile imread to logviewer and imwrite to lognflow
+
+0.6.7 (2023-04-27)
+------------------
+* A bug in tifffile support was fixed
