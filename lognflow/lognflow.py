@@ -725,12 +725,12 @@ class lognflow:
             
             for list_cnt, parameter_value in enumerate(parameter_value_list):
                 if(x_values is None):
-                    plt.plot(parameter_value, '-*', **kwargs)
+                    plt.plot(parameter_value, **kwargs)
                 else:
                     if(len(x_values) == len(parameter_value)):
                         plt.plot(x_values[list_cnt], parameter_value, **kwargs)
                     else:
-                        plt.plot(x_values[0], parameter_value, '-*', **kwargs)
+                        plt.plot(x_values[0], parameter_value, **kwargs)
             
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
@@ -902,7 +902,7 @@ class lognflow:
     def log_imshow(self, parameter_name: str, 
                    parameter_value,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_tag: bool = None, nan_borders = np.nan,
+                   time_tag: bool = None, borders = 0,
                    **kwargs):
         """log an image
             The image is logged using plt.imshow
@@ -948,7 +948,7 @@ class lognflow:
         
         if(use_multichannel_to_square):
             parameter_value = self. multichannel_to_square(
-                parameter_value, nan_borders = nan_borders)
+                parameter_value, borders = borders)
         if(FLAG_img_ready):
             plt.figure()
             plt.imshow(parameter_value, cmap = cmap, **kwargs)
@@ -965,7 +965,7 @@ class lognflow:
                 f'{parameter_value.shape}')
             return
 
-    def multichannel_to_square(self, stack, nan_borders = np.nan):
+    def multichannel_to_square(self, stack, borders = 0):
         """ turn a stack of multi-channel images into stack of square images
             This is very useful when lots of images need to be tiled
             against each other.
@@ -980,7 +980,7 @@ class lognflow:
                 In both cases n_ch will be turned into a square tile
                 Remember if you have N images to put into a square, the input
                 shape should be 1 x n_r x n_c x N
-            :param nan_borders: literal or np.inf or np.nan
+            :param borders: literal or np.inf or np.nan
                 When plotting images with matplotlib.pyplot.imshow, there
                 needs to be a border between them. This is the value for the 
                 border elements.
@@ -1016,10 +1016,10 @@ class lognflow:
                                  dtype = stack.dtype)
             used_ch_cnt = 0
 
-            stack[:,   :1      ] = nan_borders
-            stack[:,   : ,   :1] = nan_borders
-            stack[:, -1:       ] = nan_borders
-            stack[:,   : , -1: ] = nan_borders
+            stack[:,   :1      ] = borders
+            stack[:,   : ,   :1] = borders
+            stack[:, -1:       ] = borders
+            stack[:,   : , -1: ] = borders
             
             for rcnt in range(square_side):
                 for ccnt in range(square_side):
@@ -1033,7 +1033,7 @@ class lognflow:
             return None
         return canv
 
-    def _handle_images_stack(self, stack, nan_borders = np.nan):
+    def _handle_images_stack(self, stack, borders = 0):
         canv = None
         if(len(stack.shape) == 2):
             canv = np.expand_dims(stack, axis=0)
@@ -1043,12 +1043,12 @@ class lognflow:
             else:
                 canv = stack
         if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-            canv = self.multichannel_to_square(stack, nan_borders = nan_borders)
+            canv = self.multichannel_to_square(stack, borders = borders)
         return canv
     
     def prepare_stack_of_images(self, 
                                 list_of_stacks, 
-                                nan_borders = np.nan):
+                                borders = 0):
         """Prepare the stack of images
             If you wish to use the log_canvas, chances are you have a list
             of stacks of images where one element, has many channels.
@@ -1069,14 +1069,14 @@ class lognflow:
             :param list_of_stacks
                     list_of_stacks would include arrays iteratable by their
                     first dimension.
-            :param nan_borders: float
+            :param borders: float
                     borders between tiles will be filled with this variable
                     default: np.nan
         """        
         if (not isinstance(list_of_stacks, list)):
             list_of_stacks = [list_of_stacks]
         for cnt, stack in enumerate(list_of_stacks):
-            stack = self._handle_images_stack(stack, nan_borders = nan_borders)
+            stack = self._handle_images_stack(stack, borders = borders)
             if(stack is None):
                 return
             list_of_stacks[cnt] = stack
@@ -1204,6 +1204,7 @@ class lognflow:
                     cbar = plt.colorbar(im, ax=ax1, fraction=0.046, pad=0.04)
                     cbar.ax.tick_params(labelsize=1)
                 ax1.set_aspect('equal')
+                ax1.axis('off')
         
         fpath = self.log_plt(
                 parameter_name = parameter_name, 

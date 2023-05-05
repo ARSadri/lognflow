@@ -1,26 +1,12 @@
 lognflow
 ========
 
+Log and Flow tracking made easy with Python. You can install it by::
 
-.. image:: https://img.shields.io/pypi/v/lognflow.svg
-        :target: https://pypi.python.org/pypi/lognflow
-
-.. image:: https://img.shields.io/travis/arsadri/lognflow.svg
-        :target: https://travis-ci.com/arsadri/lognflow
-
-.. image:: https://readthedocs.org/projects/lognflow/badge/?version=latest
-        :target: https://lognflow.readthedocs.io/en/latest/?version=latest
-        :alt: Documentation Status
-
-Log and Flow tracking made easy with Python. You can install it by:
-
-.. code-block:: python
 	pip install lognflow
 
+A simple program to use it would be similar to the following::
 
-A simple program to use it would be similar to the following:
-
-.. code-block:: python
 	from lognflow import lognflow
 	import numpy as np
 	vec = np.random.rand(100)
@@ -29,19 +15,15 @@ A simple program to use it would be similar to the following:
 	logger('This is a test for lognflow and log_var')
 	logger.log_single('vec', vec)
 
-The logviewer is also very useful.
+The logviewer is also very useful::
 
-.. code-block:: python
 	from lognflow import logviewer
-	
 	logged = logviewer('c:\\test\\some_log\')
 	vec = logged.get_single('vec')
 
-The printprogress makes a pretty nice progress bar.
+The printprogress makes a pretty nice progress bar::
 
-.. code-block:: python
 	from lognflow import printprogress
-	
 	N = 100
 	pbar = printprogress(N)
 	for _ in range(N):

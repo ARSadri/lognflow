@@ -1,7 +1,5 @@
 import pathlib
 import numpy as np
-from scipy.io import loadmat
-from matplotlib.pyplot import imread
 
 class logviewer:
     """ log viewer
@@ -48,7 +46,7 @@ class logviewer:
             return txt
 
     def get_single(self, var_name, single_shot_index = -1, 
-                     suffix = '.np*'):
+                     suffix = None):
         """ get a single variable
             return the value of a saved variable.
 
@@ -70,7 +68,19 @@ class logviewer:
         var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
             .replace('\r', '\\r').replace('\b', '\\b')
         
-        suffix = suffix.strip('.')
+        if suffix is None:
+            if len(var_name.split('.')) > 1:
+                suffix = var_name.split('.')[-1]
+                name_before_suffix = var_name.split('.')[:-1]
+                if((len(name_before_suffix) == 1) & 
+                   (name_before_suffix[0] == '')):
+                    var_name = '*'
+                else:
+                    var_name = ('.').join(var_name.split('.')[:-1])
+            else:
+                suffix = '.np*'
+
+        suffix = suffix.strip('.')        
         assert single_shot_index == int(single_shot_index), \
                     f'single_shot_index {single_shot_index} must be an integer'
         flist = []            
@@ -81,7 +91,10 @@ class logviewer:
         else:
             _var_name = (self.log_dir / var_name).name
             _var_dir = (self.log_dir / var_name).parent
-            flist = list(_var_dir.glob(f'{_var_name}*.{suffix}'))
+            search_patt = f'{_var_name}*.{suffix}'
+            while('**' in search_patt):
+                search_patt = search_patt.replace('**', '*')
+            flist = list(_var_dir.glob(search_patt))
             if(len(flist) == 0):
                 flist = list(_var_dir.glob(f'{_var_name}*.*'))
                 if(len(flist) > 0):
@@ -115,6 +128,7 @@ class logviewer:
             if(var_path.suffix == '.npy'):
                 return(np.load(var_path))
             if(var_path.suffix == '.mat'):
+                from scipy.io import loadmat
                 return(loadmat(var_path))
             if(var_path.suffix == '.txt'):
                 with open(var_path) as f_txt:
@@ -126,6 +140,7 @@ class logviewer:
                 from torch import load as torch_load 
                 return(torch_load(var_path))
             try:
+                from matplotlib.pyplot import imread
                 img = imread(var_path)
                 return(img)
             except:
@@ -135,8 +150,9 @@ class logviewer:
             return
     
     def get_stack_of_files(self, 
-        var_name = None, flist = [], suffix = '*',
-        return_data = False, return_flist = True):
+        var_name = None, flist = [], suffix = None,
+        return_data = False, return_flist = True,
+        verbose = True):
         
         """ Get list or data of all files in a directory
         
@@ -174,6 +190,18 @@ class logviewer:
                 flist is type pathlib.Path
             
         """
+        if suffix is None:
+            if len(var_name.split('.')) > 1:
+                suffix = var_name.split('.')[-1]
+                name_before_suffix = var_name.split('.')[:-1]
+                if((len(name_before_suffix) == 1) & 
+                   (name_before_suffix[0] == '')):
+                    var_name = '*'
+                else:
+                    var_name = ('.').join(var_name.split('.')[:-1])
+            else:
+                suffix = '*'
+
         suffix = suffix.strip('.')
         if not flist:
             assert var_name is not None, \
@@ -187,7 +215,8 @@ class logviewer:
                 var_fname = var_dir.name
                 var_dir = var_dir.parent
                 patt = f'{var_fname}*.{suffix}'
-                patt = patt.replace('**', '*')
+                while('**' in patt):
+                    patt = patt.replace('**', '*')
                 flist = list(var_dir.glob(patt))
         if flist:
             flist.sort()
@@ -203,6 +232,7 @@ class logviewer:
                     pass
             if(data_type is None):
                 try:
+                    from matplotlib.pyplot import imread
                     fdata = imread(flist[0])
                     data_type = 'image'
                 except:
@@ -215,13 +245,16 @@ class logviewer:
                         dataset[fcnt] = np.load(fpath)
                     elif(data_type == 'image'):
                         dataset[fcnt] = imread(fpath)
-                self.logger(f'shape is: {dataset.shape}')
+                if(verbose):
+                    self.logger(f'logviewer: Reading dataset from {var_dir}'
+                                f', the shape would be: {dataset.shape}')
                 if(return_flist):
                     return(dataset, flist)
                 else:
                     return(dataset)
             else:
-                self.logger(f'File {flist[0].name} cannot be opened by '\
+                if(verbose):
+                    self.logger(f'File {flist[0].name} cannot be opened by '\
                           + r'np.load() or plt.imread()')
             
     def get_common_files(self, var_name_A, var_name_B):

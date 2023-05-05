@@ -107,20 +107,21 @@ class printprogress:
             if(self.ck >= self.n_steps):
                 self.end()
             else:
+                remTimeS = self._calc_ETA() # useful when print_function is None
                 cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)    
                 #3: because 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
                     remTimeS = self._calc_ETA()
-                    if(remTimeS>=5940):
+                    if(remTimeS>5940): # less than 99h and more than 99m
                         progStr = "%02d" % int(ceil(remTimeS/3600))
                         self._print_func(progStr, end='')
                         self._print_func('h', end='')
-                    elif(remTimeS>=99):
+                    elif(remTimeS>99): # less than 99m and more than 99s
                         progStr = "%02d" % int(ceil(remTimeS/60))
                         self._print_func(progStr, end='')
                         self._print_func('m', end='')
-                    elif(remTimeS>0):
+                    elif(remTimeS>0): # less than 99s and more than 0
                         progStr = "%02d" % int(ceil(remTimeS))
                         self._print_func(progStr, end='')
                         self._print_func('s', end='')

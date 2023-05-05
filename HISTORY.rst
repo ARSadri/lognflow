@@ -73,3 +73,14 @@ History
 0.6.7 (2023-04-27)
 ------------------
 * A bug in tifffile support was fixed
+
+0.6.8 (2023-05-04)
+------------------
+* Fixing readme for PyPI.
+* removed marker from log_plot. user marker and linestyle keyword arguments.
+* printprogress returns proper ETA every time if print_function is set to None::
+    pBar = printprogress(N, print_function = None)
+    for _ in range(N):
+        ETA = pBar()
+        print(f'ETA: {ETA}')
+
