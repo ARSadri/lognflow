@@ -79,8 +79,7 @@ History
 * Fixing readme for PyPI.
 * removed marker from log_plot. user marker and linestyle keyword arguments.
 * printprogress returns proper ETA every time if print_function is set to None::
-    pBar = printprogress(N, print_function = None)
-    for _ in range(N):
-        ETA = pBar()
-        print(f'ETA: {ETA}')
 
+0.7.0 (2023-05-15)
+------------------
+* logviewer returns data by log_sigle if the full name is mentioned.

@@ -151,7 +151,7 @@ class logviewer:
     
     def get_stack_of_files(self, 
         var_name = None, flist = [], suffix = None,
-        return_data = False, return_flist = True,
+        return_data = False, return_flist = True, read_func = None,
         verbose = True):
         
         """ Get list or data of all files in a directory
@@ -191,14 +191,15 @@ class logviewer:
             
         """
         if suffix is None:
-            if len(var_name.split('.')) > 1:
-                suffix = var_name.split('.')[-1]
-                name_before_suffix = var_name.split('.')[:-1]
+            var_name_split = var_name.split('.')
+            if len(var_name_split) > 1:
+                suffix = var_name_split[-1]
+                name_before_suffix = var_name_split[:-1]
                 if((len(name_before_suffix) == 1) & 
                    (name_before_suffix[0] == '')):
                     var_name = '*'
                 else:
-                    var_name = ('.').join(var_name.split('.')[:-1])
+                    var_name = ('.').join(var_name_split[:-1])
             else:
                 suffix = '*'
 
@@ -223,28 +224,27 @@ class logviewer:
             n_files = len(flist)
             if((not return_data) & return_flist):
                 return(flist)
-            data_type = None
-            if(data_type is None):
+            
+            ######### asked for data ########
+            if(read_func is None):
                 try:
                     fdata = np.load(flist[0])
-                    data_type = 'numpy'
+                    read_func = np.load
                 except:
                     pass
-            if(data_type is None):
+            if(read_func is None):
                 try:
                     from matplotlib.pyplot import imread
                     fdata = imread(flist[0])
-                    data_type = 'image'
+                    read_func = plt.imread
                 except:
                     pass
-            if(data_type is not None):
+            if(read_func is not None):
+                fdata = read_func(flist[0])
                 dataset = np.zeros((n_files, ) + fdata.shape, 
                                    dtype=fdata.dtype)
                 for fcnt, fpath in enumerate(flist):
-                    if(data_type == 'numpy'):
-                        dataset[fcnt] = np.load(fpath)
-                    elif(data_type == 'image'):
-                        dataset[fcnt] = imread(fpath)
+                    dataset[fcnt] = read_func(fpath)
                 if(verbose):
                     self.logger(f'logviewer: Reading dataset from {var_dir}'
                                 f', the shape would be: {dataset.shape}')
@@ -255,8 +255,8 @@ class logviewer:
             else:
                 if(verbose):
                     self.logger(f'File {flist[0].name} cannot be opened by '\
-                          + r'np.load() or plt.imread()')
-            
+                          + r'np.load() or plt.imread(), provide read_func.')
+
     def get_common_files(self, var_name_A, var_name_B):
         """ get common files in two directories
         

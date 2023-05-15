@@ -279,6 +279,7 @@ if __name__ == '__main__':
     #---------------------------#
     
     test_log_text()
+    exit()
     test_log_single_text()
     test_log_surface()
     test_log_single()
