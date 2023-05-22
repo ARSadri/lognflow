@@ -83,3 +83,9 @@ History
 0.7.0 (2023-05-15)
 ------------------
 * logviewer returns data by log_sigle if the full name is mentioned.
+
+0.7.1 (2023-05-22)
+------------------
+* printprogress supports lognflow.
+* bugs fixed in lognflow.
+* For now I guess lognflow and logviewer could be separate.

@@ -119,12 +119,15 @@ class logviewer:
             self.logger(f'Loading {var_path}')
             if(var_path.suffix == '.npz'):
                 buf = np.load(var_path)
-                time_array = buf['time_array']
-                n_logs = (time_array > 0).sum()
-                time_array = time_array[:n_logs]
-                data_array = buf['data_array']
-                data_array = data_array[:n_logs]
-                return((time_array, data_array))
+                try:
+                    time_array = buf['time_array']
+                    n_logs = (time_array > 0).sum()
+                    time_array = time_array[:n_logs]
+                    data_array = buf['data_array']
+                    data_array = data_array[:n_logs]
+                    return((time_array, data_array))
+                except:
+                    return(buf)
             if(var_path.suffix == '.npy'):
                 return(np.load(var_path))
             if(var_path.suffix == '.mat'):
@@ -240,6 +243,8 @@ class logviewer:
                 except:
                     pass
             if(read_func is not None):
+                assert callable(read_func), \
+                    f'given read_func: {read_func} is not callable.'
                 fdata = read_func(flist[0])
                 dataset = np.zeros((n_files, ) + fdata.shape, 
                                    dtype=fdata.dtype)
@@ -295,41 +300,8 @@ class logviewer:
 
         return(flist_A_new, flist_B_new)
     
-    def replace_time_with_index(self, var_name):
-        """ index in file names
-            lognflow uses time stamps to make new log files for a variable.
-            That is done by putting _time_stamp after the name of the variable.
-            This function changes all of the time stamps, sorted ascendingly,
-            by indices.
-            
-            Parameters
-            ----------
-            :param var_name:
-                variable name
-        """
-        var_dir = self.log_dir / var_name
-        if(var_dir.is_dir()):
-            var_fname = None
-            flist = list(var_dir.glob(f'*.*'))
-        else:
-            var_fname = var_dir.name
-            var_dir = var_dir.parent
-            flist = list(var_dir.glob(f'{var_fname}_*.*'))
-        if flist:
-            flist.sort()
-            fcnt_width = len(str(len(flist)))
-            for fcnt, fpath in enumerate(flist):
-                self.logger(f'Changing {flist[fcnt].name}')
-                fname_new = ''
-                if(var_fname is not None):
-                    fname_new = var_fname + '_'
-                fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
-                fpath_new = flist[fcnt].parent / fname_new
-                self.logger(f'To {fpath_new.name}')
-                flist[fcnt].rename(fpath_new)
-                
     def __repr__(self):
-        return f'<logviewer(log_dir = {self.log_dir})>'
+        return f'{self.log_dir}'
 
     def __bool__(self):
         return self.log_dir.is_dir()

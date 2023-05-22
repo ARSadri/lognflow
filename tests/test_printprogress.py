@@ -24,10 +24,19 @@ def test_content(response):
 
 def test_printprogress():
     N = 15000000
-    pprog = printprogress(N)
+    pprog = printprogress(Ne)
     for _ in range(N):
         pprog()
     # assert input('Did it show you a progress bar? (y for yes)')=='y'
-    
+
+def test_with_logger():
+    logger = lognflow()
+    N = 1500000
+    pprog = printprogress(Ne, print_function = logger, log_time_stamp = False)
+    for _ in range(N):
+        pprog()
+
 if __name__ == '__main__':
     test_printprogress()
+    test_with_logger()
+    exit()

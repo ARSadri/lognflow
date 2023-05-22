@@ -16,8 +16,9 @@ class printprogress:
                  n_steps, 
                  numTicks = 80,
                  title = None,
+                 method = 'linear',
                  print_function = print,
-                 method = 'linear'):
+                 **print_function_kwargs):
         """
             n_steps: int
                 Number of iterations in the for loop
@@ -42,6 +43,7 @@ class printprogress:
                 more options to come
         """
         assert method in ['linear', 'linear_robust']
+        self.print_function_kwargs = print_function_kwargs
         self.method = method
         self.in_print_function = print_function
         if(n_steps != int(n_steps)):
@@ -79,7 +81,8 @@ class printprogress:
             if (self.in_print_function == print):
                 print(text, end = end, flush = True)
             else:
-                self.in_print_function(text)
+                self.in_print_function(text, end = end,
+                                       **self.print_function_kwargs)
         
     def _calc_ETA(self):
         if(self.method == 'linear'):

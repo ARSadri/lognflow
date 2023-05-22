@@ -54,8 +54,8 @@ def test_get_images_as_stack():
     logger(flist_A)
     logger(flist_B)
     
-    logged.replace_time_with_index('A/')
-    logged.replace_time_with_index('B/')
+    logger.replace_time_with_index('A/')
+    logger.replace_time_with_index('B/')
     
     stack_A = logged.get_stack_of_files('A/', return_data = True, return_flist = False)
     stack_B = logged.get_stack_of_files('B/', return_data = True, return_flist = False)
@@ -102,7 +102,7 @@ def test_replace_time_with_index():
     
     logger(flist)
 
-    logged.replace_time_with_index('test_param')
+    logger.replace_time_with_index('test_param')
     
     data_out, flist = logged.get_stack_of_files(
         'test_param', return_data=True, return_flist=True)
