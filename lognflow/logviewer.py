@@ -222,6 +222,12 @@ class logviewer:
                 while('**' in patt):
                     patt = patt.replace('**', '*')
                 flist = list(var_dir.glob(patt))
+        else:
+            var_dir = flist[0].parent
+            assert var_dir.is_dir(),\
+                f'The directory {var_dir} for the '\
+                + 'provided list cannot be accessed.'
+            
         if flist:
             flist.sort()
             n_files = len(flist)
@@ -239,7 +245,7 @@ class logviewer:
                 try:
                     from matplotlib.pyplot import imread
                     fdata = imread(flist[0])
-                    read_func = plt.imread
+                    read_func = imread
                 except:
                     pass
             if(read_func is not None):
@@ -248,11 +254,11 @@ class logviewer:
                 fdata = read_func(flist[0])
                 dataset = np.zeros((n_files, ) + fdata.shape, 
                                    dtype=fdata.dtype)
-                for fcnt, fpath in enumerate(flist):
-                    dataset[fcnt] = read_func(fpath)
                 if(verbose):
                     self.logger(f'logviewer: Reading dataset from {var_dir}'
                                 f', the shape would be: {dataset.shape}')
+                for fcnt, fpath in enumerate(flist):
+                    dataset[fcnt] = read_func(fpath)
                 if(return_flist):
                     return(dataset, flist)
                 else:
@@ -305,3 +311,46 @@ class logviewer:
 
     def __bool__(self):
         return self.log_dir.is_dir()
+
+def str2type(_element):
+    if _element[0] == '\'':
+        return _element[1:-1]
+    else:
+        try:
+            return int(_element)
+        except ValueError:
+            try:
+                return float(_element)
+            except ValueError:
+                pass
+    return _element
+
+def text_to_object(txt):
+    """ Read a list or dict that was sent to write to text e.g. via log_single:
+    As you may have tried, it is possible to send a Pythonic list to a text file
+    the list will be typed there with [ and ] and ' and ' for strings with ', '
+    in between. In this function we will merely return the actual content
+    of the original list.
+    Now if the type the element of the list was string, it would put ' and ' in
+    the text file. But if it is a number, no kind of punctuation or sign is 
+    used. by write(). We support int or float. Otherwise the written text
+    will be returned as string with any other wierd things attached to it.
+    
+    """
+    if(txt[0] == '['):
+        txt = txt.strip('[').strip(']')
+        txt = txt.split(', ')
+        obj_out = txt
+        for cnt, _element in enumerate(txt):
+            obj_out[cnt] = str2type(_element)
+    elif(txt[0] == '{'):
+        txt = txt.strip('{').strip('}')
+        txt = txt.split(', ')
+        obj_out = dict()
+        for cnt, _element in enumerate(txt):
+            _element_key = str2type(_element.split(': ')[0])
+            _element_value = str2type(_element.split(': ')[1])
+            obj_out[_element_key] = _element_value
+    else:
+        obj_out = txt
+    return obj_out

@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.7.1'
+__version__ = '0.7.2'
 
 from .lognflow import lognflow, select_directory, select_file
 from .logviewer import logviewer

@@ -79,8 +79,10 @@ def test_get_images_as_stack():
     
     if(flist_A_AB):
         
-        dataset_A = logged.get_stack_of_files(flist = flist_A_AB, return_data = True, return_flist = False)
-        dataset_B = logged.get_stack_of_files(flist = flist_B_AB, return_data = True, return_flist = False)
+        dataset_A = logged.get_stack_of_files('A/',
+            flist = flist_A_AB, return_data = True, return_flist = False)
+        dataset_B = logged.get_stack_of_files('B/',
+            flist = flist_B_AB, return_data = True, return_flist = False)
         
         logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
         _ = logger._loggers_dict['main_log'].log_size
@@ -112,8 +114,34 @@ def test_replace_time_with_index():
     logger(data_in)
     logger(data_out)
 
+def test_text_to_object():
+    from lognflow.logviewer import text_to_object
+    
+    logger = lognflow(temp_dir, time_tag = False)
+    test_list = ['asdf', 1243, "dd"]
+    logger.log_single('test_list', test_list, save_as = 'txt')
+    
+    test_dict = {"one": "asdf", 'two': 1243, 'thre': "dd"}
+    logger.log_single('test_dict', test_dict, save_as = 'txt')
+    
+    logged = logviewer(logger.log_dir)
+    flist = logged.get_stack_of_files('*')
+    print(flist)
+    for file_name_input in flist:
+        print('='*60)
+        print(f'file name: {file_name_input}')
+        with open(file_name_input, 'r') as opened_txt:
+            txt = opened_txt.read()
+        print('text read from the file:')
+        print(txt)
+        print('- '*30)
+        ext_obj = text_to_object(txt)
+        print(f'Extracted object is of type {type(ext_obj)}:')
+        print(ext_obj)
+
 if __name__ == '__main__':
     temp_dir = select_directory()
     test_get_images_as_stack()
     test_replace_time_with_index()
     test_logviewer()
+    test_text_to_object()

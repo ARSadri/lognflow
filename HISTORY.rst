@@ -89,3 +89,9 @@ History
 * printprogress supports lognflow.
 * bugs fixed in lognflow.
 * For now I guess lognflow and logviewer could be separate.
+
+0.7.2 (2023-05-25)
+------------------
+* bug fixed in logviewer
+* text_to_object added to logviewer to read dict or list logged via log_single
+* test pass for logviewer including the test for text_to_object
