@@ -14,34 +14,39 @@ pip install lognflow
 A simple program to use ```lognflow``` would be similar to the following:
 
 ```python 
-from lognflow import lognflow
-import numpy as np
-vec = np.random.rand(100)
-
-logger = lognflow('c:\\test\\')
-logger('This is a test for lognflow and log_var')
-logger.log_single('vec', vec)
+	
+	from lognflow import lognflow
+	import numpy as np
+	
+	data = np.random.rand(100)
+	
+	logger = lognflow(r'c:\all_logs\\')
+	logger('This is a test for lognflow and log_single')
+	logger.log_single('data', data)
+	
 ```
 
 The ```logviewer``` is also very useful.
 
 ```python 
-from lognflow import logviewer
 
-logged = logviewer('c:\\test\\some_log\')
-vec = logged.get_single('vec')
+	from lognflow import logviewer
+	logged = logviewer(r'c:\all_logs\some_log\\')
+	data = logged.get_single('data')
+
 ```
 
 The ```printprogress``` makes a pretty nice progress bar.
 
 ```python 
-from lognflow import printprogress
 
-N = 100
-pbar = printprogress(N)
-for _ in range(N):
-	# do_something()
-	pbar()
+	from lognflow import printprogress
+	N = 100
+	pbar = printprogress(N)
+	for _ in range(N):
+		# do_something()
+		pbar()
+
 ```
 
 ## Introduction

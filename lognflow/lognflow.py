@@ -46,6 +46,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
 
+from .logviewer import logviewer
+
 @dataclass
 class varinlog:
     data_array        : np.ndarray      
@@ -172,6 +174,8 @@ class lognflow:
             self.log_dir.mkdir(parents = True, exist_ok = True)
         assert self.log_dir.is_dir(), \
             f'Could not access the log directory {self.log_dir}'
+        
+        self.logged = logviewer(self.log_dir, self)
         
         self._print_text = print_text
         self._loggers_dict = {}
@@ -937,11 +941,10 @@ class lognflow:
                 f'Cannot make the hexbin for variable {parameter_name}.')
             return None
         
-    def log_imshow(self, parameter_name: str, 
-                   parameter_value,
+    def log_imshow(self, parameter_name: str, parameter_value, 
+                   colorbar = True, remove_axis_ticks = True,
                    image_format='jpeg', dpi=1200, cmap = 'jet',
-                   time_tag: bool = None, borders = 0,
-                   **kwargs):
+                   time_tag: bool = None, borders = 0, **kwargs):
         """log an image
             The image is logged using plt.imshow
             
@@ -988,9 +991,12 @@ class lognflow:
             parameter_value = self. multichannel_to_square(
                 parameter_value, borders = borders)
         if(FLAG_img_ready):
-            plt.figure()
-            plt.imshow(parameter_value, cmap = cmap, **kwargs)
-            plt.colorbar()
+            fig, ax = plt.subplots()
+            ax.imshow(parameter_value, cmap = cmap, **kwargs)
+            if(colorbar):
+                ax.colorbar()
+            if(remove_axis_ticks):
+                plt.setp(ax, xticks=[], yticks=[])
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,

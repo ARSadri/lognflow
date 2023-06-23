@@ -95,3 +95,9 @@ History
 * bug fixed in logviewer
 * text_to_object added to logviewer to read dict or list logged via log_single
 * test pass for logviewer including the test for text_to_object
+
+0.7.3 (2023-06-01)
+------------------
+* bug fixed in logviewer in the use of suffix in get_stack_of_files
+* log_imshow takes colorbar and remove_axis_ticks flags.
+* every lognflow instance has a logviewer pointing to its log_dir called logged.

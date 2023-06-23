@@ -139,8 +139,25 @@ def test_text_to_object():
         print(f'Extracted object is of type {type(ext_obj)}:')
         print(ext_obj)
 
+def test_get_single_specific_fname():
+    logger = lognflow(temp_dir)
+    logger('test get single specific fname')
+    
+    vec = np.array([1])
+    logger.log_single('vec', vec, time_tag = False)
+
+    vec2 = np.array([2])
+    logger.log_single('vec2', vec2, time_tag = False)
+    
+    logged = logviewer(logger.log_dir)
+    vec_out = logged.get_single('vec.npy')
+    
+    assert vec_out == vec
+
 if __name__ == '__main__':
     temp_dir = select_directory()
+    test_get_single_specific_fname()
+    exit()
     test_get_images_as_stack()
     test_replace_time_with_index()
     test_logviewer()

@@ -6,12 +6,8 @@ class logviewer:
         Since lognflow makes lots of files and folders, maybe it is nice
         to have a logviewer that loads those information. In this module we
         provide a set of functions for a logged object that can load variables,
-        texts, file lists and etc.. Use it simply by:
-        
-        .. highlight:: python
-           :linenothreshold: 5
-           
-        .. code-block:: python
+        texts, file lists and etc.. Use it simply by::
+ 
             from lognflow import logviewer
             logged = logviewer(log_dir = 'dir_contatining_files')
             var = logged.get_single('variable_name')
@@ -151,54 +147,59 @@ class logviewer:
         else:
             self.logger(f'{var_name} not found.')
             return
-    
-    def get_stack_of_files(self, 
+   
+    def get_stack_of_files(self,
         var_name = None, flist = [], suffix = None,
         return_data = False, return_flist = True, read_func = None,
-        verbose = True):
-        
+        data_makes_a_block = False, verbose = True):
+       
         """ Get list or data of all files in a directory
-        
+       
             This function gives the list of paths of all files in a directory
-            for a single variable. 
+            for a single variable.
 
             Parameters
             ----------
             :param var_name:
                 The directory or variable name to look for the files
             :type var_name: str
-            
+           
             :param flist:
-                list of Paths, if data is returned, this flist input can limit 
+                list of Paths, if data is returned, this flist input can limit
                 the data requested to this list.
             :type flist: list
-            
+           
             :param suffix:
                 the suffix of files to look for, e.g. 'txt'
             :type siffix: str
-            
-            :param return_data: 
+           
+            :param return_data:
                     with flist you can limit the data that is returned.
                     Otherwise the data for all files in the directory will be
                     returned
-            :param return_flist
+            :param return_flist:
                     Maybe you are only intrested in the flist.
-                    
+                   
+            :param data_makes_a_block:
+                    if you know that the shape of all numpy arrays in files, or
+                    images are the same, set this as true and receive a numpy
+                    array. Otherwise returns a list. default: False
+           
             Output
             ----------
-            
+           
                 It returns a tuple, (dataset, flist),
-                dataset will be a numpy array in case all files produce same
-                shape numpy arrays.
+                dataset will be a list of files contains or numpy array in
+                case all files produce same shape numpy arrays.
                 flist is type pathlib.Path
-            
+           
         """
         if suffix is None:
             var_name_split = var_name.split('.')
             if len(var_name_split) > 1:
                 suffix = var_name_split[-1]
                 name_before_suffix = var_name_split[:-1]
-                if((len(name_before_suffix) == 1) & 
+                if((len(name_before_suffix) == 1) &
                    (name_before_suffix[0] == '')):
                     var_name = '*'
                 else:
@@ -227,13 +228,13 @@ class logviewer:
             assert var_dir.is_dir(),\
                 f'The directory {var_dir} for the '\
                 + 'provided list cannot be accessed.'
-            
+           
         if flist:
             flist.sort()
             n_files = len(flist)
             if((not return_data) & return_flist):
                 return(flist)
-            
+           
             ######### asked for data ########
             if(read_func is None):
                 try:
@@ -252,13 +253,16 @@ class logviewer:
                 assert callable(read_func), \
                     f'given read_func: {read_func} is not callable.'
                 fdata = read_func(flist[0])
-                dataset = np.zeros((n_files, ) + fdata.shape, 
-                                   dtype=fdata.dtype)
-                if(verbose):
-                    self.logger(f'logviewer: Reading dataset from {var_dir}'
-                                f', the shape would be: {dataset.shape}')
-                for fcnt, fpath in enumerate(flist):
-                    dataset[fcnt] = read_func(fpath)
+                if(data_makes_a_block):
+                    dataset = np.zeros((n_files, ) + fdata.shape,
+                                       dtype=fdata.dtype)
+                    if(verbose):
+                        self.logger(f'logviewer: Reading dataset from {var_dir}'
+                                    f', the shape would be: {dataset.shape}')
+                    for fcnt, fpath in enumerate(flist):
+                        dataset[fcnt] = read_func(fpath)
+                else:
+                    dataset = [read_func(fpath) for fpath in flist]
                 if(return_flist):
                     return(dataset, flist)
                 else:
