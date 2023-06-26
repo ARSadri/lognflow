@@ -101,3 +101,7 @@ History
 * bug fixed in logviewer in the use of suffix in get_stack_of_files
 * log_imshow takes colorbar and remove_axis_ticks flags.
 * every lognflow instance has a logviewer pointing to its log_dir called logged.
+
+0.7.4 (2023-06-26)
+------------------
+* critical bug fixed in log_imshow

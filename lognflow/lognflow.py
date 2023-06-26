@@ -992,9 +992,9 @@ class lognflow:
                 parameter_value, borders = borders)
         if(FLAG_img_ready):
             fig, ax = plt.subplots()
-            ax.imshow(parameter_value, cmap = cmap, **kwargs)
+            im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
             if(colorbar):
-                ax.colorbar()
+                plt.colorbar(im)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
             fpath = self.log_plt(
