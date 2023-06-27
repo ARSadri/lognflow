@@ -272,14 +272,25 @@ def test_log_single_text():
     logger.log_single('text_log', 'bye\n', save_as='txt', time_tag = False)
     logger.log_single('text_log', var, save_as='txt', time_tag = False)
     
+def test_log_imshow_complex():
+    logger = lognflow(temp_dir)
+    logger('This is a test for test_log_imshow_complex', flush = True)
+    
+    mat = np.random.rand(100, 100) + 10 * 1j * np.random.rand(100, 100)
+    
+    logger(f'mat is complex? {np.iscomplexobj(mat)}')
+    logger.log_imshow('mat', mat)
+    
+    
 if __name__ == '__main__':
     
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    
-    test_log_text()
+    test_log_imshow_complex()
     exit()
+    test_log_imshow()
+    test_log_text()
     test_log_single_text()
     test_log_surface()
     test_log_single()
@@ -296,6 +307,5 @@ if __name__ == '__main__':
     test_log_scatter3()
     test_log_plt()
     test_log_hexbin()
-    test_log_imshow()
     test_log_canvas()
     test_log_confusion_matrix()

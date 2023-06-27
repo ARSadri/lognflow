@@ -668,6 +668,7 @@ class lognflow:
         """
         ax = mappable.axes
         fig = ax.figure
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = fig.colorbar(mappable, cax=cax)
@@ -991,12 +992,30 @@ class lognflow:
             parameter_value = self. multichannel_to_square(
                 parameter_value, borders = borders)
         if(FLAG_img_ready):
-            fig, ax = plt.subplots()
-            im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
-            if(colorbar):
-                plt.colorbar(im)
-            if(remove_axis_ticks):
-                plt.setp(ax, xticks=[], yticks=[])
+
+            if(not np.iscomplexobj(parameter_value)):
+                fig, ax = plt.subplots()
+                im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
+                if(colorbar):
+                    plt.colorbar(im)
+                if(remove_axis_ticks):
+                    plt.setp(ax, xticks=[], yticks=[])
+            else:
+                fig, ax = plt.subplots(1, 2)
+                im = ax[0].imshow(np.real(parameter_value), cmap = cmap, **kwargs)
+                if(colorbar):
+                    self.add_colorbar(im)
+                    # plt.colorbar(im)
+                ax[0].set_title('Real')    
+                im = ax[1].imshow(np.imag(parameter_value), cmap = cmap, **kwargs)
+                if(colorbar):
+                    self.add_colorbar(im)
+                    # plt.colorbar(im)
+                ax[1].set_title('Imag')
+                if(remove_axis_ticks):
+                    plt.setp(ax[0], xticks=[], yticks=[])
+                    plt.setp(ax[1], xticks=[], yticks=[])
+                
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,

@@ -105,3 +105,7 @@ History
 0.7.4 (2023-06-26)
 ------------------
 * critical bug fixed in log_imshow
+
+0.7.5 (2023-08-01)
+------------------
+* Added complex numbers to log_imshow
