@@ -288,7 +288,6 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     test_log_imshow_complex()
-    exit()
     test_log_imshow()
     test_log_text()
     test_log_single_text()
@@ -309,3 +308,4 @@ if __name__ == '__main__':
     test_log_hexbin()
     test_log_canvas()
     test_log_confusion_matrix()
+    exit()    

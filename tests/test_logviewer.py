@@ -157,8 +157,9 @@ def test_get_single_specific_fname():
 if __name__ == '__main__':
     temp_dir = select_directory()
     test_get_single_specific_fname()
-    exit()
     test_get_images_as_stack()
     test_replace_time_with_index()
     test_logviewer()
     test_text_to_object()
+    exit()
+    
