@@ -116,7 +116,11 @@ class printprogress:
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
                     remTimeS = self._calc_ETA()
-                    if(remTimeS>5940): # less than 99h and more than 99m
+                    if(remTimeS>356400): # less than 99d and more than 99h
+                        progStr = "%02d" % int(ceil(remTimeS/86400))
+                        self._print_func(progStr, end='')
+                        self._print_func('d', end='')
+                    elif(remTimeS>5940): # less than 99h and more than 99m
                         progStr = "%02d" % int(ceil(remTimeS/3600))
                         self._print_func(progStr, end='')
                         self._print_func('h', end='')
@@ -124,7 +128,7 @@ class printprogress:
                         progStr = "%02d" % int(ceil(remTimeS/60))
                         self._print_func(progStr, end='')
                         self._print_func('m', end='')
-                    elif(remTimeS>0): # less than 99s and more than 0
+                    elif(remTimeS>=0): # less than 99s and more than 0
                         progStr = "%02d" % int(ceil(remTimeS))
                         self._print_func(progStr, end='')
                         self._print_func('s', end='')

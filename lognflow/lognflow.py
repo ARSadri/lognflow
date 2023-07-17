@@ -40,6 +40,8 @@ import pathlib
 import time
 import itertools
 from   dataclasses import dataclass
+from re import sub as re_sub
+from unicodedata import normalize as unicodedata_normalize
 from   os import sep as os_sep
 import numpy as np
 import matplotlib.pyplot as plt
@@ -65,6 +67,34 @@ class textinlog:
     log_size            : int     
     last_log_flush_time : float
     log_flush_period    : int
+
+def repr_raw(text):
+    """Returns a raw string representation of a text with escape charachters"""
+    escape_dict={'\a':r'\a',
+                 '\b':r'\b',
+                 '\c':r'\c',
+                 '\f':r'\f',
+                 '\n':r'\n',
+                 '\r':r'\r',
+                 '\t':r'\t',
+                 '\v':r'\v',
+                 '\'':r'\'',
+                 '\"':r'\"'}
+    new_string=''
+    for char in text:
+        try: 
+            new_string += escape_dict[char]
+        except KeyError: 
+            new_string += char
+    return new_string
+
+def replace_all(text, pattern, fill_value):
+    while (len(text.split(pattern)) > 1):
+        text = text.replace(pattern, fill_value)
+    return text
+
+if __name__ == '__main__':
+    name = 'asdfkyt sdyufg%^&*()'
 
 class lognflow:
     """Initialization
@@ -187,6 +217,9 @@ class lognflow:
     
     @property
     def time_stamp(self):
+        """ Current time stamp
+            Gives the time after the start of the lognflow
+        """
         return time.time() - self._init_time
     
     def rename(self, new_name:str, append: bool = False):
@@ -246,28 +279,20 @@ class lognflow:
         return self.log_dir
     
     def _prepare_param_dir(self, parameter_name: str):
-        try:
-            _ = parameter_name.split()
-        except:
-            self.log_text(
-                self.log_name,
-                f'The parameter name {parameter_name} is not a string.' \
-                + f' Its type is {type(parameter_name)}.')
-        assert len(parameter_name.split()) == 1, \
-            self.log_text(self.log_name,\
-                  f'The variable name {parameter_name} you chose, is splitable'\
-                + f' I can split it into {parameter_name.split()}'             \
-                + ' Make sure you dont use space, tab, or backslash with known'\
-                + ' small letters such as f, t, ...'                           \
-                + ' If you are using single backslash, e.g. for windows'       \
-                + ' folders, replace it with \\ or make it a literal string'   \
-                + ' by putting an r before the variable name.')
         
-        is_dir = (parameter_name[-1] == '/') | (parameter_name[-1] == '\\') \
-                 | (parameter_name[-1] == r'/') | (parameter_name[-1] == r'\\')
+        assert isinstance(parameter_name, str), \
+            f'The parameter name {parameter_name} is not a string.' \
+            + f' It is of type {type(parameter_name)}.' \
+            + 'Perhaps you forgot to pass the name of the variable first.'
+        parameter_name = ''.join(
+            [_ for _ in repr(repr_raw(parameter_name))  if _ != '\''])
+        parameter_name = replace_all(parameter_name, ' ', '_')
+        parameter_name = replace_all(parameter_name, '\\', '/')
+        parameter_name = replace_all(parameter_name, '//', '/')
+        
         param_dir = self.log_dir /  parameter_name
         
-        if(is_dir):
+        if(parameter_name[-1] == '/'):
             param_name = ''
         else:
             param_name = param_dir.name
@@ -293,19 +318,20 @@ class lognflow:
                 fname += f'_{self.time_stamp:>6.6f}'
         else:
             fname = f'{self.time_stamp:>6.6f}'
-            
+        
         return(param_dir / f'{fname}.{save_as}')
         
     def _log_text_handler(self, log_name = None, 
                          log_size_limit: int = int(1e+7),
                          time_tag: bool = None,
-                         log_flush_period = None):
+                         log_flush_period = None,
+                         save_as = 'txt'):
         
         if (log_flush_period is None):
             log_flush_period = self.log_flush_period
             
         param_dir, param_name = self._prepare_param_dir(log_name)
-        fpath = self._get_fpath(param_dir, param_name, 'txt', time_tag)
+        fpath = self._get_fpath(param_dir, param_name, save_as, time_tag)
         self._loggers_dict[log_name] = textinlog(
             to_be_logged=[],      
             log_fpath=fpath,         
@@ -351,7 +377,8 @@ class lognflow:
                  log_flush_period: int = None,
                  flush = False,
                  end = '\n',
-                 new_file = False):
+                 new_file = False,
+                 save_as = 'txt'):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
             Also you can pass a small numpy array. You can ask it to put time
@@ -386,6 +413,8 @@ class lognflow:
                    if a new file is needed. If time_tag is True, it will make
                    a new file with a new name that has a time tag. If False,
                    it closees the current text file and overwrites on it.
+            :param save_as: str
+                   save_as is the suffix of the text file.
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
         log_flush_period = self.log_flush_period \
@@ -402,7 +431,8 @@ class lognflow:
         if ( (not (log_name in self._loggers_dict)) or new_file):
             self._log_text_handler(log_name, 
                                    log_size_limit = log_size_limit,
-                                   time_tag = time_tag)
+                                   time_tag = time_tag,
+                                   save_as = save_as)
 
         curr_textinlog = self._loggers_dict[log_name]
         _logger = []
@@ -585,7 +615,8 @@ class lognflow:
                     An np array whose size doesn't change
             :param save_as: str
                     can be 'npz', 'npy', 'mat', 'torch' for pytorch models
-                    or 'txt' which will save it as text.
+                    or 'txt' or anything else which will save it as text.
+                    This includes 'json', 'pdb', or ...
             :param mat_field: str
                     when saving as 'mat' file, the field can be set.
                     otherwise it will be the parameter_name
@@ -596,7 +627,8 @@ class lognflow:
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         if(save_as is None):
-            save_as = 'npy'
+            if isinstance(parameter_value, (np.ndarray, int, float)):
+                save_as = 'npy'
             if (isinstance(parameter_value, dict)):
                 save_as = 'npz'
         save_as = save_as.strip()
@@ -604,26 +636,27 @@ class lognflow:
 
         param_dir, param_name = self._prepare_param_dir(parameter_name)
         fpath = self._get_fpath(param_dir, param_name, save_as, time_tag)
-            
-        if(save_as == 'npy'):
-            np.save(fpath, parameter_value)
-        elif(save_as == 'npz'):
-            np.savez(fpath, **parameter_value)
-        elif((save_as == 'tif') | (save_as == 'tiff')):
-            from tifffile import imwrite
-            imwrite(fpath, parameter_value)
-        elif(save_as == 'txt'):
-            with open(fpath,'a') as fdata: 
-                fdata.write(str(parameter_value))
-        elif(save_as == 'mat'):
-            from scipy.io import savemat
-            if(mat_field is None):
-                mat_field = param_name
-            savemat(fpath, {f'{mat_field}':parameter_value})
-        elif(save_as == 'torch'):
-            from torch import save as torch_save
-            torch_save(parameter_value.state_dict(), fpath)
-        else:
+        
+        try:
+            if(save_as == 'npy'):
+                np.save(fpath, parameter_value)
+            elif(save_as == 'npz'):
+                np.savez(fpath, **parameter_value)
+            elif((save_as == 'tif') | (save_as == 'tiff')):
+                from tifffile import imwrite
+                imwrite(fpath, parameter_value)
+            elif(save_as == 'mat'):
+                from scipy.io import savemat
+                if(mat_field is None):
+                    mat_field = param_name
+                savemat(fpath, {f'{mat_field}':parameter_value})
+            elif(save_as == 'torch'):
+                from torch import save as torch_save
+                torch_save(parameter_value.state_dict(), fpath)
+            else:
+                with open(fpath,'a') as fdata: 
+                    fdata.write(str(parameter_value))
+        except:
             fpath = None
         return fpath
     

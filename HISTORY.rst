@@ -106,6 +106,13 @@ History
 ------------------
 * critical bug fixed in log_imshow
 
-0.7.5 (2023-08-01)
+0.7.5 (2023-06-27)
 ------------------
 * Added complex numbers to log_imshow
+
+0.7.6 (2023-08-01)
+------------------
+* printprogress can handle up to 99 days
+* log_text takes any save_as
+* If variable name has escapekey is alright
+* If variable name is splitable, we replace them with _
