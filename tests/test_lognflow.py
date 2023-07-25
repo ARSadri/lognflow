@@ -3,9 +3,9 @@
 """Tests for `lognflow` package."""
 
 import time
+import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-import pytest
 
 from lognflow import lognflow, logviewer, printprogress, select_directory
 
@@ -281,6 +281,30 @@ def test_log_imshow_complex():
     logger(f'mat is complex? {np.iscomplexobj(mat)}')
     logger.log_imshow('mat', mat)
     
+def test_replace_time_with_index():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for logviewer')
+    
+    for _ in range(5):
+        logger.log_single('test_param', np.array([_]))
+        logger.log_single('testy/t', np.array([_]))
+    
+    logged = logviewer(logger.log_dir, logger)
+
+    data_in, flist = logged.get_stack_of_files(
+        'test_param', return_data=True, return_flist=True)
+    
+    logger(flist)
+
+    logger.replace_time_with_index('test_param')
+    
+    data_out, flist = logged.get_stack_of_files(
+        'test_param', return_data=True, return_flist=True)
+    
+    logger(flist)
+    
+    logger(data_in)
+    logger(data_out)
     
 if __name__ == '__main__':
     
@@ -308,3 +332,4 @@ if __name__ == '__main__':
     test_log_hexbin()
     test_log_canvas()
     test_log_confusion_matrix()
+    test_replace_time_with_index()

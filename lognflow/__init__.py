@@ -2,8 +2,10 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.7.6'
+__version__ = '0.8.0'
 
-from .lognflow import lognflow, select_directory, select_file
+from .lognflow import lognflow
 from .logviewer import logviewer
 from .printprogress import printprogress
+from .utils import select_directory, select_file
+from .utils import repr_raw, replace_all, text_to_object

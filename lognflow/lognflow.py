@@ -40,10 +40,8 @@ import pathlib
 import time
 import itertools
 from   dataclasses import dataclass
-from re import sub as re_sub
-from unicodedata import normalize as unicodedata_normalize
-from   os import sep as os_sep
 import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
@@ -68,33 +66,7 @@ class textinlog:
     last_log_flush_time : float
     log_flush_period    : int
 
-def repr_raw(text):
-    """Returns a raw string representation of a text with escape charachters"""
-    escape_dict={'\a':r'\a',
-                 '\b':r'\b',
-                 '\c':r'\c',
-                 '\f':r'\f',
-                 '\n':r'\n',
-                 '\r':r'\r',
-                 '\t':r'\t',
-                 '\v':r'\v',
-                 '\'':r'\'',
-                 '\"':r'\"'}
-    new_string=''
-    for char in text:
-        try: 
-            new_string += escape_dict[char]
-        except KeyError: 
-            new_string += char
-    return new_string
-
-def replace_all(text, pattern, fill_value):
-    while (len(text.split(pattern)) > 1):
-        text = text.replace(pattern, fill_value)
-    return text
-
-if __name__ == '__main__':
-    name = 'asdfkyt sdyufg%^&*()'
+from .utils import repr_raw, replace_all
 
 class lognflow:
     """Initialization
@@ -214,7 +186,12 @@ class lognflow:
 
         self.log_name = main_log_name
         self.log_flush_period = log_flush_period
+        self.save = self.log_single
     
+    def savez(self, *args, **kwargs):
+        kwargs['save_as'] = 'npz'
+        return self.save(*args, **kwargs)
+        
     @property
     def time_stamp(self):
         """ Current time stamp
@@ -378,7 +355,7 @@ class lognflow:
                  flush = False,
                  end = '\n',
                  new_file = False,
-                 save_as = 'txt'):
+                 save_as = None):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
             Also you can pass a small numpy array. You can ask it to put time
@@ -419,7 +396,16 @@ class lognflow:
         time_tag = self.time_tag if (time_tag is None) else time_tag
         log_flush_period = self.log_flush_period \
             if (log_flush_period is None) else log_flush_period
+        
         log_name = self.log_name if (log_name is None) else log_name
+
+        if(save_as is None):
+            log_name_split = log_name.split('.')
+            if len(log_name_split) > 1:
+                save_as = log_name_split[-1]
+                log_name = '.'.join(log_name_split)
+        else:
+            save_as = 'txt'
 
         if((print_text is None) | (print_text is True)):
             print_text = self._print_text
@@ -427,7 +413,7 @@ class lognflow:
             if(log_time_stamp):
                 print(f'T:{self.time_stamp:>6.6f}| ', end='')
             print(to_be_logged, end = end)
-                
+        
         if ( (not (log_name in self._loggers_dict)) or new_file):
             self._log_text_handler(log_name, 
                                    log_size_limit = log_size_limit,
@@ -472,7 +458,7 @@ class lognflow:
         return cnt_limit
 
     def log_var(self, parameter_name: str, parameter_value, 
-                save_as='npz', log_size_limit: int = int(1e+7)):
+                save_as = None, log_size_limit: int = int(1e+7)):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -501,6 +487,14 @@ class lognflow:
             _ = parameter_value.shape
         except:
             parameter_value = np.array([parameter_value])
+        
+        if(save_as is None):
+            parameter_name_split = parameter_name.split('.')
+            if len(parameter_name_split) > 1:
+                save_as = parameter_name_split[-1]
+                parameter_name = '.'.join(parameter_name_split)
+        else:
+            save_as = 'npz'
         
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
@@ -563,17 +557,20 @@ class lognflow:
         _var = self._vars_dict[parameter_name]
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
-        if(_var.save_as == 'npz'):
+        if((_var.save_as == 'npz')):# | (_var.save_as == 'npy')):
             fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
                 data_array = _var_data_array)
-        elif(_var.save_as == 'txt'):
+        else:#if(_var.save_as == 'txt'):
             fpath = param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_time_array)
             fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
-        return fpath
+        try:
+            return fpath
+        except:
+            print('here')
     
     def get_var(self, parameter_name: str) -> tuple:
         """ Get the buffered numpy arrays
@@ -612,7 +609,9 @@ class lognflow:
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
             :param parameter_value: np.array
-                    An np array whose size doesn't change
+                    Could be anything and np.save will be used. If it is a
+                    dictionary, np.savez will be used. As you may know, np.save
+                    can save all pickalables.
             :param save_as: str
                     can be 'npz', 'npy', 'mat', 'torch' for pytorch models
                     or 'txt' or anything else which will save it as text.
@@ -625,12 +624,19 @@ class lognflow:
                     
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
-            
+
         if(save_as is None):
-            if isinstance(parameter_value, (np.ndarray, int, float)):
+            parameter_name_split = parameter_name.split('.')
+            if len(parameter_name_split) > 1:
+                save_as = parameter_name_split[-1]
+                #YOU CAN CHECK IF IT IS LEGITEMATE EXTENSION
+                parameter_name = '.'.join(parameter_name_split)
+            elif isinstance(parameter_value, (np.ndarray, int, float)):
                 save_as = 'npy'
-            if (isinstance(parameter_value, dict)):
+            elif (isinstance(parameter_value, dict)):
                 save_as = 'npz'
+            else:
+                save_as = 'txt'
         save_as = save_as.strip()
         save_as = save_as.strip('.')
 
@@ -716,6 +722,7 @@ class lognflow:
         time_tag: bool = None,
         add_colorbar = False,
         remove_axis_ticks = True,
+        return_figure = False,
         **kwargs):
         """log multiple images as a tiled square
             The image is logged using plt.imshow
@@ -741,7 +748,7 @@ class lognflow:
             n_ch_r, n_ch_c = (n_ch_sq, n_ch_sq)
         else:
             n_ch_r, n_ch_c = frame_shape
-        _, ax = plt.subplots(n_ch_r,n_ch_c)
+        fig, ax = plt.subplots(n_ch_r,n_ch_c)
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
         for rcnt in range(n_ch_r):
@@ -750,9 +757,12 @@ class lognflow:
                 im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
                 if(add_colorbar):
                     self.add_colorbar(im_ch)
-        return self.log_plt(parameter_name = parameter_name,
-                     image_format=image_format, dpi=dpi,
-                     time_tag = time_tag)
+        if not return_figure:
+            return self.log_plt(parameter_name = parameter_name,
+                         image_format=image_format, dpi=dpi,
+                         time_tag = time_tag)
+        else:
+            return fig
             
     def log_plot(self, parameter_name: str, 
                        parameter_value_list,
@@ -872,7 +882,7 @@ class lognflow:
     
     def log_scatter3(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag: bool = None):
+                       time_tag: bool = None, return_figure = False):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
@@ -888,25 +898,22 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        try:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(parameter_value[0], 
-                       parameter_value[1], 
-                       parameter_value[2])
-            fpath = self.log_plt(
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(parameter_value[0], 
+                   parameter_value[1], 
+                   parameter_value[2])
+        if not return_figure:
+            return self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
-            return fpath
-        except:
-            self.log_text(self.log_name,
-                f'Cannot make the scatter3 for variable {parameter_name}.')
-            return None
+        else:
+            return fig
     
     def log_surface(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag: bool = None, **kwargs):
+                       time_tag: bool = None, return_figure = False, **kwargs):
         """log a surface in 3D
             surface plotting in 3D exactly similar to imshow but in 3D
             
@@ -922,23 +929,21 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        try:
-            # from mpl_toolkits.mplot3d import Axes3D
-            n_r, n_c = parameter_value.shape
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
-                               np.arange(n_c, dtype='int'))
-            ax.plot_surface(X, Y, parameter_value, **kwargs)
+        from mpl_toolkits.mplot3d import Axes3D
+        n_r, n_c = parameter_value.shape
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
+                           np.arange(n_c, dtype='int'))
+        ax.plot_surface(X, Y, parameter_value, **kwargs)
+        if not return_figure:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
             return fpath
-        except:
-            self.log_text(self.log_name,
-                f'Cannot make the surface plot for variable {parameter_name}.')
-            return None
+        else:
+            return fig
         
     def log_hexbin(self, parameter_name: str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200,
@@ -1062,72 +1067,8 @@ class lognflow:
             return
 
     def multichannel_to_square(self, stack, borders = 0):
-        """ turn a stack of multi-channel images into stack of square images
-            This is very useful when lots of images need to be tiled
-            against each other.
-        
-            :param stack: np.ndarray
-                    It must have the shape of either
-                    n_r x n_c x n_ch
-                    n_r x n_c x  3  x n_ch
-                    n_f x n_r x n_c x n_ch
-                    n_f x n_r x n_c x  3  x n_ch
-                    
-                In both cases n_ch will be turned into a square tile
-                Remember if you have N images to put into a square, the input
-                shape should be 1 x n_r x n_c x N
-            :param borders: literal or np.inf or np.nan
-                When plotting images with matplotlib.pyplot.imshow, there
-                needs to be a border between them. This is the value for the 
-                border elements.
-                
-            output
-            ---------
-                Since we have N channels to be laid into a square, the side
-                length woul be ceil(N**0.5)
-                it produces an np.array of shape n_f x n_r * S x n_c * S or
-                n_f x n_r * S x n_c * S x 3 in case of RGB input.
-        """
-        if(len(stack.shape) == 4):
-            if(stack.shape[3] == 3):
-                stack = np.array([stack])
-        if(len(stack.shape) == 3):
-            stack = np.array([stack])
-        
-        if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-            if(len(stack.shape) == 4):
-                n_imgs, n_R, n_C, n_ch = stack.shape
-            if(len(stack.shape) == 5):
-                n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
-                if(is_rgb != 3):
-                    return None
-            square_side = int(np.ceil(np.sqrt(n_ch)))
-            new_n_R = n_R * square_side
-            new_n_C = n_C * square_side
-            if(len(stack.shape) == 4):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C), 
-                                dtype = stack.dtype)
-            if(len(stack.shape) == 5):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C, 3),
-                                 dtype = stack.dtype)
-            used_ch_cnt = 0
-            if(borders is not None):
-                stack[:,   :1      ] = borders
-                stack[:,   : ,   :1] = borders
-                stack[:, -1:       ] = borders
-                stack[:,   : , -1: ] = borders
-            
-            for rcnt in range(square_side):
-                for ccnt in range(square_side):
-                    ch_cnt = rcnt + square_side*ccnt
-                    if (ch_cnt<n_ch):
-                        canv[:, rcnt*n_R: (rcnt + 1)*n_R,
-                                ccnt*n_C: (ccnt + 1)*n_C] = \
-                            stack[..., used_ch_cnt]
-                        used_ch_cnt += 1
-        else:
-            return None
-        return canv
+        return self.multichannel_to_frame(stack, 
+                              frame_shape = None, borders = borders)
 
     def multichannel_to_frame(self, stack, 
                               frame_shape : tuple = None, borders = 0):
@@ -1563,27 +1504,3 @@ class lognflow:
 
     def __bool__(self):
         return self.log_dir.is_dir()
-
-def select_directory(default_directory = './'):
-    """ Open dialog to select a directory
-        It works for windows and Linux using PyQt5.
-    
-       :param default_directory: pathlib.Path
-                When dialog opens, it starts from this default directory.
-    """
-    from PyQt5.QtWidgets import QFileDialog, QApplication
-    _ = QApplication([])
-    log_dir = QFileDialog.getExistingDirectory(
-        None, "Select a directory", default_directory, QFileDialog.ShowDirsOnly)
-    return(log_dir)
-
-def select_file():
-    """ Open dialog to select a file
-        It works for windows and Linux using PyQt5.
-    """
-    from PyQt5.QtWidgets import QFileDialog, QApplication
-    from pathlib import Path
-    _ = QApplication([])
-    fpath = QFileDialog.getOpenFileName()
-    fpath = Path(fpath[0])
-    return(fpath)

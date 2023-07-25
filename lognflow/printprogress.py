@@ -14,7 +14,7 @@ class printprogress:
     """
     def __init__(self, 
                  n_steps, 
-                 numTicks = 80,
+                 numTicks = 78,
                  title = None,
                  method = 'linear',
                  print_function = print,
@@ -71,7 +71,7 @@ class printprogress:
         self._print_func('/', end='')
         self._print_func(' '*int((self.numTicks - len(title))/2), end='')
         self._print_func(title, end='')
-        self._print_func(' '*int((self.numTicks - len(title))/2), end='')
+        self._print_func(' '*int(ceil((self.numTicks-len(title))/2)-1), end='')
         self._print_func(' \\')
         
         self._print_func(' ', end = '')

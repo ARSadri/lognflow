@@ -116,3 +116,10 @@ History
 * log_text takes any save_as
 * If variable name has escape key is alright
 * If variable name is splitable, we replace them with _
+
+0.8.0 (2023-07-25)
+------------------
+* logger.save and savez are set to be identical to log_single.
+* logged.load is set to be identical to get_single.
+* utils.py is added to contain all misc functions.
+* replace_all added to utils

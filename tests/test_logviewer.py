@@ -4,9 +4,11 @@
 
 import pytest
 import re
-from lognflow import lognflow, select_directory, logviewer, printprogress
-
 import numpy as np
+
+from lognflow import (lognflow, select_directory, 
+                      logviewer, printprogress,
+                      text_to_object)
 
 import tempfile
 temp_dir = tempfile.gettempdir()
@@ -89,34 +91,7 @@ def test_get_images_as_stack():
         logger('Size of the log file in bytes is: ' \
                + f'{_}')
 
-def test_replace_time_with_index():
-    logger = lognflow(temp_dir)
-    logger('Well this is a test for logviewer')
-    
-    for _ in range(5):
-        logger.log_single('test_param', np.array([_]))
-        logger.log_single('testy/t', np.array([_]))
-    
-    logged = logviewer(logger.log_dir, logger)
-
-    data_in, flist = logged.get_stack_of_files(
-        'test_param', return_data=True, return_flist=True)
-    
-    logger(flist)
-
-    logger.replace_time_with_index('test_param')
-    
-    data_out, flist = logged.get_stack_of_files(
-        'test_param', return_data=True, return_flist=True)
-    
-    logger(flist)
-    
-    logger(data_in)
-    logger(data_out)
-
 def test_text_to_object():
-    from lognflow.logviewer import text_to_object
-    
     logger = lognflow(temp_dir, time_tag = False)
     test_list = ['asdf', 1243, "dd"]
     logger.log_single('test_list', test_list, save_as = 'txt')
@@ -158,8 +133,5 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     test_get_single_specific_fname()
     test_get_images_as_stack()
-    test_replace_time_with_index()
     test_logviewer()
     test_text_to_object()
-    exit()
-    
