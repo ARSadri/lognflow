@@ -557,20 +557,17 @@ class lognflow:
         _var = self._vars_dict[parameter_name]
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
-        if((_var.save_as == 'npz')):# | (_var.save_as == 'npy')):
+        if((_var.save_as == 'npz') | (_var.save_as == 'npy')):
             fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
                 data_array = _var_data_array)
-        else:#if(_var.save_as == 'txt'):
+        else:
             fpath = param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_time_array)
             fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
-        try:
-            return fpath
-        except:
-            print('here')
+        return fpath
     
     def get_var(self, parameter_name: str) -> tuple:
         """ Get the buffered numpy arrays
@@ -1442,7 +1439,8 @@ class lognflow:
             ims.append([im])
         ani = animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit,
-            repeat_delay = repeat_delay)    
+            repeat_delay = repeat_delay)
+
         ani.save(fpath, dpi = dpi, 
                  writer = animation.PillowWriter(fps=int(1000/interval)))
         return fpath

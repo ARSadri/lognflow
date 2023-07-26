@@ -123,3 +123,7 @@ History
 * logged.load is set to be identical to get_single.
 * utils.py is added to contain all misc functions.
 * replace_all added to utils
+
+0.8.1 (2023-07-26)
+------------------
+* a bug fixed in log_var
