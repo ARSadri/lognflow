@@ -503,7 +503,7 @@ class lognflow:
         except:
             parameter_value = np.array([parameter_value])
         
-        _, parameter_name, suffix = self._param_dir_name_suffix(parameter_name, suffix)
+        _, _, suffix = self._param_dir_name_suffix(parameter_name, suffix)
         if(suffix is None):
             suffix = 'npz'
         
@@ -542,7 +542,7 @@ class lognflow:
         else:
             self.log_text(
                 self.log_name,
-                f'Shape of variable {parameter_name} cannot change '\
+                f'Shape of variable {parameter_name} cannot change shape '\
                 f'from {data_array[curr_index].shape} '\
                 f'to {parameter_value.shape}. Coppying from the last time.')
             data_array[curr_index] = data_array[curr_index - 1]

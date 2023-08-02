@@ -128,11 +128,11 @@ History
 ------------------
 * a bug fixed in log_var
 
-0.8.2 (2023-08-01)
+0.8.2 (2023-08-02)
 ------------------
 * the word save_as is now replaced with suffix as is in pathlib
 * all loggers can take the suffix as the extension in the parameter_name
 
-0.8.3 (2023-08-20)
+0.8.3 (2023-08-02)
 -----------------
-* time_tag is automatically disabled if extension is given, unless overwriting
+* critical bug fixed in log_var to support v0.8.2
