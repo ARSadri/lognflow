@@ -54,7 +54,7 @@ class varinlog:
     time_array        : np.ndarray    
     curr_index        : int
     file_start_time   : float          
-    save_as           : str
+    suffix           : str
     log_counter_limit : int
 
 @dataclass
@@ -135,10 +135,10 @@ class lognflow:
                  log_dir          : pathlib.Path = None,
                  log_dir_prefix   : str          = None,
                  log_dir_suffix   : str          = None,
+                 time_tag         : bool         = True,
                  print_text       : bool         = True,
                  main_log_name    : str          = 'main_log',
-                 log_flush_period : int          = 10,
-                 time_tag         : bool         = True):
+                 log_flush_period : int          = 10):
         self._init_time = time.time()
         self.time_tag = time_tag
         self.log_dir_prefix = log_dir_prefix
@@ -189,7 +189,7 @@ class lognflow:
         self.save = self.log_single
     
     def savez(self, *args, **kwargs):
-        kwargs['save_as'] = 'npz'
+        kwargs['suffix'] = 'npz'
         return self.save(*args, **kwargs)
         
     @property
@@ -255,7 +255,7 @@ class lognflow:
             self.log_text(None, 'Most probably a file was open.')
         return self.log_dir
     
-    def _prepare_param_dir(self, parameter_name: str):
+    def _param_dir_name_suffix(self, parameter_name: str, suffix: str = None):
         
         assert isinstance(parameter_name, str), \
             f'The parameter name {parameter_name} is not a string.' \
@@ -274,20 +274,38 @@ class lognflow:
         else:
             param_name = param_dir.name
             param_dir = param_dir.parent
+        
+        if(suffix == 'mat'):
+            if(len(param_name) == 0):
+                param_name = param_dir.name            
+        
+        if(suffix is None):
+            param_name_split = param_name.split('.')
+            if len(param_name_split) > 1:
+                param_suffix = param_name_split[-1]
+                #Here you can check if it is a valid extention
+                param_name = '.'.join(param_name_split[:-1])
+            else:
+                param_suffix = None
+        else:
+            param_suffix = suffix
+            param_name_split = param_name.split('.')
+            if len(param_name_split) > 1:
+                fname_suffix = param_name_split[-1]
+                if fname_suffix == param_suffix:
+                    param_name = '.'.join(param_name_split[:-1])
+    
+        return(param_dir, param_name, param_suffix)
+
+    def _get_fpath(self, param_dir: pathlib.Path, param_name: str, 
+                   suffix: str, time_tag: bool = None) -> pathlib.Path:
+        
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+        
         if(not param_dir.is_dir()):
             self.log_text(self.log_name,
                           f'Creating directory: {param_dir.absolute()}')
             param_dir.mkdir(parents = True, exist_ok = True)
-        return(param_dir, param_name)
-
-    def _get_fpath(self, param_dir: pathlib.Path, param_name: str, 
-                   save_as: str, time_tag: bool = None) -> pathlib.Path:
-        
-        time_tag = self.time_tag if (time_tag is None) else time_tag
-        
-        if(save_as == 'mat'):
-            if(len(param_name) == 0):
-                param_name = param_dir.name
         
         if(len(param_name) > 0):
             fname = f'{param_name}'
@@ -296,19 +314,23 @@ class lognflow:
         else:
             fname = f'{self.time_stamp:>6.6f}'
         
-        return(param_dir / f'{fname}.{save_as}')
+        fpath = param_dir / f'{fname}.{suffix}'
         
-    def _log_text_handler(self, log_name = None, 
+        return fpath
+        
+    def _log_text_handler(self, log_name: str, 
                          log_size_limit: int = int(1e+7),
                          time_tag: bool = None,
                          log_flush_period = None,
-                         save_as = 'txt'):
+                         suffix = None):
         
         if (log_flush_period is None):
             log_flush_period = self.log_flush_period
-            
-        param_dir, param_name = self._prepare_param_dir(log_name)
-        fpath = self._get_fpath(param_dir, param_name, save_as, time_tag)
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            log_name, suffix)
+        if suffix is None:
+            suffix = 'txt'
+        fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
         self._loggers_dict[log_name] = textinlog(
             to_be_logged=[],      
             log_fpath=fpath,         
@@ -332,6 +354,7 @@ class lognflow:
             :type flush: bool
         """
         log_name = self.log_name if (log_name is None) else log_name
+        
         curr_textinlog = self._loggers_dict[log_name]
         
         if((self.time_stamp - curr_textinlog.last_log_flush_time \
@@ -355,7 +378,7 @@ class lognflow:
                  flush = False,
                  end = '\n',
                  new_file = False,
-                 save_as = None):
+                 suffix = None):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
             Also you can pass a small numpy array. You can ask it to put time
@@ -390,22 +413,19 @@ class lognflow:
                    if a new file is needed. If time_tag is True, it will make
                    a new file with a new name that has a time tag. If False,
                    it closees the current text file and overwrites on it.
-            :param save_as: str
-                   save_as is the suffix of the text file.
+            :param suffix: str
+                   suffix is the extension of the file name.
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
         log_flush_period = self.log_flush_period \
             if (log_flush_period is None) else log_flush_period
-        
         log_name = self.log_name if (log_name is None) else log_name
 
-        if(save_as is None):
-            log_name_split = log_name.split('.')
-            if len(log_name_split) > 1:
-                save_as = log_name_split[-1]
-                log_name = '.'.join(log_name_split)
-        else:
-            save_as = 'txt'
+        if ( (not (log_name in self._loggers_dict)) or new_file):
+            self._log_text_handler(log_name, 
+                                   log_size_limit = log_size_limit,
+                                   time_tag = time_tag,
+                                   suffix = suffix)
 
         if((print_text is None) | (print_text is True)):
             print_text = self._print_text
@@ -413,12 +433,6 @@ class lognflow:
             if(log_time_stamp):
                 print(f'T:{self.time_stamp:>6.6f}| ', end='')
             print(to_be_logged, end = end)
-        
-        if ( (not (log_name in self._loggers_dict)) or new_file):
-            self._log_text_handler(log_name, 
-                                   log_size_limit = log_size_limit,
-                                   time_tag = time_tag,
-                                   save_as = save_as)
 
         curr_textinlog = self._loggers_dict[log_name]
         _logger = []
@@ -448,7 +462,8 @@ class lognflow:
         if(log_size >= curr_textinlog.log_size_limit):
             self._log_text_handler(log_name, 
                                    log_size_limit = curr_textinlog.log_size_limit,
-                                   time_tag = curr_textinlog.time_tag)
+                                   time_tag = curr_textinlog.time_tag,
+                                   suffix = suffix)
             curr_textinlog = self._loggers_dict[log_name]
         return curr_textinlog.log_fpath
                         
@@ -458,7 +473,7 @@ class lognflow:
         return cnt_limit
 
     def log_var(self, parameter_name: str, parameter_value, 
-                save_as = None, log_size_limit: int = int(1e+7)):
+                suffix = None, log_size_limit: int = int(1e+7)):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -477,7 +492,7 @@ class lognflow:
                     path like name such as myscript/myvar.
             :param parameter_value: np.array
                     An np array whose size doesn't change
-            :param save_as: str
+            :param suffix: str
                     can be 'npz' or 'txt' which will save it as text.
             :param log_size_limit: int
                     log_size_limit in bytes, default: 1e+7.
@@ -488,13 +503,9 @@ class lognflow:
         except:
             parameter_value = np.array([parameter_value])
         
-        if(save_as is None):
-            parameter_name_split = parameter_name.split('.')
-            if len(parameter_name_split) > 1:
-                save_as = parameter_name_split[-1]
-                parameter_name = '.'.join(parameter_name_split)
-        else:
-            save_as = 'npz'
+        _, parameter_name, suffix = self._param_dir_name_suffix(parameter_name, suffix)
+        if(suffix is None):
+            suffix = 'npz'
         
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
@@ -502,9 +513,9 @@ class lognflow:
         if(parameter_name in self._vars_dict):
             _var = self._vars_dict[parameter_name]
             data_array, time_array, curr_index, \
-                file_start_time, save_as, log_counter_limit = \
+                file_start_time, suffix, log_counter_limit = \
                 (_var.data_array, _var.time_array, _var.curr_index, \
-                    _var.file_start_time, _var.save_as, _var.log_counter_limit)
+                    _var.file_start_time, _var.suffix, _var.log_counter_limit)
             curr_index += 1
         else:
             file_start_time = self.time_stamp
@@ -539,7 +550,7 @@ class lognflow:
                                                    time_array, 
                                                    curr_index,
                                                    file_start_time,
-                                                   save_as,
+                                                   suffix,
                                                    log_counter_limit)
 
     def log_var_flush(self, parameter_name: str):
@@ -552,12 +563,12 @@ class lognflow:
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
         """
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        param_dir, param_name, _ = self._param_dir_name_suffix(parameter_name)
         
         _var = self._vars_dict[parameter_name]
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
-        if((_var.save_as == 'npz') | (_var.save_as == 'npy')):
+        if((_var.suffix == 'npz') | (_var.suffix == 'npy')):
             fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
@@ -591,7 +602,7 @@ class lognflow:
 
     def log_single(self, parameter_name: str, 
                          parameter_value,
-                         save_as = None,
+                         suffix = None,
                          mat_field = None,
                          time_tag: bool = None):
         """log a single variable
@@ -609,7 +620,7 @@ class lognflow:
                     Could be anything and np.save will be used. If it is a
                     dictionary, np.savez will be used. As you may know, np.save
                     can save all pickalables.
-            :param save_as: str
+            :param suffix: str
                     can be 'npz', 'npy', 'mat', 'torch' for pytorch models
                     or 'txt' or anything else which will save it as text.
                     This includes 'json', 'pdb', or ...
@@ -622,38 +633,30 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        if(save_as is None):
-            parameter_name_split = parameter_name.split('.')
-            if len(parameter_name_split) > 1:
-                save_as = parameter_name_split[-1]
-                #YOU CAN CHECK IF IT IS LEGITEMATE EXTENSION
-                parameter_name = '.'.join(parameter_name_split)
-            elif isinstance(parameter_value, (np.ndarray, int, float)):
-                save_as = 'npy'
+        param_dir, param_name, suffix = self._param_dir_name_suffix(parameter_name, suffix)
+        if(suffix is None):
+            if isinstance(parameter_value, (np.ndarray, int, float)):
+                suffix = 'npy'
             elif (isinstance(parameter_value, dict)):
-                save_as = 'npz'
+                suffix = 'npz'
             else:
-                save_as = 'txt'
-        save_as = save_as.strip()
-        save_as = save_as.strip('.')
-
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
-        fpath = self._get_fpath(param_dir, param_name, save_as, time_tag)
+                suffix = 'txt'
+        fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
         
         try:
-            if(save_as == 'npy'):
+            if(suffix == 'npy'):
                 np.save(fpath, parameter_value)
-            elif(save_as == 'npz'):
+            elif(suffix == 'npz'):
                 np.savez(fpath, **parameter_value)
-            elif((save_as == 'tif') | (save_as == 'tiff')):
+            elif((suffix == 'tif') | (suffix == 'tiff')):
                 from tifffile import imwrite
                 imwrite(fpath, parameter_value)
-            elif(save_as == 'mat'):
+            elif(suffix == 'mat'):
                 from scipy.io import savemat
                 if(mat_field is None):
                     mat_field = param_name
                 savemat(fpath, {f'{mat_field}':parameter_value})
-            elif(save_as == 'torch'):
+            elif(suffix == 'torch'):
                 from torch import save as torch_save
                 torch_save(parameter_value.state_dict(), fpath)
             else:
@@ -681,7 +684,8 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        param_dir, param_name, image_format = \
+            self._param_dir_name_suffix(parameter_name, image_format)
         fpath = self._get_fpath(param_dir, param_name, image_format, time_tag)
         
         try:
@@ -1184,8 +1188,7 @@ class lognflow:
                     borders between tiles will be filled with this variable
                     default: np.nan
         """        
-        if (not isinstance(list_of_stacks, list)):
-            list_of_stacks = [list_of_stacks]
+        list_of_stacks = list(list_of_stacks)
         for cnt, stack in enumerate(list_of_stacks):
             stack = self._handle_images_stack(stack, borders = borders)
             if(stack is None):
@@ -1428,7 +1431,8 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        param_dir, param_name = self._prepare_param_dir(parameter_name)
+        param_dir, param_name, _ = self._param_dir_name_suffix(parameter_name, 
+                                                               'gif')
         fpath = self._get_fpath(param_dir, param_name, 'gif', time_tag)
 
         fig, ax = plt.subplots()
@@ -1445,37 +1449,6 @@ class lognflow:
                  writer = animation.PillowWriter(fps=int(1000/interval)))
         return fpath
 
-    def replace_time_with_index(self, var_name):
-        """ index in file names
-            lognflow uses time stamps to make new log files for a variable.
-            That is done by putting time stamp after the name of the variable.
-            This function changes all of the time stamps, sorted ascendingly,
-            by indices.
-            
-            :param var_name:
-                variable name
-        """
-        var_dir = self.log_dir / var_name
-        if(var_dir.is_dir()):
-            var_fname = None
-            flist = list(var_dir.glob(f'*.*'))
-        else:
-            var_fname = var_dir.name
-            var_dir = var_dir.parent
-            flist = list(var_dir.glob(f'{var_fname}_*.*'))
-        if flist:
-            flist.sort()
-            fcnt_width = len(str(len(flist)))
-            for fcnt, fpath in enumerate(flist):
-                # self.log_text(None, f'Changing {flist[fcnt].name}')
-                fname_new = ''
-                if(var_fname is not None):
-                    fname_new = var_fname + '_'
-                fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
-                fpath_new = flist[fcnt].parent / fname_new
-                # self.log_text(None, f'To {fpath_new.name}')
-                flist[fcnt].rename(fpath_new)
-                
     def flush_all(self):
         for log_name in list(self._loggers_dict):
             self.log_text_flush(log_name, flush = True)

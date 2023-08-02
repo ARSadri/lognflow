@@ -56,8 +56,8 @@ def test_get_images_as_stack():
     logger(flist_A)
     logger(flist_B)
     
-    logger.replace_time_with_index('A/')
-    logger.replace_time_with_index('B/')
+    logger.logged.replace_time_with_index('A/')
+    logger.logged.replace_time_with_index('B/')
     
     stack_A = logged.get_stack_of_files('A/', return_data = True, return_flist = False)
     stack_B = logged.get_stack_of_files('B/', return_data = True, return_flist = False)
@@ -94,10 +94,10 @@ def test_get_images_as_stack():
 def test_text_to_object():
     logger = lognflow(temp_dir, time_tag = False)
     test_list = ['asdf', 1243, "dd"]
-    logger.log_single('test_list', test_list, save_as = 'txt')
+    logger.log_single('test_list', test_list, suffix = 'txt')
     
     test_dict = {"one": "asdf", 'two': 1243, 'thre': "dd"}
-    logger.log_single('test_dict', test_dict, save_as = 'txt')
+    logger.log_single('test_dict', test_dict, suffix = 'txt')
     
     logged = logviewer(logger.log_dir)
     flist = logged.get_stack_of_files('*')

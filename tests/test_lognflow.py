@@ -31,28 +31,28 @@ def test_lognflow_conflict_in_names():
     logger('This is a test for conflict in names')
     logger1 = lognflow(logger.log_dir)
     logger2 = lognflow(logger.log_dir)
-    print(logger1.log_dir)
-    print(logger2.log_dir)
+    logger1(logger1.log_dir)
+    logger2(logger2.log_dir)
 
 def test_log_text():
-    logger = lognflow(temp_dir)
+    logger = lognflow(temp_dir, print_text = False)
     logger('This is a test for log_text')    
-    for _ in range(1000000):
+    for _ in range(10000):
         logger(f'{_}')
 
-    logger.log_text('not_main_script',
+    logger.log_text('not_main_script1.pdb',
            'This is a new log file for another script')
-    logger.log_text('not_main_script',
+    logger.log_text('not_main_script2.test',
                     'For other log files you need to mention the log_name')
     logger.log_text('not_main_script3',
-           'This is a new log file for another script')
-    logger.log_text('not_main_script4',
+           'This is a new log file for another script', suffix = 'io')
+    logger.log_text('test.to\not_main_script4.top',
                     'For other log files you need to mention the log_name')
-    logger.log_text('not_main_script',
+    logger.log_text('not_main_script2',
            'This is a new log file for another script')
-    logger.log_text('not_main_script',
+    logger.log_text('not_main_script2.test',
                     'For other log files you need to mention the log_name')
-    for _ in range(1000000):
+    for _ in range(10000):
         logger(f'{_}')
 
 def test_logger():
@@ -73,12 +73,12 @@ def test_logger():
     
     logger(a)
     logger.log_single('a', a)
-    logger.log_single('aa', a, save_as = 'txt', time_tag = False)
+    logger.log_single('aa', a, suffix = 'txt', time_tag = False)
     logger(b)
     logger.log_single('b', b)
-    logger.log_single('bb', b, save_as = 'txt', time_tag = False)
+    logger.log_single('bb', b, suffix = 'txt', time_tag = False)
     logger(c)
-    logger.log_single('test/c', c, save_as = 'txt')
+    logger.log_single('test/c', c, suffix = 'txt')
 
 def test_log_flush_period():
     logger = lognflow(temp_dir, log_flush_period = 30)
@@ -97,13 +97,12 @@ def test_log_flush_period():
     logger.log_text('not_main_script',
                     'For other log files you need to mention the log_name')
 
-
 def test_log_var():
     logger = lognflow(temp_dir)
     logger('This is a test for lognflow and log_var')    
 
     for _ in range(1000):
-        logger.log_var('vars/vec/v', np.random.rand(10000))
+        logger.log_var('vars/vec/v.to.txt', np.random.rand(10000))
         
 def test_log_var_without_time_stamp():
     logger = lognflow(temp_dir)
@@ -124,11 +123,13 @@ def test_log_single():
     
     logger = lognflow(temp_dir)
     logger('This is a test for log_single')    
-    logger.log_single('var1',var1)
+    logger.log_single('var1/var1.txt', var1)
+    logger.log_single('var1/var1.npy', var1)
     a_dict = dict({'str_var': 'This is a string',
                    'var1': var1})
     logger.log_single('a_dict', a_dict)
-    logger.log_single('a_dict', a_dict, save_as = 'txt')
+    logger.log_single('a_dict.txt', a_dict)
+    logger.log_single('a_dict2', a_dict, suffix = 'txt')
 
 def test_log_plot():
     var1 = np.random.rand(100)
@@ -268,9 +269,9 @@ def test_log_single_text():
     logger = lognflow(temp_dir)
     logger('This is a test for test_log_single_text', flush = True)
     var = 2
-    logger.log_single('text_log\a\t/\b/\b//\\/b', 'hello\n', save_as='txt', time_tag = False)
-    logger.log_single('text_log\a', 'bye\n', save_as='json', time_tag = False)
-    logger.log_single('text_log\a', var, save_as='pdb', time_tag = False)
+    logger.log_single('text_log\a\t/\b/\b//\\/b', 'hello\n', suffix='txt', time_tag = False)
+    logger.log_single('text_log\a', 'bye\n', suffix='json', time_tag = False)
+    logger.log_single('text_log\a', var, suffix='pdb', time_tag = False)
     
 def test_log_imshow_complex():
     logger = lognflow(temp_dir)
@@ -296,7 +297,7 @@ def test_replace_time_with_index():
     
     logger(flist)
 
-    logger.replace_time_with_index('test_param')
+    logger.logged.replace_time_with_index('test_param')
     
     data_out, flist = logged.get_stack_of_files(
         'test_param', return_data=True, return_flist=True)
@@ -311,12 +312,13 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_log_single()
+    test_log_var()
+    test_log_text()
     test_log_single_text()
     test_log_imshow_complex()
     test_log_imshow()
-    test_log_text()
     test_log_surface()
-    test_log_single()
     test_lognflow_conflict_in_names()
     test_rename()
     test_log_plot()
@@ -324,7 +326,6 @@ if __name__ == '__main__':
     test_logger()
     test_log_flush_period()
     test_log_var_without_time_stamp()
-    test_log_var()
     test_log_animation()
     test_log_hist()
     test_log_scatter3()

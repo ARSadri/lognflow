@@ -312,6 +312,37 @@ class logviewer:
 
         return(flist_A_new, flist_B_new)
     
+    def replace_time_with_index(self, var_name):
+        """ index in file names
+            lognflow uses time stamps to make new log files for a variable.
+            That is done by putting time stamp after the name of the variable.
+            This function changes all of the time stamps, sorted ascendingly,
+            by indices.
+            
+            :param var_name:
+                variable name
+        """
+        var_dir = self.log_dir / var_name
+        if(var_dir.is_dir()):
+            var_fname = None
+            flist = list(var_dir.glob(f'*.*'))
+        else:
+            var_fname = var_dir.name
+            var_dir = var_dir.parent
+            flist = list(var_dir.glob(f'{var_fname}_*.*'))
+        if flist:
+            flist.sort()
+            fcnt_width = len(str(len(flist)))
+            for fcnt, fpath in enumerate(flist):
+                # self.log_text(None, f'Changing {flist[fcnt].name}')
+                fname_new = ''
+                if(var_fname is not None):
+                    fname_new = var_fname + '_'
+                fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
+                fpath_new = flist[fcnt].parent / fname_new
+                # self.log_text(None, f'To {fpath_new.name}')
+                flist[fcnt].rename(fpath_new)
+    
     def __repr__(self):
         return f'{self.log_dir}'
 
