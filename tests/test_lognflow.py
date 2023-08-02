@@ -52,6 +52,8 @@ def test_log_text():
            'This is a new log file for another script')
     logger.log_text('not_main_script2.test',
                     'For other log files you need to mention the log_name')
+    logger.log_text('test.to\not_main_script4.top',
+                    'To see if variable names are OK when passed properly')
     for _ in range(10000):
         logger(f'{_}')
 
@@ -312,9 +314,9 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_log_single()
     test_log_var()
     test_log_text()
+    test_log_single()
     test_log_single_text()
     test_log_imshow_complex()
     test_log_imshow()

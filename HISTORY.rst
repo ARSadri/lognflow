@@ -136,3 +136,9 @@ History
 0.8.3 (2023-08-02)
 -----------------
 * critical bug fixed in log_var to support v0.8.2
+
+0.8.4 (2023-08-03)
+-----------------
+* variable names that are pecular will always be fixed first.
+* suffix can be read form the file name.
+* time_tag will always accompany file name unless stated otherwised.

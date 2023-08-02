@@ -267,18 +267,28 @@ class lognflow:
         parameter_name = replace_all(parameter_name, '\\', '/')
         parameter_name = replace_all(parameter_name, '//', '/')
         
-        param_dir = self.log_dir /  parameter_name
+        # param_dir = self.log_dir /  parameter_name
         
         if(parameter_name[-1] == '/'):
             param_name = ''
+            param_dir = parameter_name
         else:
-            param_name = param_dir.name
-            param_dir = param_dir.parent
+            parameter_name_split = parameter_name.split('/')
+            if len(parameter_name_split) == 1:
+                param_name = parameter_name
+                param_dir = ''
+            else:
+                param_name = parameter_name_split[-1]
+                param_dir = '/'.join(parameter_name_split[:-1])
         
         if(suffix == 'mat'):
             if(len(param_name) == 0):
-                param_name = param_dir.name            
-        
+                param_dir_split = param_dir.split('/')
+                if param_dir_split[-1] == '/':
+                    param_name = param_dir_split[-2]
+                else:
+                    param_name = param_dir_split[-1]
+                    
         if(suffix is None):
             param_name_split = param_name.split('.')
             if len(param_name_split) > 1:
@@ -297,26 +307,33 @@ class lognflow:
     
         return(param_dir, param_name, param_suffix)
 
-    def _get_fpath(self, param_dir: pathlib.Path, param_name: str, 
-                   suffix: str, time_tag: bool = None) -> pathlib.Path:
+    def _get_fpath(self, param_dir: pathlib.Path, param_name: str = None, 
+                   suffix: str = None, time_tag: bool = None) -> pathlib.Path:
         
         time_tag = self.time_tag if (time_tag is None) else time_tag
         
-        if(not param_dir.is_dir()):
+        _param_dir = self.log_dir / param_dir
+        
+        if(not _param_dir.is_dir()):
             self.log_text(self.log_name,
-                          f'Creating directory: {param_dir.absolute()}')
-            param_dir.mkdir(parents = True, exist_ok = True)
-        
-        if(len(param_name) > 0):
-            fname = f'{param_name}'
-            if(time_tag):
-                fname += f'_{self.time_stamp:>6.6f}'
+                          f'Creating directory: {_param_dir.absolute()}')
+            _param_dir.mkdir(parents = True, exist_ok = True)
+            
+        if(param_name is not None):
+            if(len(param_name) > 0):
+                fname = f'{param_name}'
+                if(time_tag):
+                    fname += f'_{self.time_stamp:>6.6f}'
+            else:
+                fname = f'{self.time_stamp:>6.6f}'
+                
+            if(suffix is None):
+                fpath = _param_dir / f'{fname}'
+            else:
+                fpath = _param_dir / f'{fname}.{suffix}'
+            return fpath
         else:
-            fname = f'{self.time_stamp:>6.6f}'
-        
-        fpath = param_dir / f'{fname}.{suffix}'
-        
-        return fpath
+            return _param_dir
         
     def _log_text_handler(self, log_name: str, 
                          log_size_limit: int = int(1e+7),
@@ -330,8 +347,10 @@ class lognflow:
             log_name, suffix)
         if suffix is None:
             suffix = 'txt'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        
         fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
-        self._loggers_dict[log_name] = textinlog(
+        self._loggers_dict[log_dirnamesuffix] = textinlog(
             to_be_logged=[],      
             log_fpath=fpath,         
             log_size_limit=log_size_limit,    
@@ -339,8 +358,7 @@ class lognflow:
             last_log_flush_time=0,
             log_flush_period=log_flush_period)  
 
-    def log_text_flush(self, log_name = None, 
-                       flush = False):
+    def log_text_flush(self, log_name = None, flush = False, suffix = None):
         """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
@@ -355,7 +373,13 @@ class lognflow:
         """
         log_name = self.log_name if (log_name is None) else log_name
         
-        curr_textinlog = self._loggers_dict[log_name]
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            log_name, suffix)
+        if suffix is None:
+            suffix = 'txt'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        
+        curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         
         if((self.time_stamp - curr_textinlog.last_log_flush_time \
                                            > curr_textinlog.log_flush_period)
@@ -421,8 +445,14 @@ class lognflow:
             if (log_flush_period is None) else log_flush_period
         log_name = self.log_name if (log_name is None) else log_name
 
-        if ( (not (log_name in self._loggers_dict)) or new_file):
-            self._log_text_handler(log_name, 
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            log_name, suffix)
+        if suffix is None:
+            suffix = 'txt'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+
+        if ( (not (log_dirnamesuffix in self._loggers_dict)) or new_file):
+            self._log_text_handler(log_dirnamesuffix, 
                                    log_size_limit = log_size_limit,
                                    time_tag = time_tag,
                                    suffix = suffix)
@@ -434,7 +464,7 @@ class lognflow:
                 print(f'T:{self.time_stamp:>6.6f}| ', end='')
             print(to_be_logged, end = end)
 
-        curr_textinlog = self._loggers_dict[log_name]
+        curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         _logger = []
         if(log_time_stamp):
             _time_str = f'T:{self.time_stamp:>6.6f}| '
@@ -457,14 +487,14 @@ class lognflow:
             log_size += len(_logger_el)
         curr_textinlog.log_size += log_size
         
-        self.log_text_flush(log_name, flush)        
+        self.log_text_flush(log_dirnamesuffix, flush)        
 
         if(log_size >= curr_textinlog.log_size_limit):
-            self._log_text_handler(log_name, 
+            self._log_text_handler(log_dirnamesuffix, 
                                    log_size_limit = curr_textinlog.log_size_limit,
                                    time_tag = curr_textinlog.time_tag,
                                    suffix = suffix)
-            curr_textinlog = self._loggers_dict[log_name]
+            curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         return curr_textinlog.log_fpath
                         
 
@@ -503,15 +533,17 @@ class lognflow:
         except:
             parameter_value = np.array([parameter_value])
         
-        _, _, suffix = self._param_dir_name_suffix(parameter_name, suffix)
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, suffix)
         if(suffix is None):
             suffix = 'npz'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
         
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
 
-        if(parameter_name in self._vars_dict):
-            _var = self._vars_dict[parameter_name]
+        if(log_dirnamesuffix in self._vars_dict):
+            _var = self._vars_dict[log_dirnamesuffix]
             data_array, time_array, curr_index, \
                 file_start_time, suffix, log_counter_limit = \
                 (_var.data_array, _var.time_array, _var.curr_index, \
@@ -522,7 +554,7 @@ class lognflow:
             curr_index = 0
 
         if(curr_index >= log_counter_limit):
-            self.log_var_flush(parameter_name)
+            self.log_var_flush(log_dirnamesuffix)
             file_start_time = self.time_stamp
             curr_index = 0
 
@@ -542,18 +574,18 @@ class lognflow:
         else:
             self.log_text(
                 self.log_name,
-                f'Shape of variable {parameter_name} cannot change shape '\
+                f'Shape of variable {log_dirnamesuffix} cannot change shape '\
                 f'from {data_array[curr_index].shape} '\
                 f'to {parameter_value.shape}. Coppying from the last time.')
             data_array[curr_index] = data_array[curr_index - 1]
-        self._vars_dict[parameter_name] = varinlog(data_array, 
-                                                   time_array, 
-                                                   curr_index,
-                                                   file_start_time,
-                                                   suffix,
-                                                   log_counter_limit)
+        self._vars_dict[log_dirnamesuffix] = varinlog(data_array, 
+                                                      time_array, 
+                                                      curr_index,
+                                                      file_start_time,
+                                                      suffix,
+                                                      log_counter_limit)
 
-    def log_var_flush(self, parameter_name: str):
+    def log_var_flush(self, parameter_name: str, suffix: str = None):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
@@ -563,24 +595,30 @@ class lognflow:
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
         """
-        param_dir, param_name, _ = self._param_dir_name_suffix(parameter_name)
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, suffix)
+        if(suffix is None):
+            suffix = 'npz'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
         
-        _var = self._vars_dict[parameter_name]
+        _param_dir = self._get_fpath(param_dir)
+        
+        _var = self._vars_dict[log_dirnamesuffix]
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
         if((_var.suffix == 'npz') | (_var.suffix == 'npy')):
-            fpath = param_dir / f'{param_name}_{_var.file_start_time}.npz'
+            fpath = _param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
                 data_array = _var_data_array)
         else:
-            fpath = param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
+            fpath = _param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_time_array)
-            fpath = param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
+            fpath = _param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
         return fpath
     
-    def get_var(self, parameter_name: str) -> tuple:
+    def get_var(self, parameter_name: str, suffix: str = None) -> tuple:
         """ Get the buffered numpy arrays
             If you need the buffered variable back.
             :param parameter_name: str
@@ -595,7 +633,13 @@ class lognflow:
                 tuple of two nd.arrays
         
         """
-        _var = self._vars_dict[parameter_name]
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, suffix)
+        if(suffix is None):
+            suffix = 'npz'
+        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        
+        _var = self._vars_dict[log_dirnamesuffix]
         data_array = _var.data_array[_var.time_array>0].copy()
         time_array = _var.time_array[_var.time_array>0].copy()
         return(time_array, data_array)
@@ -1431,9 +1475,9 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        param_dir, param_name, _ = self._param_dir_name_suffix(parameter_name, 
-                                                               'gif')
-        fpath = self._get_fpath(param_dir, param_name, 'gif', time_tag)
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, 'gif')
+        fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
 
         fig, ax = plt.subplots()
         ims = []
