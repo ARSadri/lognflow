@@ -8,6 +8,9 @@ from lognflow import lognflow, select_directory, logviewer, printprogress
 
 import numpy as np
 
+import tempfile
+temp_dir = tempfile.gettempdir()
+
 @pytest.fixture
 def response():
     """Sample pytest fixture.
@@ -30,23 +33,37 @@ def test_printprogress():
     # assert input('Did it show you a progress bar? (y for yes)')=='y'
 
 def test_printprogress_with_logger():
-    logger = lognflow()
+    logger = lognflow(temp_dir)
     N = 1500000
     pprog = printprogress(N, print_function = logger, log_time_stamp = False)
     for _ in range(N):
         pprog()
         
 def test_printprogress_ETA():
-    logger = lognflow()
+    logger = lognflow(temp_dir)
     N = 500000
     pprog = printprogress(N, print_function = None)
     for _ in range(N):
         ETA = pprog()
         print(ETA)
     
+def test_specific_timing():
+    import time
+    logger = lognflow(temp_dir)
+    N = 7812
+    pprog = printprogress(N, title='Inference of 7812 points. ')
+    for _ in range(N):
+        counter = 0
+        while counter < 15000: 
+            counter += 1
+        pprog()
 
 if __name__ == '__main__':
-    test_printprogress_with_logger()
+    #-----IF RUN BY PYTHON------#
+    temp_dir = select_directory()
+    #---------------------------#
     test_printprogress_ETA()
+    test_specific_timing()
+    test_printprogress_with_logger()
     test_printprogress()
     exit()

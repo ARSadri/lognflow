@@ -107,9 +107,7 @@ class printprogress:
                 self._print_func('-' * self.numTicks)
         else:
             self.ck += ck
-            if(self.ck >= self.n_steps):
-                self.end()
-            else:
+            if(self.ck <= self.n_steps):
                 remTimeS = self._calc_ETA() # useful when print_function is None
                 cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)    
                 #3: because 3 charachters are used
@@ -134,6 +132,8 @@ class printprogress:
                         self._print_func('s', end='')
                     else:
                         self.end()
+            if(self.ck >= self.n_steps):
+                self.end()
         return remTimeS
     def end(self):
         if(not self.FLAG_ended):

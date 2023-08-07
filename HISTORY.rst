@@ -142,3 +142,8 @@ History
 * variable names that are pecular will always be fixed first.
 * suffix can be read form the file name.
 * time_tag will always accompany file name unless stated otherwised.
+
+0.8.5 (2023-08-04)
+-----------------
+* Some functions can go to utils and be mentioned in the __init__
+* a bug was fixed in printprogress.

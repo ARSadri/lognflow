@@ -45,17 +45,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
+from .utils import repr_raw, replace_all, select_directory
+from .plt_utils import plt_colorbar, plt_hist
 
 from .logviewer import logviewer
 
 @dataclass
 class varinlog:
-    data_array        : np.ndarray      
-    time_array        : np.ndarray    
-    curr_index        : int
-    file_start_time   : float          
-    suffix           : str
-    log_counter_limit : int
+    data_array          : np.ndarray      
+    time_array          : np.ndarray    
+    curr_index          : int
+    file_start_time     : float          
+    suffix              : str
+    log_counter_limit   : int
 
 @dataclass
 class textinlog:
@@ -65,8 +67,6 @@ class textinlog:
     log_size            : int     
     last_log_flush_time : float
     log_flush_period    : int
-
-from .utils import repr_raw, replace_all
 
 class lognflow:
     """Initialization
@@ -151,7 +151,9 @@ class lognflow:
                 try:
                     logs_root = select_directory(logs_root)
                 except:
-                    pass
+                    print('no logs_root was provided.'
+                          + 'Could not open select_folder'
+                          + f'So a folder from tmp is chosen: {logs_root}')
             new_log_dir_found = False
             while(not new_log_dir_found):
                 log_dir_name = ''
@@ -744,20 +746,6 @@ class lognflow:
                           f'Cannot save the plt instance {parameter_name}.')
             return None
      
-    def add_colorbar(self, mappable):
-        """ Add colobar to the current axis 
-            This is specially useful in plt.subplots
-            stackoverflow.com/questions/23876588/
-                matplotlib-colorbar-in-each-subplot
-        """
-        ax = mappable.axes
-        fig = ax.figure
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        cbar = fig.colorbar(mappable, cax=cax)
-        # cbar.ax.tick_params(size=0.01)
-
     def log_multichannel_by_subplots(self, 
         parameter_name: str, 
         parameter_value: np.ndarray,
@@ -765,7 +753,7 @@ class lognflow:
         image_format='jpeg', 
         dpi=1200, 
         time_tag: bool = None,
-        add_colorbar = False,
+        colorbar = False,
         remove_axis_ticks = True,
         return_figure = False,
         **kwargs):
@@ -800,8 +788,8 @@ class lognflow:
             for ccnt in range(n_ch_c):
                 im = parameter_value[:,:, ccnt + rcnt * n_ch_c]
                 im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
-                if(add_colorbar):
-                    self.add_colorbar(im_ch)
+                if(colorbar):
+                    plt_colorbar(im_ch)
         if not return_figure:
             return self.log_plt(parameter_name = parameter_name,
                          image_format=image_format, dpi=dpi,
@@ -875,8 +863,10 @@ class lognflow:
     
     def log_hist(self, parameter_name: str, 
                        parameter_value_list,
+                       labels_list = None,
                        n_bins = 10,
                        alpha = 0.5,
+                       normalize = False,
                        image_format='jpeg', dpi=1200,
                        time_tag: bool = None, 
                        **kwargs):
@@ -905,25 +895,16 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        try:
-            if not isinstance(parameter_value_list, list):
-                parameter_value_list = [parameter_value_list]
-                
-            for list_cnt, parameter_value in enumerate(parameter_value_list):
-                bins, edges = np.histogram(parameter_value, n_bins)
-                plt.bar(edges[:-1], bins, 
-                        width =np.diff(edges).mean(), alpha=alpha)
-                plt.plot(edges[:-1], bins, **kwargs)
-            
-            fpath = self.log_plt(
-                parameter_name = parameter_name, 
-                image_format=image_format, dpi=dpi,
-                time_tag = time_tag)
-            return fpath
-        except:
-            self.log_text(self.log_name,
-                f'Cannot make the histogram for variable {parameter_name}.')
-            return None
+        plt_hist(parameter_value_list, 
+             n_bins = n_bins, alpha = alpha, 
+             normalize = normalize, 
+             labels_list = None, **kwargs)
+        
+        fpath = self.log_plt(
+            parameter_name = parameter_name, 
+            image_format=image_format, dpi=dpi,
+            time_tag = time_tag)
+        return fpath
     
     def log_scatter3(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
@@ -1087,13 +1068,11 @@ class lognflow:
                 fig, ax = plt.subplots(1, 2)
                 im = ax[0].imshow(np.real(parameter_value), cmap = cmap, **kwargs)
                 if(colorbar):
-                    self.add_colorbar(im)
-                    # plt.colorbar(im)
+                    plt_colorbar(im)
                 ax[0].set_title('Real')    
                 im = ax[1].imshow(np.imag(parameter_value), cmap = cmap, **kwargs)
                 if(colorbar):
-                    self.add_colorbar(im)
-                    # plt.colorbar(im)
+                    plt_colorbar(im)
                 ax[1].set_title('Imag')
                 if(remove_axis_ticks):
                     plt.setp(ax[0], xticks=[], yticks=[])
