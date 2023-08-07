@@ -147,3 +147,7 @@ History
 -----------------
 * Some functions can go to utils and be mentioned in the __init__
 * a bug was fixed in printprogress.
+
+0.8.6 (2023-08-04)
+-----------------
+* plt_utils was not added tp 0.8.5
