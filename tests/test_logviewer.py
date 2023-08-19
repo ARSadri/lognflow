@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Tests for `lognflow` package."""
+"""Tests for `lognflow.logviewer` package."""
 
 import pytest
 import re
@@ -12,20 +12,6 @@ from lognflow import (lognflow, select_directory,
 
 import tempfile
 temp_dir = tempfile.gettempdir()
-
-@pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_logviewer():
     logger = lognflow(temp_dir)
@@ -48,10 +34,8 @@ def test_get_images_as_stack():
 
     logged = logviewer(logger.log_dir, logger)
 
-    flist_A = logged.get_stack_of_files(
-        'A/', return_data=False, return_flist=True)
-    flist_B = logged.get_stack_of_files(
-        'B/', return_data=False, return_flist=True)
+    flist_A = logged.get_flist('A/')
+    flist_B = logged.get_flist('B/')
     
     logger(flist_A)
     logger(flist_B)
@@ -59,18 +43,16 @@ def test_get_images_as_stack():
     logger.logged.replace_time_with_index('A/')
     logger.logged.replace_time_with_index('B/')
     
-    stack_A = logged.get_stack_of_files('A/', return_data = True, return_flist = False)
-    stack_B = logged.get_stack_of_files('B/', return_data = True, return_flist = False)
+    stack_A = logged.get_stack_of_files('A/')
+    stack_B = logged.get_stack_of_files('B/')
 
     logger(stack_A.shape)
     logger(stack_B.shape)
     
     logger.log_canvas('data_samples', [stack_A, stack_B], dpi = 300)
 
-    flist_A = logged.get_stack_of_files(
-        'A/', return_data=False, return_flist=True)
-    flist_B = logged.get_stack_of_files(
-        'B/', return_data=False, return_flist=True)
+    flist_A = logged.get_flist('A/')
+    flist_B = logged.get_flist('B/')
     
     logger(flist_A)
     logger(flist_B)
@@ -81,13 +63,11 @@ def test_get_images_as_stack():
     
     if(flist_A_AB):
         
-        dataset_A = logged.get_stack_of_files('A/',
-            flist = flist_A_AB, return_data = True, return_flist = False)
-        dataset_B = logged.get_stack_of_files('B/',
-            flist = flist_B_AB, return_data = True, return_flist = False)
+        dataset_A = logged.get_stack_of_files('A/', flist = flist_A_AB)
+        dataset_B = logged.get_stack_of_files('B/', flist = flist_B_AB)
         
         logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
-        _ = logger._loggers_dict['main_log'].log_size
+        _ = logger._loggers_dict['main_log.txt'].log_size
         logger('Size of the log file in bytes is: ' \
                + f'{_}')
 
@@ -100,7 +80,7 @@ def test_text_to_object():
     logger.log_single('test_dict', test_dict, suffix = 'txt')
     
     logged = logviewer(logger.log_dir)
-    flist = logged.get_stack_of_files('*')
+    flist = logged.get_flist('*')
     print(flist)
     for file_name_input in flist:
         print('='*60)

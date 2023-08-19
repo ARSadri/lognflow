@@ -1,5 +1,8 @@
 from re import sub as re_sub
+import numpy as np
 from unicodedata import normalize as unicodedata_normalize
+
+def dummy_function(*args, **kwargs): ...
 
 def repr_raw(text):
     """ Raw text representation
@@ -103,3 +106,79 @@ def text_to_object(txt):
     else:
         obj_out = txt
     return obj_out
+
+def multichannel_to_frame(stack, frame_shape : tuple = None, borders = 0):
+    """ turn a stack of multi-channel images into a frame of images
+        This is very useful when lots of images need to be tiled
+        against each other.
+    
+        :param stack: np.ndarray
+                It must have the shape of either
+                n_r x n_c x n_ch
+                n_r x n_c x  3  x n_ch
+                n_f x n_r x n_c x n_ch
+                n_f x n_r x n_c x  3  x n_ch
+                
+            In both cases n_ch will be turned into a square tile
+            Remember if you have N images to put into a square, the input
+            shape should be 1 x n_r x n_c x N
+        :param frame_shape: tuple
+            The shape of the frame to put n_rows and n_colmnss of images
+            close to each other to form a rectangle of image.
+        :param borders: literal or np.inf or np.nan
+            When plotting images with matplotlib.pyplot.imshow, there
+            needs to be a border between them. This is the value for the 
+            border elements.
+            
+        output
+        ---------
+            Since we have N channels to be laid into a square, the side
+            length woul be ceil(N**0.5)
+            it produces an np.array of shape n_f x n_r * S x n_c * S or
+            n_f x n_r * S x n_c * S x 3 in case of RGB input.
+    """
+    if(len(stack.shape) == 4):
+        if(stack.shape[3] == 3):
+            stack = np.array([stack])
+    if(len(stack.shape) == 3):
+        stack = np.array([stack])
+    
+    if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
+        if(len(stack.shape) == 4):
+            n_imgs, n_R, n_C, n_ch = stack.shape
+        if(len(stack.shape) == 5):
+            n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
+            if(is_rgb != 3):
+                return None
+        if(frame_shape is None):
+            square_side = int(np.ceil(np.sqrt(n_ch)))
+            frame_n_r, frame_n_c = (square_side, square_side)
+        else:
+            frame_n_r, frame_n_c = frame_shape
+        
+        new_n_R = n_R * frame_n_r
+        new_n_C = n_C * frame_n_c
+        if(len(stack.shape) == 4):
+            canv = np.zeros((n_imgs, new_n_R, new_n_C), 
+                            dtype = stack.dtype)
+        if(len(stack.shape) == 5):
+            canv = np.zeros((n_imgs, new_n_R, new_n_C, 3),
+                             dtype = stack.dtype)
+        used_ch_cnt = 0
+        if(borders is not None):
+            stack[:,   :1      ] = borders
+            stack[:,   : ,   :1] = borders
+            stack[:, -1:       ] = borders
+            stack[:,   : , -1: ] = borders
+        
+        for rcnt in range(frame_n_r):
+            for ccnt in range(frame_n_c):
+                ch_cnt = rcnt + frame_n_c*ccnt
+                if (ch_cnt<n_ch):
+                    canv[:, rcnt*n_R: (rcnt + 1)*n_R,
+                            ccnt*n_C: (ccnt + 1)*n_C] = \
+                        stack[..., used_ch_cnt]
+                    used_ch_cnt += 1
+    else:
+        return None
+    return canv

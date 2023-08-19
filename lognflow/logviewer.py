@@ -1,6 +1,6 @@
 import pathlib
 import numpy as np
-from .utils import replace_all
+from .utils import replace_all, dummy_function
 
 class logviewer:
     """ log viewer
@@ -22,27 +22,9 @@ class logviewer:
         self.logger = logger
         self.load = self.get_single
     
-    def get_text(self, log_name='main_log'):
-        """ get text log files
-            Given the log_name, this function returns the text therein.
-
-            Parameters
-            ----------
-            :param log_name:
-                the log name. If not given then it is the main log.
-        """
-        flist = list(self.log_dir.glob(f'{log_name}*.txt'))
-        flist.sort()
-        n_files = len(flist)
-        if (n_files>0):
-            txt = []
-            for fcnt in range(n_files):
-                with open(flist[fcnt]) as f_txt:
-                    txt.append(f_txt.readlines())
-            if(n_files == 1):
-                txt = txt[0]
-            return txt
-
+    def stop_logging(self):
+        self.logger = dummy_function
+    
     def get_flist(self, var_name, suffix = None):
         """ get list of files
             return the list of files for a saved variable.
@@ -69,7 +51,7 @@ class logviewer:
                 else:
                     var_name = ('.').join(var_name.split('.')[:-1])
             else:
-                suffix = '.np*'
+                suffix = '.*'
 
         suffix = suffix.strip('.')        
 
@@ -104,8 +86,84 @@ class logviewer:
             if(len(flist) > 0):
                 flist.sort()
         return flist
+
+    def get_common_files(self, var_name_A, var_name_B, suffix = None,
+                               flist_A = None, flist_B = None):
+        """ get common files in two directories
+        
+            It happens often in ML that there are two directories, A and B,
+            and we are interested to get the flist in both that is common 
+            between them. returns a tuple of two lists of files.
             
-    def get_single(self, var_name, file_index = -1, suffix = None):
+            Parameters
+            ----------
+            :param var_name_A:
+                directory A name
+            :param var_name_B:
+                directory B name
+        """
+        if not flist_A:
+            flist_A = self.get_flist(var_name_A, suffix)
+        if not flist_B:
+            flist_B = self.get_flist(var_name_B, suffix)
+        
+        suffix_A = flist_A[0].suffix
+        suffix_B = flist_B[0].suffix 
+        parent_A = flist_A[0].parent
+        parent_B = flist_B[0].parent
+        
+        fstems_A = [_fst.stem for _fst in flist_A]
+        fstems_B = [_fst.stem for _fst in flist_B]
+        
+        fstems_A_set = set(fstems_A)
+        fstems_B_set = set(fstems_B)
+        common_stems = list(fstems_A_set.intersection(fstems_B_set))
+
+        flist_A_new = [parent_A / (common_stem + suffix_A) \
+                          for common_stem in common_stems]
+        flist_B_new = [parent_B / (common_stem + suffix_B) \
+                          for common_stem in common_stems]
+
+        return(flist_A_new, flist_B_new)
+
+    # def load(self, parameter_name, suffix = None, flist = None,
+    #              file_index : [int, list[int]] = -1, read_func = None):
+    #     ...
+    
+    def get_text(self, log_name='main_log', flist = None, suffix = 'txt',
+                       file_index : [int, list[int]] = -1):
+        """ get text log files
+            Given the log_name, this function returns the text therein.
+
+            Parameters
+            ----------
+            :param log_name:
+                the log name. If not given then it is the main log.
+            :param flist:
+                you can give a file list in Posix paths, for text files
+            :param suffix: str
+                to search for specifi files
+            :param file_index: int or list[int]
+                a number or a list of numbers for the index of the file 
+                to include, default: -1
+
+        """
+        if isinstance(file_index, int):
+            file_index = [file_index]
+        if not flist:
+            flist = self.get_flist(log_name, suffix)
+        n_files = len(flist)
+        if (n_files>0):
+            txt = []
+            for fcnt in file_index:
+                with open(flist[int(fcnt)]) as f_txt:
+                    txt.append(f_txt.readlines())
+            if(n_files == 1):
+                txt = txt[0]
+            return txt
+
+    def get_single(self, var_name, file_index = -1, 
+                   suffix = None, read_func = None, verbose = False):
         """ get a single variable
             return the value of a saved variable.
 
@@ -120,27 +178,37 @@ class logviewer:
                 If there are different suffixes availble for a variable
                 this input needs to be set. npy, npz, mat, and torch are
                 supported.
-                
+            :param read_func:
+                a function that takes the Posix path and returns data
             .. note::
                 when reading a MATLAB file, the output is a dictionary.
+                Also when reading a npz except if it is made by log_var
         """
         assert file_index == int(file_index), \
                     f'file_index {file_index} must be an integer'
         flist = self.get_flist(var_name, suffix)
         var_path = None
         if flist:
+            if len(flist)>1:
+                if verbose:
+                    self.logger(  f'There are {len(flist)} files, logged with'
+                                + f' name {var_name}.'
+                                + f' The given index is {file_index}.')
             var_path = flist[file_index]
     
             if(var_path.is_file()):
-                self.logger(f'Loading {var_path}')
+                if verbose:
+                    self.logger(f'Loading {var_path}')
+                if read_func is not None:
+                    return read_func(var_path)
                 if(var_path.suffix == '.npz'):
                     buf = np.load(var_path)
-                    try:
+                    try: #check if it is made by log_var
+                        assert len(buf.files) == 2
                         time_array = buf['time_array']
-                        n_logs = (time_array > 0).sum()
-                        time_array = time_array[:n_logs]
                         data_array = buf['data_array']
-                        data_array = data_array[:n_logs]
+                        data_array = data_array[time_array > 0]
+                        time_array = time_array[time_array > 0]
                         return((time_array, data_array))
                     except:
                         return(buf)
@@ -149,11 +217,9 @@ class logviewer:
                 if(var_path.suffix == '.mat'):
                     from scipy.io import loadmat
                     return(loadmat(var_path))
-                if( (var_path.suffix == '.txt')
-                   |(var_path.suffix == '.pdb')
-                   |(var_path.suffix == '.json')):
-                    with open(var_path) as f_txt:
-                        return(f_txt.read())
+                if(var_path.suffix == '.dm4'):
+                    from hyperspy.api import load as hyperspy_api_load
+                    return hyperspy_api_load(filename)
                 if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
                     from tifffile import imread
                     return(imread(var_path))
@@ -165,7 +231,10 @@ class logviewer:
                     img = imread(var_path)
                     return(img)
                 except:
-                    var_path = None
+                    pass
+                # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
+                #     return var_path.read_text()
+                return var_path.read_text()
             else:
                 var_path = None
                 
@@ -174,9 +243,7 @@ class logviewer:
                         f'or directory in the log_dir: {self.log_dir}')
     
     def get_stack_of_files(self, 
-        var_name = None, flist = [], suffix = None,
-        return_data = False, return_flist = True, read_func = None,
-        data_makes_a_block = True, verbose = True):
+        var_name = None, flist = [], suffix = None, read_func = None):
        
         """ Get list or data of all files in a directory
        
@@ -198,36 +265,21 @@ class logviewer:
                 the suffix of files to look for, e.g. 'txt'
             :type siffix: str
            
-            :param return_data:
-                    with flist you can limit the data that is returned.
-                    Otherwise the data for all files in the directory will be
-                    returned
-            :param return_flist:
-                    Maybe you are only intrested in the flist.
-                   
-            :param data_makes_a_block:
-                    if you know that the shape of all numpy arrays in files, or
-                    images are the same, set this as true and receive a numpy
-                    array. Otherwise returns a list. default: False
+            :param read_func:
+                the function that takes the posix path of a file and returns
+                the data in there.
            
             Output
             ----------
            
-                It returns a tuple, (dataset, flist),
-                dataset will be a list of files contains or numpy array in
-                case all files produce same shape numpy arrays.
-                flist is type pathlib.Path
-           
+                It returns a list of data in all files or a numpy array if 
+                concatenation of all is possible.
         """
         if not flist:
             flist = self.get_flist(var_name, suffix)
         
         if flist:
-            flist.sort()
             n_files = len(flist)
-            if((not return_data) & return_flist):
-                return(flist)
-           
             if(read_func is None):
                 try:
                     fdata = np.load(flist[0])
@@ -241,77 +293,19 @@ class logviewer:
                     read_func = imread
                 except:
                     pass
-            if(read_func is not None):
-                assert callable(read_func), \
-                    f'given read_func: {read_func} is not callable.'
-                fdata = read_func(flist[0])
-                if(data_makes_a_block):
-                    dataset = np.zeros((n_files, ) + fdata.shape,
-                                       dtype=fdata.dtype)
-                    if(verbose):
-                        self.logger(f'logviewer: Reading dataset from '
-                                    f'{flist[0].parent}'
-                                    f', the shape would be: {dataset.shape}')
-                    for fcnt, fpath in enumerate(flist):
-                        try:
-                            dataset[fcnt] = read_func(fpath)
-                        except e:
-                            self.logger(
-                                'I cannot concatenate the data I just read on'
-                                ' top of last files data. You need to set'
-                                ' data_makes_a_block = False in the input'
-                                f' of get_stack_of_files({var_name}, ...)'
-                                ' This will return a list of data of files')
-                            raise e
-                else:
-                    dataset = [read_func(fpath) for fpath in flist]
-                if(return_flist):
-                    return(dataset, flist)
-                else:
-                    return(dataset)
-            else:
-                if(verbose):
-                    self.logger(f'File {flist[0].name} cannot be opened by '\
-                          + r'np.load() or plt.imread(), provide read_func.')
+            try:
+                read_func(flist[0])
+            except e:
+                self.logger(f'The data file {flist[0]} could not be opened.'
+                            'Please provide a read_function in the input.')
+                raise e
+            dataset = [read_func(fpath) for fpath in flist]
+            try:
+                dataset = np.array(dataset)
+            except:
+                pass
+            return(dataset)
 
-    def get_common_files(self, var_name_A, var_name_B):
-        """ get common files in two directories
-        
-            It happens often in ML that there are two directories, A and B,
-            and we are interested to get the flist in both that is common 
-            between them. returns a tuple of two lists of files.
-            
-            Parameters
-            ----------
-            :param var_name_A:
-                directory A name
-            :param var_name_B:
-                directory B name
-        """
-        flist_A = self.get_stack_of_files(
-            var_name_A, return_data = False, return_flist = True)
-        flist_B = self.get_stack_of_files(
-            var_name_B, return_data = False, return_flist = True)
-        
-        suffix_A = flist_A[0].suffix
-        suffix_B = flist_B[0].suffix 
-        parent_A = flist_A[0].parent
-        parent_B = flist_B[0].parent
-        
-        fstems_A = [_fst.stem for _fst in flist_A]
-        fstems_B = [_fst.stem for _fst in flist_B]
-        
-        fstems_A_set = set(fstems_A)
-        fstems_B_set = set(fstems_B)
-        common_stems = list(fstems_A_set.intersection(fstems_B_set))
-
-        flist_A_new = [parent_A / (common_stem + suffix_A) \
-                          for common_stem in common_stems]
-        flist_B_new = [parent_B / (common_stem + suffix_B) \
-                          for common_stem in common_stems]
-
-        return(flist_A_new, flist_B_new)
-    
     def replace_time_with_index(self, var_name):
         """ index in file names
             lognflow uses time stamps to make new log files for a variable.
@@ -342,7 +336,7 @@ class logviewer:
                 fpath_new = flist[fcnt].parent / fname_new
                 # self.log_text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
-    
+        
     def __repr__(self):
         return f'{self.log_dir}'
 

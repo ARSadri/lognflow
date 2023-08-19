@@ -36,16 +36,19 @@ before storing into the directory using log_var(name, var).
 
 """
 
-import pathlib
+from pathlib import Path as pathlib_Path
 import time
-import itertools
+from itertools import product as itertools_product
 from   dataclasses import dataclass
 import numpy as np
+from sys import platform as sys_platform
+from os import system as os_system
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
-from .utils import repr_raw, replace_all, select_directory
+from .utils import (
+    repr_raw, replace_all, select_directory, multichannel_to_frame)
 from .plt_utils import plt_colorbar, plt_hist
 
 from .logviewer import logviewer
@@ -62,7 +65,7 @@ class varinlog:
 @dataclass
 class textinlog:
     to_be_logged        : str   
-    log_fpath           : pathlib.Path         
+    log_fpath           : pathlib_Path         
     log_size_limit      : int 
     log_size            : int     
     last_log_flush_time : float
@@ -131,8 +134,8 @@ class lognflow:
     """
     
     def __init__(self, 
-                 logs_root        : pathlib.Path = None,
-                 log_dir          : pathlib.Path = None,
+                 logs_root        : pathlib_Path = None,
+                 log_dir          : pathlib_Path = None,
                  log_dir_prefix   : str          = None,
                  log_dir_suffix   : str          = None,
                  time_tag         : bool         = True,
@@ -167,13 +170,13 @@ class lognflow:
                 else:
                     log_dir_name += f'{log_dir_suffix}'
                 self.log_dir = \
-                    pathlib.Path(logs_root) / log_dir_name
+                    pathlib_Path(logs_root) / log_dir_name
                 if(not self.log_dir.is_dir()):
                     new_log_dir_found = True
                 else:
                     self._init_time = time.time()
         else:
-            self.log_dir = pathlib.Path(log_dir)
+            self.log_dir = pathlib_Path(log_dir)
         if(not self.log_dir.is_dir()):
             self.log_dir.mkdir(parents = True, exist_ok = True)
         assert self.log_dir.is_dir(), \
@@ -188,12 +191,70 @@ class lognflow:
 
         self.log_name = main_log_name
         self.log_flush_period = log_flush_period
-        self.save = self.log_single
     
-    def savez(self, *args, **kwargs):
-        kwargs['suffix'] = 'npz'
-        return self.save(*args, **kwargs)
+        self.log_dir_str = str(self.log_dir.absolute())
+    
+    def name_from_file(self, fpath):
+        """ 
+            Given a fpath inside the logger log_dir, what would be its
+            equivalent parameter_name?
+        """
+        fpath_str = str(fpath.absolute())
+        log_dir_str = None
+        if self.log_dir_str in fpath_str:
+            log_dir_str = self.log_dir_str
+        if (self.log_dir_str + '/') in fpath_str:
+            log_dir_str = self.log_dir_str + '/'
+        if log_dir_str:
+            fpath_name = fpath_str.split(log_dir_str)[-1]
+            fpath_split = fpath_name.split('.')
+            return '.'.join(fpath_split[:-1])
+
+    def copy(self, parameter_name, source, suffix = None, 
+             time_tag: bool = None):
+        """ copy into a new file
+            Given a parameter_name, the second argument will be copied into
+            the first. We will try syntaxes os_system('cp') and copy for
+            Windows.
+            
+            :param parameter_name: str
+                examples: myvar or myscript/myvar
+                parameter_name can be just a name e.g. myvar, or could be a
+                path like name such as myscript/myvar.
+            :param source: str
+                if source.is_file() then it is copied into its new location.
+                Otherwise, we use logger.logged.get_flist(source, suffix) to 
+                obtain a list of files matching the source and copy them into
+                their new location.
+        """
+        try:
+            if source.is_file():
+                flist = [source]
+        except:
+            flist = self.logged.get_flist(source, suffix)
+        assert flist, 'source could not be found to copy'
+
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, suffix)
         
+        for fpath in flist:
+            if len(param_name) == 0:
+                new_param_name = fpath.stem
+            else:
+                new_param_name = param_name
+            if suffix is None:
+                suffix = fpath.suffix
+            fpath_dest = self._get_fpath(param_dir, new_param_name, 
+                                         suffix, time_tag)
+            
+            if sys_platform == "linux" or sys_platform == "linux2":
+                os_system(f'cp {fpath} {fpath_dest}')
+            elif sys_platform == "darwin":
+                os_system(f'cp {fpath} {fpath_dest}')
+            elif sys_platform == "win32":
+                os_system(f'copy {fpath} {fpath_dest}')
+            
     @property
     def time_stamp(self):
         """ Current time stamp
@@ -229,7 +290,8 @@ class lognflow:
             if(self.log_dir_suffix is None):
                 log_dir_name_with_suffix = log_dir_name + f'{self._init_time}'
             else:
-                log_dir_name_with_suffix = log_dir_name + f'{self.log_dir_suffix}'
+                log_dir_name_with_suffix = \
+                    log_dir_name + f'{self.log_dir_suffix}'
             if self.log_dir.name == log_dir_name_with_suffix:
                 log_dir_name += new_name
                 if log_dir_name[-1] != '_':
@@ -309,16 +371,14 @@ class lognflow:
     
         return(param_dir, param_name, param_suffix)
 
-    def _get_fpath(self, param_dir: pathlib.Path, param_name: str = None, 
-                   suffix: str = None, time_tag: bool = None) -> pathlib.Path:
+    def _get_fpath(self, param_dir: pathlib_Path, param_name: str = None, 
+                   suffix: str = None, time_tag: bool = None) -> pathlib_Path:
         
         time_tag = self.time_tag if (time_tag is None) else time_tag
         
         _param_dir = self.log_dir / param_dir
         
         if(not _param_dir.is_dir()):
-            self.log_text(self.log_name,
-                          f'Creating directory: {_param_dir.absolute()}')
             _param_dir.mkdir(parents = True, exist_ok = True)
             
         if(param_name is not None):
@@ -337,6 +397,14 @@ class lognflow:
         else:
             return _param_dir
         
+    def _get_dirnamesuffix(self, param_dir, param_name, suffix):
+        log_dirnamesuffix = param_name
+        if(len(param_dir) > 0):
+            log_dirnamesuffix = param_dir + '/' + log_dirnamesuffix
+        if(len(suffix) > 0):
+            log_dirnamesuffix = log_dirnamesuffix + '.' + suffix
+        return log_dirnamesuffix
+            
     def _log_text_handler(self, log_name: str, 
                          log_size_limit: int = int(1e+7),
                          time_tag: bool = None,
@@ -349,7 +417,10 @@ class lognflow:
             log_name, suffix)
         if suffix is None:
             suffix = 'txt'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
+        
         
         fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
         self._loggers_dict[log_dirnamesuffix] = textinlog(
@@ -379,7 +450,8 @@ class lognflow:
             log_name, suffix)
         if suffix is None:
             suffix = 'txt'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
         
         curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         
@@ -451,7 +523,8 @@ class lognflow:
             log_name, suffix)
         if suffix is None:
             suffix = 'txt'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
 
         if ( (not (log_dirnamesuffix in self._loggers_dict)) or new_file):
             self._log_text_handler(log_dirnamesuffix, 
@@ -492,14 +565,14 @@ class lognflow:
         self.log_text_flush(log_dirnamesuffix, flush)        
 
         if(log_size >= curr_textinlog.log_size_limit):
-            self._log_text_handler(log_dirnamesuffix, 
-                                   log_size_limit = curr_textinlog.log_size_limit,
-                                   time_tag = curr_textinlog.time_tag,
-                                   suffix = suffix)
+            self._log_text_handler(
+                log_dirnamesuffix, 
+                log_size_limit = curr_textinlog.log_size_limit,
+                time_tag = curr_textinlog.time_tag,
+                suffix = suffix)
             curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         return curr_textinlog.log_fpath
                         
-
     def _get_log_counter_limit(self, param, log_size_limit):
         cnt_limit = int(log_size_limit/(param.size*param.itemsize))
         return cnt_limit
@@ -539,7 +612,8 @@ class lognflow:
             parameter_name, suffix)
         if(suffix is None):
             suffix = 'npz'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
         
         log_counter_limit = self._get_log_counter_limit(\
             parameter_value, log_size_limit)
@@ -601,7 +675,8 @@ class lognflow:
             parameter_name, suffix)
         if(suffix is None):
             suffix = 'npz'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
         
         _param_dir = self._get_fpath(param_dir)
         
@@ -639,7 +714,8 @@ class lognflow:
             parameter_name, suffix)
         if(suffix is None):
             suffix = 'npz'
-        log_dirnamesuffix = param_dir + '/' + param_name + '.' + suffix
+        log_dirnamesuffix = self._get_dirnamesuffix(
+            param_dir, param_name, suffix)
         
         _var = self._vars_dict[log_dirnamesuffix]
         data_array = _var.data_array[_var.time_array>0].copy()
@@ -679,7 +755,8 @@ class lognflow:
         """
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        param_dir, param_name, suffix = self._param_dir_name_suffix(parameter_name, suffix)
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, suffix)
         if(suffix is None):
             if isinstance(parameter_value, (np.ndarray, int, float)):
                 suffix = 'npy'
@@ -742,8 +819,8 @@ class lognflow:
         except:
             if(close_plt):
                 plt.close()
-            self.log_text(self.log_name,
-                          f'Cannot save the plt instance {parameter_name}.')
+            self.log_text(
+                None, f'Cannot save the plt instance {parameter_name}.')
             return None
      
     def log_multichannel_by_subplots(self, 
@@ -857,8 +934,7 @@ class lognflow:
                         
             return fpath
         except:
-            self.log_text(self.log_name,
-                          f'Cannot plot variable {parameter_name}.')
+            self.log_text(None, f'Cannot plot variable {parameter_name}.')
             return None
     
     def log_hist(self, parameter_name: str, 
@@ -1002,7 +1078,7 @@ class lognflow:
                     time_tag = time_tag)
             return fpath
         except:
-            self.log_text(self.log_name,
+            self.log_text(None,
                 f'Cannot make the hexbin for variable {parameter_name}.')
             return None
         
@@ -1066,11 +1142,13 @@ class lognflow:
                     plt.setp(ax, xticks=[], yticks=[])
             else:
                 fig, ax = plt.subplots(1, 2)
-                im = ax[0].imshow(np.real(parameter_value), cmap = cmap, **kwargs)
+                im = ax[0].imshow(np.real(parameter_value), 
+                                  cmap = cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
                 ax[0].set_title('Real')    
-                im = ax[1].imshow(np.imag(parameter_value), cmap = cmap, **kwargs)
+                im = ax[1].imshow(np.imag(parameter_value), 
+                                  cmap = cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
                 ax[1].set_title('Imag')
@@ -1090,87 +1168,6 @@ class lognflow:
                 f'{parameter_value.shape}')
             return
 
-    def multichannel_to_square(self, stack, borders = 0):
-        return self.multichannel_to_frame(stack, 
-                              frame_shape = None, borders = borders)
-
-    def multichannel_to_frame(self, stack, 
-                              frame_shape : tuple = None, borders = 0):
-        """ turn a stack of multi-channel images into a frame of images
-            This is very useful when lots of images need to be tiled
-            against each other.
-        
-            :param stack: np.ndarray
-                    It must have the shape of either
-                    n_r x n_c x n_ch
-                    n_r x n_c x  3  x n_ch
-                    n_f x n_r x n_c x n_ch
-                    n_f x n_r x n_c x  3  x n_ch
-                    
-                In both cases n_ch will be turned into a square tile
-                Remember if you have N images to put into a square, the input
-                shape should be 1 x n_r x n_c x N
-            :param frame_shape: tuple
-                The shape of the frame to put n_rows and n_colmnss of images
-                close to each other to form a rectangle of image.
-            :param borders: literal or np.inf or np.nan
-                When plotting images with matplotlib.pyplot.imshow, there
-                needs to be a border between them. This is the value for the 
-                border elements.
-                
-            output
-            ---------
-                Since we have N channels to be laid into a square, the side
-                length woul be ceil(N**0.5)
-                it produces an np.array of shape n_f x n_r * S x n_c * S or
-                n_f x n_r * S x n_c * S x 3 in case of RGB input.
-        """
-        if(len(stack.shape) == 4):
-            if(stack.shape[3] == 3):
-                stack = np.array([stack])
-        if(len(stack.shape) == 3):
-            stack = np.array([stack])
-        
-        if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-            if(len(stack.shape) == 4):
-                n_imgs, n_R, n_C, n_ch = stack.shape
-            if(len(stack.shape) == 5):
-                n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
-                if(is_rgb != 3):
-                    return None
-            if(frame_shape is None):
-                square_side = int(np.ceil(np.sqrt(n_ch)))
-                frame_n_r, frame_n_c = (square_side, square_side)
-            else:
-                frame_n_r, frame_n_c = frame_shape
-            
-            new_n_R = n_R * frame_n_r
-            new_n_C = n_C * frame_n_c
-            if(len(stack.shape) == 4):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C), 
-                                dtype = stack.dtype)
-            if(len(stack.shape) == 5):
-                canv = np.zeros((n_imgs, new_n_R, new_n_C, 3),
-                                 dtype = stack.dtype)
-            used_ch_cnt = 0
-            if(borders is not None):
-                stack[:,   :1      ] = borders
-                stack[:,   : ,   :1] = borders
-                stack[:, -1:       ] = borders
-                stack[:,   : , -1: ] = borders
-            
-            for rcnt in range(frame_n_r):
-                for ccnt in range(frame_n_c):
-                    ch_cnt = rcnt + frame_n_c*ccnt
-                    if (ch_cnt<n_ch):
-                        canv[:, rcnt*n_R: (rcnt + 1)*n_R,
-                                ccnt*n_C: (ccnt + 1)*n_C] = \
-                            stack[..., used_ch_cnt]
-                        used_ch_cnt += 1
-        else:
-            return None
-        return canv
-
     def _handle_images_stack(self, stack, borders = 0):
         canv = None
         if(len(stack.shape) == 2):
@@ -1181,7 +1178,7 @@ class lognflow:
             else:
                 canv = stack
         if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-            canv = self.multichannel_to_frame(stack, borders = borders)
+            canv = multichannel_to_frame(stack, borders = borders)
         return canv
     
     def prepare_stack_of_images(self, 
@@ -1234,7 +1231,8 @@ class lognflow:
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
             element of the list is supposed to be iteratable by the first
-            dimension, which should be the same sie for all elements in the list.
+            dimension, which should be the same size for all elements in 
+            the list.
             This function will start putting them in coloumns of a canvas.
             If you have an image with many channels, call 
             prepare_stack_of_images on the list to make a large single
@@ -1292,7 +1290,6 @@ class lognflow:
         else:
             gs1.update(wspace=0.025, hspace=0) 
         
-        canvas_mask_warning = False
         for img_cnt in range(n_imgs):
             for stack_cnt in range(n_stacks):
                 ax1 = plt.subplot(gs1[stack_cnt, img_cnt])
@@ -1306,15 +1303,12 @@ class lognflow:
                         if(data_canvas.shape == mask.shape):
                             data_canvas[mask==0] = 0
                             data_canvas_stat = data_canvas[mask>0]
-                        elif(not canvas_mask_warning):
-                            self.log_text(self.log_name,\
-                                'The mask shape is different from the canvas.' \
-                                + ' No mask will be applied.')
-                            canvas_mask_warning = True
                 else:
                     data_canvas_stat = data_canvas.copy()
-                data_canvas_stat = data_canvas_stat[np.isnan(data_canvas_stat) == 0]
-                data_canvas_stat = data_canvas_stat[np.isinf(data_canvas_stat) == 0]
+                data_canvas_stat = data_canvas_stat[
+                    np.isnan(data_canvas_stat) == 0]
+                data_canvas_stat = data_canvas_stat[
+                    np.isinf(data_canvas_stat) == 0]
                 vmin = data_canvas_stat.min()
                 vmax = data_canvas_stat.max()
                 im = ax1.imshow(data_canvas, 
@@ -1385,15 +1379,16 @@ class lognflow:
                 from lognflow import lognflow
                 logger = lognflow(log_roots or log_dir)
                 logger.plot_confusion_matrix(\
-                    cm           = cm,                  # confusion matrix created by
-                                                        # sklearn.metrics.confusion_matrix
-                    target_names = y_labels_vals,       # list of names of the classes
+                    cm           = cm,        # confusion matrix created by
+                                              # sklearn.metrics.confusion_matrix
+                    target_names = y_labels_vals, # list of names of the classes
                     title        = best_estimator_name) # title of graph
                         
         
             Credit
             ------
-                http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+                http://scikit-learn.org/stable/auto_examples/
+                    model_selection/plot_confusion_matrix.html
     
         """
         accuracy = np.trace(cm) / np.sum(cm).astype('float')
@@ -1416,7 +1411,7 @@ class lognflow:
             plt.xticks(tick_marks, target_names, rotation=45)
             plt.yticks(tick_marks, target_names)
     
-        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
             clr = np.array([1, 1, 1, 0]) \
                   * (cm[i, j] - cm.min()) \
                       / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
@@ -1498,3 +1493,22 @@ class lognflow:
 
     def __bool__(self):
         return self.log_dir.is_dir()
+
+    def save(self, parameter_name: str, 
+                   parameter_value,
+                   suffix = None,
+                   mat_field = None,
+                   time_tag: bool = None):
+        return self.log_single(parameter_name = parameter_name, 
+                               parameter_value = parameter_value,
+                               suffix = suffix,
+                               mat_field = mat_field,
+                               time_tag = time_tag)
+
+    def savez(self, parameter_name: str, 
+                   parameter_value,
+                   time_tag: bool = None):
+        return self.log_single(parameter_name = parameter_name, 
+                               parameter_value = parameter_value,
+                               suffix = 'npz',
+                               time_tag = time_tag)

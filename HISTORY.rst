@@ -151,3 +151,11 @@ History
 0.8.6 (2023-08-04)
 -----------------
 * plt_utils was not added tp 0.8.5
+
+0.9.0 (2023-08-09)
+-----------------
+* copy() is now possible from a file or a variable name into another
+* default suffix in get_flist is *
+* logviewer.get_stack_of_files is only useful for reading data.
+* more tests are added.
+* moved multichannel_to_frame to utils

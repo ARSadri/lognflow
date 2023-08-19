@@ -1,30 +1,14 @@
 #!/usr/bin/env python
 
 """Tests for `lognflow` package."""
+import pytest
 
 import time
-import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-
 from lognflow import lognflow, logviewer, printprogress, select_directory
-
 import tempfile
 temp_dir = tempfile.gettempdir()
-
-@pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
 
 def test_lognflow_conflict_in_names():
     logger = lognflow(temp_dir)
@@ -294,26 +278,66 @@ def test_replace_time_with_index():
     
     logged = logviewer(logger.log_dir, logger)
 
-    data_in, flist = logged.get_stack_of_files(
-        'test_param', return_data=True, return_flist=True)
+    flist = logged.get_flist('test_param')
+    data_in = logged.get_stack_of_files('test_param')
     
     logger(flist)
 
     logger.logged.replace_time_with_index('test_param')
     
-    data_out, flist = logged.get_stack_of_files(
-        'test_param', return_data=True, return_flist=True)
+    flist = logged.get_flist('test_param')
+    data_out = logged.get_stack_of_files(flist = flist)
     
     logger(flist)
     
     logger(data_in)
     logger(data_out)
+
+def test_copy_file():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for logviewer')
     
+    var = np.random.rand(10)
+    fpath = logger.log_single('var', var, suffix = 'txt')
+    
+    logger.copy('myvar/varvar', fpath, suffix = 'pdb', 
+             time_tag= True)
+    
+    var_check = logger.logged.get_single('myvar/varvar')
+    assert str(var) == var_check
+    
+def test_copy_list_of_files():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for logviewer')
+    
+    logger.log_single('test/var', np.random.rand(10), suffix = 'txt')
+    logger.log_single('test/var', np.random.rand(10), suffix = 'fasta')
+    logger.log_single('test/var', np.random.rand(10), suffix = 'json')
+    logger.log_single('test/var', np.random.rand(10), suffix = 'txt')
+    
+    logger.copy('myvar/', 'test/var', suffix = 'pdb', time_tag = False)
+    
+    for test_cnt in range(4):
+        var_check1 = logger.logged.get_single('test/var', file_index = test_cnt)
+        var_check2 = logger.logged.get_single('myvar/var', file_index = test_cnt)
+        assert var_check1 == var_check2
+    
+def test_log_multichannel_by_subplots():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for log_multichannel_by_subplots')
+    images = np.random.rand(100, 100, 20)
+    logger.log_multichannel_by_subplots('images', images, (4, 5))
+
 if __name__ == '__main__':
     
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_log_multichannel_by_subplots()
+    test_replace_time_with_index()
+    test_log_hist()
+    test_copy_list_of_files()
+    test_copy_file()
     test_log_var()
     test_log_text()
     test_log_single()
@@ -329,10 +353,8 @@ if __name__ == '__main__':
     test_log_flush_period()
     test_log_var_without_time_stamp()
     test_log_animation()
-    test_log_hist()
     test_log_scatter3()
     test_log_plt()
     test_log_hexbin()
     test_log_canvas()
     test_log_confusion_matrix()
-    test_replace_time_with_index()
