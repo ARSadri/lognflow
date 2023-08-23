@@ -329,7 +329,6 @@ def test_log_multichannel_by_subplots():
     logger.log_multichannel_by_subplots('images', images, (4, 5))
 
 if __name__ == '__main__':
-    
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#

@@ -47,7 +47,8 @@ class printprogress:
         self.method = method
         self.in_print_function = print_function
         if(n_steps != int(n_steps)):
-            self._print_func('textProgBar takes integers no less than 2 ')
+            self._print_func(
+                r'printprogress takes integers no less than 2 as n_steps.')
             n_steps = int(n_steps)
         if(n_steps<2):
             n_steps = 2
@@ -75,6 +76,7 @@ class printprogress:
         self._print_func(' \\')
         
         self._print_func(' ', end = '')
+        self.len_prog_text = 0
     
     def _print_func(self, text, end='\n'):
         if (self.in_print_function is not None):
@@ -93,7 +95,8 @@ class printprogress:
     
     def __call__(self, ck=1):
         """ ticking the progress bar
-            just call the object and the progress bar moves one ahead when ready.
+            just call the object and the progress bar moves ck steps
+            ahead when ready.
             
             output
             ~~~~~~
@@ -104,12 +107,12 @@ class printprogress:
         if(self.FLAG_ended):
             if(not self.FLAG_warning):
                 self.FLAG_warning = True
-                self._print_func('-' * self.numTicks)
+                self._print_func('-' * (self.numTicks + 2))
         else:
             self.ck += ck
             if(self.ck <= self.n_steps):
                 remTimeS = self._calc_ETA() # useful when print_function is None
-                cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)    
+                cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)
                 #3: because 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
@@ -118,27 +121,33 @@ class printprogress:
                         progStr = "%02d" % int(ceil(remTimeS/86400))
                         self._print_func(progStr, end='')
                         self._print_func('d', end='')
+                        self.len_prog_text += 3
                     elif(remTimeS>5940): # less than 99h and more than 99m
                         progStr = "%02d" % int(ceil(remTimeS/3600))
                         self._print_func(progStr, end='')
                         self._print_func('h', end='')
+                        self.len_prog_text += 3
                     elif(remTimeS>99): # less than 99m and more than 99s
                         progStr = "%02d" % int(ceil(remTimeS/60))
                         self._print_func(progStr, end='')
                         self._print_func('m', end='')
+                        self.len_prog_text += 3
                     elif(remTimeS>=0): # less than 99s and more than 0
                         progStr = "%02d" % int(ceil(remTimeS))
                         self._print_func(progStr, end='')
                         self._print_func('s', end='')
+                        self.len_prog_text += 3
                     else:
-                        self.end()
-            if(self.ck >= self.n_steps):
-                self.end()
+                        self._end()
+            if((self.ck >= self.n_steps) | 
+               (self.len_prog_text >= self.numTicks)):
+                self._end()
         return remTimeS
-    def end(self):
+
+    def _end(self):
         if(not self.FLAG_ended):
             self._print_func('')
             self.FLAG_ended = True
             
     def __del__(self):
-        self.end()
+        self._end()

@@ -277,6 +277,10 @@ class logviewer:
         """
         if not flist:
             flist = self.get_flist(var_name, suffix)
+        else:
+            flist = list(flist)
+            assert pathlib.Path(flist[0]).is_file(), \
+                f'File not found: {flist[0]}. You can use logviewer get_flist'
         
         if flist:
             n_files = len(flist)

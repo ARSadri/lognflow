@@ -159,3 +159,8 @@ History
 * logviewer.get_stack_of_files is only useful for reading data.
 * more tests are added.
 * moved multichannel_to_frame to utils
+
+0.9.1 (2023-09-01)
+-----------------
+* bug removed from plt_utils numbers_as_images_4D.
+* bug removed from printprogress when number of steps is very low.

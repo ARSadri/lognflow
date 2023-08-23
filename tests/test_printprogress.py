@@ -11,26 +11,11 @@ import numpy as np
 import tempfile
 temp_dir = tempfile.gettempdir()
 
-@pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
-
 def test_printprogress():
-    N = 3000000
-    pprog = printprogress(N)
-    for _ in range(N):
-        pprog()
-    # assert input('Did it show you a progress bar? (y for yes)')=='y'
+    for N in list([2, 4, 8, 10, 20, 200, 2000, 20000, 20000000]):
+        pprog = printprogress(N)
+        for _ in range(N):
+            pprog()
 
 def test_printprogress_with_logger():
     logger = lognflow(temp_dir)
@@ -62,8 +47,8 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_printprogress()
     test_printprogress_ETA()
     test_specific_timing()
     test_printprogress_with_logger()
-    test_printprogress()
-    exit()
+    exit()    

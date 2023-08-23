@@ -1473,6 +1473,25 @@ class lognflow:
         for parameter_name in list(self._vars_dict):
             self.log_var_flush(parameter_name)
 
+    def save(self, parameter_name: str, 
+                   parameter_value,
+                   suffix = None,
+                   mat_field = None,
+                   time_tag: bool = None):
+        return self.log_single(parameter_name = parameter_name, 
+                               parameter_value = parameter_value,
+                               suffix = suffix,
+                               mat_field = mat_field,
+                               time_tag = time_tag)
+
+    def savez(self, parameter_name: str, 
+                    parameter_value,
+                    time_tag: bool = None):
+        return self.log_single(parameter_name = parameter_name, 
+                               parameter_value = parameter_value,
+                               suffix = 'npz',
+                               time_tag = time_tag)
+
     def __call__(self, *args, **kwargs):
         """calling the object
             In the case of the following code::
@@ -1493,22 +1512,3 @@ class lognflow:
 
     def __bool__(self):
         return self.log_dir.is_dir()
-
-    def save(self, parameter_name: str, 
-                   parameter_value,
-                   suffix = None,
-                   mat_field = None,
-                   time_tag: bool = None):
-        return self.log_single(parameter_name = parameter_name, 
-                               parameter_value = parameter_value,
-                               suffix = suffix,
-                               mat_field = mat_field,
-                               time_tag = time_tag)
-
-    def savez(self, parameter_name: str, 
-                   parameter_value,
-                   time_tag: bool = None):
-        return self.log_single(parameter_name = parameter_name, 
-                               parameter_value = parameter_value,
-                               suffix = 'npz',
-                               time_tag = time_tag)
