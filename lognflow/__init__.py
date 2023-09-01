@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.9.1'
+__version__ = '0.10.0'
 
 from .lognflow import lognflow
 from .logviewer import logviewer
@@ -11,3 +11,4 @@ from .plt_utils import plt_colorbar
 from .utils import (
     select_directory, select_file, repr_raw, replace_all, 
     text_to_object, multichannel_to_frame)
+from .multiprocessor import multiprocessor

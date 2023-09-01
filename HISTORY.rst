@@ -160,7 +160,12 @@ History
 * more tests are added.
 * moved multichannel_to_frame to utils
 
-0.9.1 (2023-09-01)
+0.9.1 (2023-08-25)
 -----------------
 * bug removed from plt_utils numbers_as_images_4D.
-* bug removed from printprogress when number of steps is very low.
+* bug removed from printprogress when number of steps is very small.
+
+0.10.0 (2023-09-01)
+-----------------
+* I added multiprocessor to lognflow
+* bug fixed in logviewer

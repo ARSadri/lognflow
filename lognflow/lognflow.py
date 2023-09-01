@@ -35,23 +35,21 @@ numpy variables that don't change size can be buffered up to a certain size
 before storing into the directory using log_var(name, var).
 
 """
-
-from pathlib import Path as pathlib_Path
 import time
-from itertools import product as itertools_product
-from   dataclasses import dataclass
 import numpy as np
-from sys import platform as sys_platform
-from os import system as os_system
-
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from   matplotlib import animation
-from .utils import (
-    repr_raw, replace_all, select_directory, multichannel_to_frame)
-from .plt_utils import plt_colorbar, plt_hist
+from   pathlib import Path as pathlib_Path
+from   itertools import product as itertools_product
+from   dataclasses import dataclass
+from   sys import platform as sys_platform
+from   os import system as os_system
 
-from .logviewer import logviewer
+from   .utils import (
+    repr_raw, replace_all, select_directory, multichannel_to_frame)
+from   .plt_utils import plt_colorbar, plt_hist
+from   .logviewer import logviewer
 
 @dataclass
 class varinlog:
@@ -193,11 +191,18 @@ class lognflow:
         self.log_flush_period = log_flush_period
     
         self.log_dir_str = str(self.log_dir.absolute())
+        self.enabled = True
+        
+    def disable(self):
+        self.enabled = False
+        
+    def enable(self):
+        self.enabled = True
     
     def name_from_file(self, fpath):
         """ 
-            Given a fpath inside the logger log_dir, what would be its
-            equivalent parameter_name?
+            Given an fpath inside the logger log_dir, 
+            what would be its equivalent parameter_name?
         """
         fpath_str = str(fpath.absolute())
         log_dir_str = None
@@ -210,11 +215,11 @@ class lognflow:
             fpath_split = fpath_name.split('.')
             return '.'.join(fpath_split[:-1])
 
-    def copy(self, parameter_name, source, suffix = None, 
+    def copy(self, parameter_name, source, suffix = None,
              time_tag: bool = None):
         """ copy into a new file
             Given a parameter_name, the second argument will be copied into
-            the first. We will try syntaxes os_system('cp') and copy for
+            the first. We will try syntaxes os_system('cp') and 'copy' for
             Windows.
             
             :param parameter_name: str
@@ -227,6 +232,8 @@ class lognflow:
                 obtain a list of files matching the source and copy them into
                 their new location.
         """
+        if not self.enabled: return
+        
         try:
             if source.is_file():
                 flist = [source]
@@ -245,12 +252,10 @@ class lognflow:
                 new_param_name = param_name
             if suffix is None:
                 suffix = fpath.suffix
-            fpath_dest = self._get_fpath(param_dir, new_param_name, 
-                                         suffix, time_tag)
+            fpath_dest = self._get_fpath(
+                param_dir, new_param_name, suffix, time_tag)
             
-            if sys_platform == "linux" or sys_platform == "linux2":
-                os_system(f'cp {fpath} {fpath_dest}')
-            elif sys_platform == "darwin":
+            if sys_platform in ["linux", "linux2", "darwin"]:
                 os_system(f'cp {fpath} {fpath_dest}')
             elif sys_platform == "win32":
                 os_system(f'copy {fpath} {fpath_dest}')
@@ -279,6 +284,8 @@ class lognflow:
             :type append: bool
             
         """
+        if not self.enabled: return
+        
         self.flush_all()
         if(append):
             log_dir_name = ''
@@ -444,6 +451,7 @@ class lognflow:
                 default: False
             :type flush: bool
         """
+        if not self.enabled: return
         log_name = self.log_name if (log_name is None) else log_name
         
         param_dir, param_name, suffix = self._param_dir_name_suffix(
@@ -514,6 +522,7 @@ class lognflow:
             :param suffix: str
                    suffix is the extension of the file name.
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
         log_flush_period = self.log_flush_period \
             if (log_flush_period is None) else log_flush_period
@@ -603,6 +612,7 @@ class lognflow:
                     log_size_limit in bytes, default: 1e+7.
                     
         """
+        if not self.enabled: return
         try:
             _ = parameter_value.shape
         except:
@@ -671,6 +681,7 @@ class lognflow:
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
         """
+        if not self.enabled: return
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
         if(suffix is None):
@@ -710,6 +721,7 @@ class lognflow:
                 tuple of two nd.arrays
         
         """
+        if not self.enabled: return
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
         if(suffix is None):
@@ -753,6 +765,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
         param_dir, param_name, suffix = self._param_dir_name_suffix(
@@ -805,6 +818,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         param_dir, param_name, image_format = \
@@ -848,7 +862,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
-        
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         n_r, n_c, n_ch = parameter_value.shape
@@ -900,6 +914,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         try:
@@ -969,6 +984,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         plt_hist(parameter_value_list, 
@@ -998,6 +1014,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         fig = plt.figure()
@@ -1029,6 +1046,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
             rest of the parameters (**kwargs) will be passed to plot_surface() 
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         from mpl_toolkits.mplot3d import Axes3D
@@ -1063,8 +1081,8 @@ class lognflow:
                     grid size is the number of bins in 2D
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
-                    
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
         try:
@@ -1102,8 +1120,8 @@ class lognflow:
                     * (n, m, 3, ch)
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
-                    
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         parameter_value = parameter_value.squeeze()
@@ -1137,7 +1155,7 @@ class lognflow:
                 fig, ax = plt.subplots()
                 im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
                 if(colorbar):
-                    plt.colorbar(im)
+                    plt_colorbar(im)
                 if(remove_axis_ticks):
                     plt.setp(ax, xticks=[], yticks=[])
             else:
@@ -1207,7 +1225,8 @@ class lognflow:
             :param borders: float
                     borders between tiles will be filled with this variable
                     default: np.nan
-        """        
+        """
+        if not self.enabled: return        
         list_of_stacks = list(list_of_stacks)
         for cnt, stack in enumerate(list_of_stacks):
             stack = self._handle_images_stack(stack, borders = borders)
@@ -1267,6 +1286,7 @@ class lognflow:
                     Wheather if the time stamp is in the file name or not.
                     
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         try:
@@ -1391,6 +1411,7 @@ class lognflow:
                     model_selection/plot_confusion_matrix.html
     
         """
+        if not self.enabled: return
         accuracy = np.trace(cm) / np.sum(cm).astype('float')
         misclass = 1 - accuracy
     
@@ -1447,6 +1468,7 @@ class lognflow:
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
         """
+        if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
         param_dir, param_name, suffix = self._param_dir_name_suffix(
@@ -1468,6 +1490,7 @@ class lognflow:
         return fpath
 
     def flush_all(self):
+        if not self.enabled: return
         for log_name in list(self._loggers_dict):
             self.log_text_flush(log_name, flush = True)
         for parameter_name in list(self._vars_dict):
@@ -1500,6 +1523,7 @@ class lognflow:
             The text (str(...)) will be passed to the main log text file.
         """
         self.log_text(None, *args, **kwargs)
+        self.flush_all()
 
     def __del__(self):
         try:

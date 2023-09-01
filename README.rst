@@ -30,6 +30,27 @@ The printprogress makes a pretty nice progress bar::
 	for _ in range(N):
 		# do_something()
 		pbar()
+		
+There is also a conviniant way to use multiprocessing in Python. You wish to 
+provide a function and some shared inputs and ask to run the function over 
+those inputs using multiprcessing. The multiprocessor is for you. The 
+following is a masked median of verctors::
+
+	def some_func(idx, shared_inputs):
+        data, mask, statistics_func = shared_inputs
+        _data = data[idx]
+        _mask = mask[idx]
+        vector_to_analyze = _data[_mask==1]
+        to_return = statistics_func(vector_to_analyze)
+        return(np_array([to_return]))
+        
+    data_shape = (1000, 1000000)
+    data = np.random.randn(*data_shape)
+    mask = (2*np.random.rand(*data_shape)).astype('int')
+    statistics_func = np.median
+    
+    shared_inputs = (data, mask, op_type)
+    medians = multiprocessor(some_function, shared_inputs).start()
 
 In this package we use a folder on the HDD to generate files and folders in typical
 formats such as numpy npy and npz, png, ... to log. A log viewer is also availble
