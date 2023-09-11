@@ -55,21 +55,39 @@ those inputs using multiprcessing. The ```multiprocessor``` is for you. The
 following is a masked median of verctors::
 
 ```python 
-	def some_func(idx, shared_inputs):
-        data, mask, statistics_func = shared_inputs
-        _data = data[idx]
-        _mask = mask[idx]
-        vector_to_analyze = _data[_mask==1]
-        to_return = statistics_func(vector_to_analyze)
-        return(np_array([to_return]))
-        
-    data_shape = (1000, 1000000)
-    data = np.random.randn(*data_shape)
-    mask = (2*np.random.rand(*data_shape)).astype('int')
-    statistics_func = np.median
-    
-    shared_inputs = (data, mask, op_type)
-    medians = multiprocessor(some_function, shared_inputs).start()
+
+	def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
+	    vec1, vec2 = inputs_to_iter_sliced
+	    mask, statistics_func = inputs_to_share
+	    vec1 = vec1[mask==1]
+	    vec2 = vec2[mask==1]
+	    
+	    vec1 -= vec1.mean()
+	    vec1_std = vec1.std()
+	    if vec1_std > 0:
+	        vec1 /= vec1_std
+	    vec2 -= vec2.mean()
+	    vec2_std = vec2.std()
+	    if vec2_std > 0:
+	        vec2 /= vec2_std
+	
+	    correlation = vec1 * vec2
+	    to_return = statistics_func(correlation)
+	    return(to_return)
+	
+	def test_multiprocessor_ccorr():
+	    data_shape = (1000, 2000)
+	    data1 = np.random.randn(*data_shape)
+	    data2 = 2 + 5 * np.random.randn(*data_shape)
+	    mask = (2*np.random.rand(data_shape[1])).astype('int')
+	    statistics_func = np.median
+	    
+	    inputs_to_iter = (data1, data2)
+	    inputs_to_share = (mask, statistics_func)
+	    ccorr = multiprocessor(
+	        masked_cross_correlation, inputs_to_iter, inputs_to_share,
+	        test_mode = False)
+	    print(f'ccorr: {ccorr}')
 
 ```
 
