@@ -145,3 +145,79 @@ def numbers_as_images_4D(data4D_shape: tuple[int, int, int, int],
             if(verbose):
                 pBar()
     return dataset
+
+class plot_gaussian_gradient:
+    """ Orignally developed for RobustGaussinFittingLibrary
+    Plot curves by showing their average, and standard deviatoin
+    by shading the area around the average according to a Gaussian that
+    reduces the alpha as it gets away from the average.
+    You need to init() the object then add() plots and then show() it.
+    refer to the tests.py
+    """
+    def __init__(self, xlabel = None, ylabel = None, num_bars = 100, 
+                 title = None, xmin = None, xmax = None, 
+                 ymin = None, ymax = None, fontsize = 14):
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+        self.title = title
+        self.num_bars = num_bars
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ymin = ymin
+        self.ymax = ymax
+        LWidth = 1
+        font = {
+                'weight' : 'bold',
+                'size'   : fontsize}
+        plt.rc('font', **font)
+        params = {'legend.fontsize': 'x-large',
+                 'axes.labelsize': 'x-large',
+                 'axes.titlesize':'x-large',
+                 'xtick.labelsize':'x-large',
+                 'ytick.labelsize':'x-large'}
+        plt.rcParams.update(params)
+        plt.figure(figsize=(8, 6), dpi=50)
+        self.ax1 = plt.subplot(111)
+    
+    def addPlot(self, x, mu, std, gradient_color, label, 
+                snr = 3.0, mu_color = None, general_alpha = 1,
+                mu_linewidth = 1):
+
+        for idx in range(self.num_bars-1):
+            y1 = ((self.num_bars-idx)*mu + idx*(mu + snr*std))/self.num_bars
+            y2 = y1 + snr*std/self.num_bars
+            
+            prob = np.exp(-(snr*idx/self.num_bars)**2/2)
+            plt.fill_between(
+                x, y1, y2, 
+                color = (gradient_color + (prob*general_alpha,)), 
+                edgecolor=(gradient_color + (0,)))
+
+            y1 = ((self.num_bars-idx)*mu + idx*(mu - snr*std))/self.num_bars
+            y2 = y1 - snr*std/self.num_bars
+            
+            plt.fill_between(
+                x, y1, y2, 
+                color = (gradient_color + (prob*general_alpha,)), 
+                edgecolor=(gradient_color + (0,)))
+        if(mu_color is None):
+            mu_color = gradient_color
+        plt.plot(x, mu, linewidth = mu_linewidth, color = mu_color, 
+                 label = label)
+        
+    def show(self, show_legend = True):
+        if(self.xmin is not None) & (self.xmax is not None):
+            plt.xlim([self.xmin, self.xmax])
+        if(self.ymin is not None) & (self.ymax is not None):
+            plt.ylim([self.ymin, self.ymax])
+        if(self.xlabel is not None):
+            plt.xlabel(self.xlabel, weight='bold')
+        if(self.ylabel is not None):
+            plt.ylabel(self.ylabel, weight='bold')
+        if(self.title is not None):
+            plt.title(self.title)
+        if(show_legend):
+            plt.legend()
+        plt.grid()
+        plt.tight_layout()
+        plt.show()

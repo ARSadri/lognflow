@@ -1,10 +1,12 @@
-
+import matplotlib.pyplot as plt
 import lognflow
+import numpy as np
 
 def test_numbers_as_images():
-    dataset_shape = (10, 10, 32, 32)
-    fontsize = 20
-    dataset = lognflow.numbers_as_images(dataset_shape, fontsize)
+    dataset_shape = (10, 10, 64, 64)
+    fontsize = 10
+    dataset = lognflow.plt_utils.numbers_as_images_4D(
+        dataset_shape, fontsize)
 
     ##########################################################################
     n_x, n_y, n_r, n_c = dataset_shape
@@ -19,10 +21,28 @@ def test_numbers_as_images():
                                           width = txt_width))
     plt.show()
 
-    
+def test_plot_gaussian_gradient():
+    print('test_plot_gaussian_gradient')
+    x = np.arange(0, 2, 0.1)
+    mu = x**2
+    std = mu**0.5
+
+    pgg = lognflow.plot_gaussian_gradient()
+    pgg.addPlot(x = x, mu = mu, std = std, 
+                  gradient_color = (1, 0, 0), 
+                  label = 'red',
+                  mu_color = (0.75, 0, 0, 1),
+                  mu_linewidth = 3)
+    pgg.show()
+
 def test_pltfig_to_numpy():
     fig, ax = plt.subplots(111)
     ax[0].imshow(np.random.rand(100, 100))
-    np_data = lognflow.pltfig_to_numpy(fig)
+    np_data = lognflow.plt_utils.pltfig_to_numpy(fig)
     print(np_data.shape)
     
+    
+if __name__ == '__main__':
+    test_plot_gaussian_gradient()
+    test_numbers_as_images()
+    test_pltfig_to_numpy()

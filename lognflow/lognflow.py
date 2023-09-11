@@ -877,10 +877,12 @@ class lognflow:
             plt.setp(ax, xticks=[], yticks=[])
         for rcnt in range(n_ch_r):
             for ccnt in range(n_ch_c):
-                im = parameter_value[:,:, ccnt + rcnt * n_ch_c]
-                im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im_ch)
+                imcnt = ccnt + rcnt * n_ch_c
+                if imcnt < n_ch:
+                    im = parameter_value[:,:, imcnt]
+                    im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
+                    if(colorbar):
+                        plt_colorbar(im_ch)
         if not return_figure:
             return self.log_plt(parameter_name = parameter_name,
                          image_format=image_format, dpi=dpi,
@@ -1102,7 +1104,7 @@ class lognflow:
         
     def log_imshow(self, parameter_name: str, parameter_value, 
                    colorbar = True, remove_axis_ticks = True,
-                   image_format='jpeg', dpi=1200, cmap = 'jet',
+                   image_format='jpeg', dpi=1200, cmap = 'viridis',
                    time_tag: bool = None, borders = 0, **kwargs):
         """log an image
             The image is logged using plt.imshow
@@ -1243,7 +1245,7 @@ class lognflow:
                    text_as_colorbar = False,
                    use_colorbar = False,
                    image_format='jpeg', 
-                   cmap = 'jet',
+                   cmap = 'viridis',
                    dpi=1200,
                    time_tag: bool = None):
         """log a cavas of stacks of images
@@ -1389,7 +1391,7 @@ class lognflow:
             :param cmap: 
                 the gradient of the values displayed from matplotlib.pyplot.cm
                 (http://matplotlib.org/examples/color/colormaps_reference.html)
-                plt.get_cmap('jet') or plt.cm.Blues
+                plt.get_cmap('viridis') or plt.cm.Blues
                 
             :param time_tag: 
                 if True, the file name will be stamped with time

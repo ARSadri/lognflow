@@ -169,3 +169,10 @@ History
 -----------------
 * I added multiprocessor to lognflow
 * bug fixed in logviewer
+
+0.10.1 (2023-09-12)
+-----------------
+* multi_channel_by_subplots bug fixed for non-square shape
+* default colormap is viridis everywhere
+* multiprocessor heavily debugged and made a lot easier to use
+* better tests added for multiprocessor

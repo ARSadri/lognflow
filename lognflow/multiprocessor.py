@@ -1,17 +1,63 @@
 #from-import is necessary to speed up spawning in Windows as much as possible
 from numpy import __name__    as np___name__
 from numpy import array       as np_array
+from numpy import ndarray     as np_ndarray
 from numpy import ceil        as np_ceil
 from numpy import arange      as np_arange
 from numpy import zeros       as np_zeros
 from numpy import minimum     as np_minimum
 from numpy import concatenate as np_concatenate
+from numpy import argsort     as np_argsort
 
 from multiprocessing import Process, Queue, cpu_count
 
 from .printprogress import printprogress
+from psutil._compat import ChildProcessError
 
-class multiprocessor:
+def _multiprocessor_function_test_mode(
+        inputs_to_iter_batch, targetFunction, \
+        inputs_to_share, theQ, procID_range):
+    outputs = []
+    for idx, procCnt in enumerate(procID_range):
+        inputs_to_iter_sliced = ()
+        for iim in inputs_to_iter_batch:
+            inputs_to_iter_sliced = inputs_to_iter_sliced + (iim[idx], )
+        if inputs_to_share is None:
+            results = targetFunction(inputs_to_iter_sliced)
+        else:
+            results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
+        outputs.append(results)
+    theQ.put(list([procID_range, outputs, False]))
+
+def _multiprocessor_function(inputs_to_iter_batch, targetFunction, \
+        inputs_to_share, theQ, procID_range):
+    outputs = []
+    for idx, procCnt in enumerate(procID_range):
+        inputs_to_iter_sliced = ()
+        for iim in inputs_to_iter_batch:
+            inputs_to_iter_sliced = inputs_to_iter_sliced + (iim[idx], )
+        try:
+            if inputs_to_share is None:
+                results = targetFunction(inputs_to_iter_sliced)
+            else:
+                results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
+            outputs.append(results)
+        except Exception as e:
+            theQ.put(list([procID_range, None, True]))
+            return
+    theQ.put(list([procID_range, outputs, False]))
+
+def multiprocessor(
+    targetFunction,
+    inputs_to_iter,
+    inputs_to_share     = None,
+    outputs             = None,
+    max_cpu             = None,
+    batchSize           = None,
+    concatenate_outputs = True,
+    verbose             = False,
+    test_mode           = False,
+    logger              = print):
     """ multiprocessor makes the use of multiprocessing in Python easy
     
     Copyright: it was developed as part of the RobustGaussianFittingLibrary,
@@ -56,362 +102,242 @@ class multiprocessor:
 
     How to use write your function
     ~~~~~~~~~~~~
+    You need a function that takes two inputs:
+        inputs_to_iter_sliced:
+            When providing inputs_to_iter, we will send a single element of every
+            member of it to the function. If it is a numpy array, we will send
+            inputs_to_iter[i] to your function. if it is a tuple of a few arrays,
+            we send a tuple of a few slices: (arr[i], brr[i], ...)
+        inputs_to_share: All inputs that we are just passed to your function.
     
-    You need a function that takes these inputs:
-        1 - a single integer: the index of current processes
-        optional: All inputs that you use by indexing
-        2 - all inputs you send as a tuple and you intrepret them
-            yourself...notice that for "READING" in multiprocessing the id
-            of an object before sending it to processors is the same 
-            inside each processor.
-            This is NOT the case for "Writing to things", the output must
-            be queued. Multiprocessing realizes if you write to something
-            but does not keep track of those who you just read from.
-        optional: All inputs that we have iterated over.
-        3 - all iteratible inputs you send as a tuple and you intrepret them
-            yourself..However, each memeber of the tuple must be indexable
-            and the tuple that is sent to the function will be a tuple
-            whose members are subsets of members of the original tuple 
-            
     Example
     ~~~~~~~~~~~~
     
     A code snippet is brought here::
     
-        from multiprocessor import multiprocessor
+        from lognflow import multiprocessor
     
-        def masked_median(idx, allInputs):
-            data, mask, statistics_func = allInputs
-            _data = data[idx]
-            _mask = mask[idx]
-            vector_to_analyze = _data[_mask==1]
-            to_return = statistics_func(vector_to_analyze)
-            return(np_array([to_return]))
+        def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
+            vec1, vec2 = inputs_to_iter_sliced
+            mask, statistics_func = inputs_to_share
+            vec1 = vec1[_mask==1]
+            vec2 = vec2[_mask==1]
+            
+            vec1 -= vec1.mean()
+            vec1_std = vec1.std()
+            if vec1_std > 0:
+                vec1 /= vec1_std
+            vec2 -= vec2.mean()
+            vec2_std = vec2.std()
+            if vec2_std > 0:
+                vec2 /= vec2_std
+
+            correlation = vec1 * vec2
+            to_return = statistics_func(correlation)
+            return(to_return)
         
         data_shape = (1000, 1000000)
-        data = np.random.randn(*data_shape)
+        data1 = np.random.randn(*data_shape)
+        data2 = 2 + 5 * np.random.randn(*data_shape)
         mask = (2*np.random.rand(*data_shape)).astype('int')
         statistics_func = np.median
         
-        allInputs = (data, mask, op_type)
-        medians = multiprocessor(some_function, allInputs).start()
+        inputs_to_iter = (data1, data2)
+        inputs_to_share = (mask, op_type)
+        ccorr = multiprocessor(some_function, inputs_to_iter, inputs_to_share)
+        print(f'ccorr: {ccorr}')
         
-    """    
-    def __init__(self, 
-        targetFunction,
-        indices = None,
-        inputs = None,
-        iteratable_inputs = None,
-        max_cpu = None,
-        batchSize = None,
-        concatenateOutput = True,
-        functionOutputSample = None, 
-        functionOutputSample_timeout = 0,
-        showProgress = False,
-        test_mode = False):
-        
-        """
-        input arguments
-        ~~~~~~~~~~~~~~~
-            targetFunction: Target function
-            indices: should be the indices of indexable parts of your input
-                example: if you have N processes, just give N,
-                    but if you like to only processes certain indices 
-                    send those in. We will be sending these indices
-                    to your function, The first element of your function
-                    will see each of these indices.
-            inputs: all READ-ONLY inputs....notice: READ-ONLY 
-            max_cpu: max number of allowed CPU
-                default: None
-            batchSize: how many data points are sent to each CPU at a time
-                default: n_CPU/n_points/2
-            concatenateOutput: If an output is np.ndarray and it can be
-                concatenated along axis = 0, with this flag, we will
-                put it as a whole ndarray in the output. Otherwise 
-                the output will be a list.
-            functionOutputSample: function output sample,  it is needed
-                to know how the output of the function looks like to be able
-                to concatenate them and produce a general output. For example
-                if the output for a single trial is a list of numpy arrays and
-                strings, give that to this input, 
-                e.g.: list([np_zeros(100, 200), 'MyString'])
-            functionOutputSample_timeout: 
-                If you do not provide functionOutputSample
-                we can call your function with index 0 to get it. 
-                But it is possible and reasonable that the function takes 
-                longer time than this input (default value is 0 seconds which
-                means we don't run it.)
-                Then we stop waiting for the function output. 
-            showProgress: using textProgBar, it shows the progress of 
-                multiprocessing of your task.
-                default: False
-        """
-        self.test_mode = test_mode
-        if iteratable_inputs is not None:
-            iteratable_inputs = list(iteratable_inputs)
-            
-        if indices is None:
-            assert iteratable_inputs is not None, \
-                'multiprocessor:If indices are not provided,'\
-                'iteratable_inputs must be a list of inputs '\
-                'for me to iterate over.'
+    input arguments
+    ~~~~~~~~~~~~~~~
+        targetFunction: Target function
+        inputs_to_iter: all iterabel inputs, We will pass them by indexing
+            them. if indices are not provideed, the len(inputs_to_iter[0])
+            will be N.
+        inputs_to_share: all READ-ONLY inputs.... Notice: READ-ONLY 
+        outputs: an indexable memory where we can just dump the output of 
+            function in relevant indices.  For example a numpy
+        max_cpu: max number of allowed CPU
+            default: None
+        batchSize: how many data points are sent to each CPU at a time
+            default: n_CPU/n_points/2
+        concatenate_outputs: If an output is np.ndarray and it can be
+            concatenated along axis = 0, with this flag, we will
+            put it as a whole ndarray in the output. Otherwise 
+            the output will be a list.
+        verbose: using textProgBar, it shows the progress of 
+            multiprocessing of your task.
+            default: False
+    """
+    if inputs_to_share is not None:
+        if not isinstance(inputs_to_share, tuple):
+            inputs_to_share = (inputs_to_share, )
+    
+    try:
+        n_pts = int(inputs_to_iter)
+        assert n_pts == inputs_to_iter, \
+            'if inputs_to_iter is a single number, please provide an integer.'
+        inputs_to_iter = [np_arange(n_pts, dtype='int')]
+    except:
+        try:
+            n_pts = inputs_to_iter.shape[0]
+            inputs_to_iter = [inputs_to_iter]
+        except:
             try:
-                indices = len(iteratable_inputs[0])
+                n_pts = len(inputs_to_iter[0])
             except:
-                pass
-            if indices is None:
                 try:
-                    indices = iteratable_inputs[0].shape[0]
+                    n_pts = inputs_to_iter[0].shape[0]
                 except Exception as e:
                     raise Exception(
-                        'You did not provide indices. I tried to get the length'
-                        ' of iteratable_inputs using len or .shape[0] which'
-                        ' did not work.'
+                        'You did not provide inputs_to_iter properly.'
+                        ' It should be either a list or tuple where all members'
+                        ' have the same length (first dimensions) or it can be'
+                        ' a numpy array to iterate over, or it can be an'
+                        ' integer.'
                         ) from e
-        else:
-            try:
-                indices = int(indices)
-                if(showProgress):
-                    print('Indices you gave will be np_arange(',indices,').')
-                indices = np_arange(indices)
-            except:
-                pass
-            if(not type(indices).__module__ == np___name__):
+    indices = np_arange(n_pts, dtype='int')
+    if(verbose):
+        logger(f'inputs to iterate over are {n_pts}.')
+
+    if(max_cpu is None):
+        max_cpu = cpu_count() - 1  #Let's keep one for the OS
+    default_batchSize = int(np_ceil(n_pts/max_cpu/2))
+    if(batchSize is not None):
+        if(default_batchSize >= batchSize):
+            default_batchSize = batchSize
+    if(verbose):
+        logger('RGFLib multiprocessor initialized with:') 
+        logger('max_cpu: ', max_cpu)
+        logger('n_pts: ', n_pts)
+        logger('default_batchSize: ', default_batchSize)
+        logger('concatenate_outputs: ', concatenate_outputs)
+
+    aQ = Queue()
+
+    outputs_is_given = True
+    if(outputs is None):
+        outputs_is_given = False
+        outputs = []
+        Q_procID = []
+    
+    procID = 0
+    numProcessed = 0
+    numBusyCores = 0
+    if(verbose):
+        pBar = printprogress(n_pts, title = 
+            f'Processing {n_pts} data points with {max_cpu} CPUs')
+    any_error = False
+    while(numProcessed<n_pts):
+        if (not aQ.empty()):
+            aQElement = aQ.get()
+            ret_procID_range = aQElement[0]
+            ret_result = aQElement[1]
+            if ((not any_error) & aQElement[2]):
+                any_error = True
+                error_ret_procID_range = ret_procID_range.copy()
                 try:
-                    indices = np_array(indices).astype('int')
-                    if(showProgress):
-                        print('Input indices are turned into numpy array')
+                    pBar._end()
                 except:
-                    print('I can not interpret the input indices')
-                    print('They are not numpy ints or cannot be turned into it.')
-                    raise ValueError
-        if((indices != indices.astype('int')).any()):
-            print('Input indices are not integers?')
-            raise ValueError
-        
-        indices = indices.astype('int64')
-        self.n_pts = indices.shape[0]     
-        if(showProgress):
-            print('Input indices are a numpy int ndArray with ', 
-                  self.n_pts, ' data points')
-        if(inputs is not None):
-            if(not type(inputs).__name__ == 'tuple'):
-                inputs = (inputs, )
-        if(iteratable_inputs is not None):
-            if(not type(iteratable_inputs).__name__ == 'tuple'):
-                iteratable_inputs = (iteratable_inputs, )
-
-        # from here we try to determine the format of the output in case 
-        # it is numpy ndarray
-        FLAG_outputSampleIsAvailable = False
-        if((functionOutputSample_timeout > 0) & (functionOutputSample is None)):
-            if(showProgress):
-                print('No output sample is provided, '
-                      'I will call the function for a sample output.')
-            try:
-                _args = 0
-                if(inputs is not None):
-                    _args = (_args, ) + (inputs, )
-                if(iteratable_inputs is not None):
-                    if(not type(_args).__name__ == 'tuple'):
-                        _args = (_args, )
-                    it_input = ()
-                    for iim in iteratable_inputs:
-                        it_input = it_input + (iim[0], )
-                    _args = _args + (it_input, )
-                p = Process(target = targetFunction, args = _args)
-                p.start()
-                p.join(functionOutputSample_timeout)
-                if p.is_alive():
-                    p.kill()
-                    p.join()
-                    if(showProgress):
-                        print('It takes too long to get a sample of the output of function')
-                        print('Timeout threshold was ', functionOutputSample_timeout, 's.')
-                        print('Consider giving me a sample of the output of the function,')
-                        print('This is useful when its output is a numpy array')
-                        print('I assume output is a list for now.')
+                    pass
+                logger('lognflow, multiprocessor:')
+                logger('An exception has been raised. Joining all processes...')
+            if (not any_error):
+                if(outputs_is_given):
+                    outputs[ret_procID_range] = ret_result
                 else:
-                    if(showProgress):
-                        print('I could call your given function with first data point')
-                        print('Your function runs fast. Please consider that multiprocessing '+ \
-                              'is most effective on functions that are slow and do a lot. It ' + \
-                              'reduces the significance of the scheduling overhead.')
-                    functionOutputSample = targetFunction(*_args)
-                    if(functionOutputSample is None):
-                        functionOutputSample = np_array([1])
-                        print('The output is None.')
-                    FLAG_outputSampleIsAvailable = True
-            except Exception as e:
-                print('I cannot run your function for index 0' \
-                      'You need to make your function work as follows:' \
-                      'The first input will be the index of data point.' \
-                      'The second input can be all of your non-iteratable inputs' \
-                      'The third input can be all of your iteratable inputs.')
-                raise e
-
-        if(not FLAG_outputSampleIsAvailable):
-                functionOutputSample = []
-
-        self.outputIsNumpy = False
-        if(type(functionOutputSample).__module__ == np___name__):
-            self.outputIsNumpy = True
-            self.output_shape = functionOutputSample.shape
-            self.output_dtype = functionOutputSample.dtype
-            self.allResults = np_zeros(
-                shape = ((self.n_pts,) + self.output_shape), 
-                dtype = self.output_dtype)
-            if(showProgress):
-                print('output is a numpy ndArray')
-                print('output_shape, ', self.output_shape)
-                print('shape to prepare: ', ((self.n_pts,) + self.output_shape))
-                print('allResults shape, ', self.allResults.shape)
-        else:
-            self.allResults = []
-            self.Q_procID = np_array([], dtype='int')
-            if(showProgress):
-                print('output is a list with ') 
-            self.output_types = []
-        ###################################################################
-        
-        self.concatenateOutput = concatenateOutput
-        self.indices = indices
-        self.targetFunction = targetFunction
-        self.inputs = inputs
-        self.iteratable_inputs = iteratable_inputs
-        self.showProgress = showProgress
-        if(max_cpu is not None):
-            self.max_cpu = max_cpu
-        else:
-            self.max_cpu = cpu_count() - 1  #Let's keep one for the queue handler
-        self.default_batchSize = int(np_ceil(self.n_pts/self.max_cpu/2))
-        if(batchSize is not None):
-            if(self.default_batchSize >= batchSize):
-                self.default_batchSize = batchSize
-        if(showProgress):
-            print('RGFLib multiprocessor initialized with:') 
-            print('max_cpu: ', self.max_cpu)
-            print('n_pts: ', self.n_pts)
-            print('default_batchSize: ', self.default_batchSize)
-            print('concatenateOutput: ', self.concatenateOutput)
-
-    def _multiprocFunc(self, theQ, procID_range, _iteratable_inputs = None):
-        if(self.outputIsNumpy):
-            allResults = np_zeros(
-                shape = ((procID_range.shape[0],) + self.output_shape), 
-                dtype = self.output_dtype)
-        else:
-            allResults = []
-        for idx, procCnt in enumerate(procID_range):
-            funcIdx = self.indices[procCnt]
-            try:
-                _args = funcIdx
-                if(self.inputs is not None):
-                    _args = (_args, ) + (self.inputs, )
-                if(_iteratable_inputs is not None):
-                    if(not type(_args).__name__ == 'tuple'):
-                        _args = (_args, )
-                    it_input = ()
-                    for iim in _iteratable_inputs:
-                        it_input = it_input + (iim[idx], )
-                    _args = _args + (it_input, )
-                results = self.targetFunction(*_args)
-                if(results is None):
-                    results = np_array([1])
-            except:
-                print('Something in multiprocessing went wrong.')
-                print('funcIdx-->.', funcIdx)
-                exit()
-            if(self.outputIsNumpy):
-                allResults[idx] = results
+                    for ret_procID, result in zip(ret_procID_range, ret_result):
+                        Q_procID.append(ret_procID)
+                        outputs.append(result)
             else:
-                allResults.append(results)
-        theQ.put(list([procID_range, allResults]))
-        
-    def start(self):
-        aQ = Queue()
-        numProc = self.n_pts
-        procID = 0
-        numProcessed = 0
-        numBusyCores = 0
-        firstProcess = True
-        if(self.showProgress):
-            print('Carrying on with the processing....')
-        while(numProcessed<numProc):
-            if (not aQ.empty()):
-                aQElement = aQ.get()
-                ret_procID_range = aQElement[0]
-                _batchSize = ret_procID_range.shape[0]
-                ret_result = aQElement[1]
-                if(self.outputIsNumpy):
-                    self.allResults[ret_procID_range] = ret_result
-                else:
-                    self.Q_procID = np_concatenate((self.Q_procID, 
-                                                    ret_procID_range))
-                    self.allResults += ret_result
-                numProcessed += _batchSize
-                numBusyCores -= 1
-                if(self.showProgress):
-                    if(firstProcess):
-                        pBar = printprogress(numProc-1, title = 'starting ' \
-                            + str(numProc) + ' processes with ' \
-                            + str(self.max_cpu) + ' CPUs')
-                        firstProcess = False
-                    pBar(_batchSize)
-            if((procID<numProc) & (numBusyCores < self.max_cpu)):
-                batchSize = np_minimum(self.default_batchSize, numProc - procID)
-                procID_arange = np_arange(procID, procID + batchSize, dtype = 'int')
-                _args = (aQ, procID_arange, )
+                logger(f'Number of busy cores: {numBusyCores}')
 
-                if(self.iteratable_inputs is not None):
-                    it_input = ()
-                    for iim in self.iteratable_inputs:
-                        it_input = it_input + (iim[procID_arange], )
-                    _args = _args + (it_input, )
-                if(self.test_mode):
-                    self._multiprocFunc(*_args)
-                else:
-                    Process(target = self._multiprocFunc, 
-                                      args = _args).start()
-                procID += batchSize
-                numBusyCores += 1
+            _batchSize = ret_procID_range.shape[0]
+            numProcessed += _batchSize
+            numBusyCores -= 1
+            if(verbose & (not any_error)):
+                pBar(_batchSize)
+            if(any_error & (numBusyCores == 0)):
+                logger(f'All cores are free')
+                break
+                
+        if((procID<n_pts) & (numBusyCores < max_cpu) & (not any_error)):
+            batchSize = np_minimum(default_batchSize, n_pts - procID)
+            procID_arange = np_arange(procID, procID + batchSize, dtype = 'int')
+
+            inputs_to_iter_batch = ()
+            for iim in inputs_to_iter:
+                inputs_to_iter_batch = \
+                    inputs_to_iter_batch + (iim[procID_arange], )
+            _args = (inputs_to_iter_batch, ) + (
+                targetFunction, inputs_to_share, aQ, procID_arange)
+            
+            if(test_mode):
+                _multiprocessor_function_test_mode(*_args)
+            else:
+                Process(target = _multiprocessor_function, args = _args).start()
+            procID += batchSize
+            numBusyCores += 1
+    
+    if(any_error):
+        logger('-'*79)
+        logger('An exception occured during submitting jobs.')
+        logger('Here we try to reproduce it but will raise '
+              'ChildProcessError regardless.')
+        logger(f'We will call {targetFunction} ')
+        logger('with the following index to slice the inputs:'
+              f' {error_ret_procID_range[0]} to {error_ret_procID_range[-1]}')
+        logger('to avoid this message set the legger arg to a dummy function')
+        logger('-'*79)
+        inputs_to_iter_batch = ()
+        for iim in inputs_to_iter:
+            inputs_to_iter_batch = \
+                inputs_to_iter_batch + (iim[error_ret_procID_range], )
+        _args = (inputs_to_iter_batch, ) + (
+            targetFunction, inputs_to_share, aQ, error_ret_procID_range)
+        _multiprocessor_function_test_mode(*_args)
+        raise ChildProcessError
+    
+    if(outputs_is_given):
+        return outputs
+    else:
+        sortArgs = np_argsort(Q_procID)
+        ret_list = [outputs[i] for i in sortArgs]
+        firstInstance = ret_list[0]
+        if(  (not isinstance(firstInstance, list))
+           | (not isinstance(firstInstance, tuple))
+           | (not isinstance(firstInstance, dict))):
+            if(type(firstInstance).__module__ == np___name__):
+                outputs = np_array(ret_list)
+                return outputs
         
-        if(self.outputIsNumpy):
-            return (self.allResults)
-        else:
-            n_individualOutputs = len(self.allResults[0])
-            sortArgs = np.argsort(self.Q_procID)
-            ret_list = [self.allResults[i] for i in sortArgs]
-            endResultList = []
-            for memberCnt in range(n_individualOutputs):
-                FLAG_output_is_numpy = False
-                if(self.concatenateOutput):
-                    firstInstance = ret_list[0][memberCnt]
-                    if(type(firstInstance).__module__ == np___name__):
-                        if(isinstance(firstInstance, np.ndarray)):
-                            n_F = 0
-                            for ptCnt in range(0, self.n_pts):
-                                n_F += ret_list[ptCnt][memberCnt].shape[0]
-                            outShape = ret_list[ptCnt][memberCnt].shape[1:]
-                            _currentList = np_zeros(
-                                shape = ( (n_F,) + outShape ), 
-                                dtype = ret_list[0][memberCnt].dtype)
-                            n_F = 0
-                            for ptCnt in range(0, self.n_pts):
-                                ndarr = ret_list[ptCnt][memberCnt]
-                                _n_F = ndarr.shape[0]
-                                _currentList[n_F: n_F + _n_F] = ndarr
-                                n_F += _n_F
-                            FLAG_output_is_numpy = True
-                        else:
-                            print('Output member', memberCnt, 'could not be',
-                                'concatenated along axis 0. exported as list.',
-                                '\nThis usually happens when you use ',
-                                'np.mean(), np.std() or np.median(), Still numpy but not arrays',
-                                ' Make sure you present it as np_array([np.mean()]).')
-                if(not FLAG_output_is_numpy):
-                    _currentList = []
-                    for ptCnt in range(self.n_pts):
-                        _currentList.append(ret_list[ptCnt][memberCnt])
-                endResultList.append(_currentList)
-            return (endResultList)
+        n_individualOutputs = len(ret_list[0])
+        outputs = []
+        for memberCnt in range(n_individualOutputs):
+            FLAG_output_is_numpy = False
+            if(concatenate_outputs):
+                firstInstance = ret_list[0][memberCnt]
+                if(type(firstInstance).__module__ == np___name__):
+                    try:
+                        _ = firstInstance.shape
+                    except:
+                        firstInstance = np.array([firstInstance])
+                    n_F = 0
+                    for ptCnt in range(0, n_pts):
+                        n_F += ret_list[ptCnt][memberCnt].shape[0]
+                    outShape = ret_list[ptCnt][memberCnt].shape[1:]
+                    _currentList = np_zeros(
+                        shape = ( (n_F,) + outShape ), 
+                        dtype = ret_list[0][memberCnt].dtype)
+                    n_F = 0
+                    for ptCnt in range(0, n_pts):
+                        ndarr = ret_list[ptCnt][memberCnt]
+                        _n_F = ndarr.shape[0]
+                        _currentList[n_F: n_F + _n_F] = ndarr
+                        n_F += _n_F
+                    FLAG_output_is_numpy = True
+            if(not FLAG_output_is_numpy):
+                _currentList = []
+                for ptCnt in range(n_pts):
+                    _currentList.append(ret_list[ptCnt][memberCnt])
+            outputs.append(_currentList)
+        return (outputs)
