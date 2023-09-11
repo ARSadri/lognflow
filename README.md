@@ -50,15 +50,19 @@ The ```printprogress``` makes a pretty nice progress bar.
 ```
 
 There is also a conviniant way to use multiprocessing in Python. You wish to 
-provide a function and some shared inputs and ask to run the function over 
-those inputs using multiprcessing. The ```multiprocessor``` is for you. The 
-following is a masked median of verctors::
+provide a function name, iterable inputs and shared inputs. Then ask 
+to run the function over the iterable inputs using multiprcessing. Then
+The ```multiprocessor``` is for you. The following is a cross-correlation of two
+masked verctors using a given ststistical function
 
 ```python 
 
 	from lognflow import multiprocessor
 	
 	def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
+		""" Calculate the correlation of two masked vectors, then use a given
+			statsitcal function to get the stat of the correlation.
+		"""
 	    vec1, vec2 = inputs_to_iter_sliced
 	    mask, statistics_func = inputs_to_share
 	    vec1 = vec1[mask==1]
@@ -85,9 +89,9 @@ following is a masked median of verctors::
 	    
 	    inputs_to_iter = (data1, data2)
 	    inputs_to_share = (mask, statistics_func)
-	    ccorr = multiprocessor(
-	        masked_cross_correlation, inputs_to_iter, inputs_to_share,
-	        test_mode = False)
+	    ccorr = multiprocessor(masked_cross_correlation, 
+	    					   inputs_to_iter, 
+	    					   inputs_to_share)
 	    print(f'ccorr: {ccorr}')
 
 ```
