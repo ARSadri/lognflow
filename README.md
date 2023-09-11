@@ -56,12 +56,13 @@ following is a masked median of verctors::
 
 ```python 
 
+	from lognflow import multiprocessor
+	
 	def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
 	    vec1, vec2 = inputs_to_iter_sliced
 	    mask, statistics_func = inputs_to_share
 	    vec1 = vec1[mask==1]
 	    vec2 = vec2[mask==1]
-	    
 	    vec1 -= vec1.mean()
 	    vec1_std = vec1.std()
 	    if vec1_std > 0:
@@ -70,12 +71,12 @@ following is a masked median of verctors::
 	    vec2_std = vec2.std()
 	    if vec2_std > 0:
 	        vec2 /= vec2_std
-	
 	    correlation = vec1 * vec2
 	    to_return = statistics_func(correlation)
 	    return(to_return)
+	    
 	
-	def test_multiprocessor_ccorr():
+	if __name__ == '__main__':
 	    data_shape = (1000, 2000)
 	    data1 = np.random.randn(*data_shape)
 	    data2 = 2 + 5 * np.random.randn(*data_shape)
