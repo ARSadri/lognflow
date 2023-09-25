@@ -43,10 +43,19 @@ def test_specific_timing():
             counter += 1
         pprog()
 
+def test_generator_type():
+    vec = np.arange(100)
+    sum = 0
+    for _ in printprogress(vec):
+        sum += _
+    print(f'sum: {sum}')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_generator_type()
+    exit()
     test_printprogress()
     test_printprogress_ETA()
     test_specific_timing()

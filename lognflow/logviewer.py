@@ -51,7 +51,7 @@ class logviewer:
                 else:
                     var_name = ('.').join(var_name.split('.')[:-1])
             else:
-                suffix = '.*'
+                suffix = '*'
 
         suffix = suffix.strip('.')        
 
@@ -82,7 +82,7 @@ class logviewer:
         else:
             var_dir = self.log_dir / var_name
             if(var_dir.is_dir()):
-                flist = list(var_dir.glob('*.*'))
+                flist = list(var_dir.glob('*'))
             if(len(flist) > 0):
                 flist.sort()
         return flist
@@ -131,7 +131,7 @@ class logviewer:
     #     ...
     
     def get_text(self, log_name='main_log', flist = None, suffix = 'txt',
-                       file_index : [int, list[int]] = -1):
+                       file_index = -1):
         """ get text log files
             Given the log_name, this function returns the text therein.
 

@@ -13,15 +13,16 @@ class printprogress:
     to go faster, call it with give number of steps that have passed.
     """
     def __init__(self, 
-                 n_steps, 
+                 it, 
                  numTicks = 78,
                  title = None,
                  method = 'linear',
                  print_function = print,
                  **print_function_kwargs):
         """
-            n_steps: int
-                Number of iterations in the for loop
+            it: int or iterable
+                Number of iterations in the for loop or iterable
+                n_steps = int(it) or n_steps = len(it)
             numTicks: int
                 The number of charachters in a row of the screen - 2
                 default: 78 for old screens that have 80 coloumns
@@ -43,13 +44,19 @@ class printprogress:
                 more options to come
         """
         assert method in ['linear', 'linear_robust']
+        
+        try:
+            n_steps = int(it)
+            self.yielding_data = False
+        except:
+            n_steps = len(it)
+            self.it = it
+            self.yielding_data = True
+        
         self.print_function_kwargs = print_function_kwargs
         self.method = method
         self.in_print_function = print_function
-        if(n_steps != int(n_steps)):
-            self._print_func(
-                r'printprogress takes integers no less than 2 as n_steps.')
-            n_steps = int(n_steps)
+        
         if(n_steps<2):
             n_steps = 2
         if (title is None):
@@ -93,16 +100,8 @@ class printprogress:
         
         return remTimeS
     
-    def __call__(self, ck=1):
-        """ ticking the progress bar
-            just call the object and the progress bar moves ck steps
-            ahead when ready.
-            
-            output
-            ~~~~~~
-            :param ETA:
-                the remaining time in seconds will be provided at the output
-        """
+    def _make_progress(self, ck = 1):
+        
         remTimeS = 0
         if(self.FLAG_ended):
             if(not self.FLAG_warning):
@@ -143,11 +142,45 @@ class printprogress:
                (self.len_prog_text >= self.numTicks)):
                 self._end()
         return remTimeS
+    
+    def __call__(self, ck=1):
+        """ ticking the progress bar
+            just call the object and the progress bar moves ck steps
+            ahead when ready.
+            
+            output
+            ~~~~~~
+            :param ETA:
+                the remaining time in seconds will be provided at the output
+        """
+        if(self.yielding_data):
+            print('printprogress is used as a generator.'
+                  ' You can not call it.')
+        else:
+            return self._make_progress(ck)
 
+    # Supporting iterator type usage
+    def __iter__(self):
+        self.FLAG_iter_ended = False
+        self.iter_ck = 0
+        return self
+  
+    def __next__(self):
+        if(self.yielding_data):
+            if not self.FLAG_iter_ended:
+                self._make_progress()
+                if self.iter_ck == self.n_steps - 1:
+                    self.FLAG_iter_ended = True
+                toret = self.it[self.iter_ck]
+                self.iter_ck += 1
+                return toret
+            else:
+                raise StopIteration
+    
     def _end(self):
         if(not self.FLAG_ended):
             self._print_func('')
             self.FLAG_ended = True
-            
+
     def __del__(self):
         self._end()

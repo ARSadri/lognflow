@@ -19,21 +19,35 @@ def plt_colorbar(mappable):
 def plt_hist(vectors_list, 
              n_bins = 10, alpha = 0.5, normalize = False, 
              labels_list = None, **kwargs):
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
     if not (type(vectors_list) is list):
         vectors_list = [vectors_list]
     for vec_cnt, vec in enumerate(vectors_list):
         bins, edges = np.histogram(vec, n_bins)
         if normalize:
             bins = bins / bins.max()
-        plt.bar(edges[:-1], bins, 
+        ax.bar(edges[:-1], bins, 
                 width =np.diff(edges).mean(), alpha=alpha)
         if labels_list is None:
-            plt.plot(edges[:-1], bins, **kwargs)
+            ax.plot(edges[:-1], bins, **kwargs)
         else:
             assert len(labels_list) == len(vectors_list)
-            plt.plot(edges[:-1], bins, 
+            ax.plot(edges[:-1], bins, 
                      label = f'{labels_list[vec_cnt]}', **kwargs)
-            
+    return fig, ax
+
+def plt_surface(parameter_value, **kwargs):
+    from mpl_toolkits.mplot3d import Axes3D
+    n_r, n_c = parameter_value.shape
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
+                       np.arange(n_c, dtype='int'))
+    ax.plot_surface(X, Y, parameter_value, **kwargs)
+    return fig, ax
+        
 def pltfig_to_numpy(fig):
     """ from https://www.icare.univ-lille.fr/how-to-
                     convert-a-matplotlib-figure-to-a-numpy-array-or-a-pil-image/
@@ -44,9 +58,9 @@ def pltfig_to_numpy(fig):
     buf.shape = (w, h, 4)
     return buf.sum(2)
 
-def numbers_as_images_3D(data3D_shape: tuple[int, int, int],
+def numbers_as_images_3D(data3D_shape: tuple,
                          fontsize: int, 
-                         text_loc: tuple[int, int] = None,
+                         text_loc: tuple = None,
                          verbose: bool = True):
     """ Numbers3D
     This function generates a 4D dataset of images with shape
@@ -91,9 +105,9 @@ def numbers_as_images_3D(data3D_shape: tuple[int, int, int],
             pBar()
     return dataset
 
-def numbers_as_images_4D(data4D_shape: tuple[int, int, int, int],
+def numbers_as_images_4D(data4D_shape: tuple,
                          fontsize: int, 
-                         text_loc: tuple[int, int] = None,
+                         text_loc: tuple = None,
                          verbose: bool = True):
     """ Numbers4D
     This function generates a 4D dataset of images with shape

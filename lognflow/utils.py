@@ -182,3 +182,22 @@ def multichannel_to_frame(stack, frame_shape : tuple = None, borders = 0):
     else:
         return None
     return canv
+	
+class ssh_stablish:
+	def __init__(self, hostname, username, password):
+		import paramiko
+
+		ssh_client = paramiko.SSHClient()
+		ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+		ssh_client.connect(hostname = hostname, 
+						   username = username,
+						   password = password)
+		self.ssh_client = ssh_client
+	
+	def ssh_ls(self, ssh_client, path):
+		stdin, stdout, stderr = ssh_client.exec_command('ls ' + results_path)
+		ls_result = stdout.readlines()
+		return ls_result
+		
+	def ssh_scp(self, ssh_client, source, destination):
+		...

@@ -176,3 +176,11 @@ History
 * default colormap is viridis everywhere
 * multiprocessor heavily debugged and made a lot easier to use
 * better tests added for multiprocessor
+
+0.10.2 (2023-10-04)
+-----------------
+* printprogress can be used as an iterator, test added
+* time_tag is False by default for copy()
+* to log MATLAB files, input must be a dictionary.
+* bug fixed in get_flist to return dirs only as well
+* all new features for Python 3.10 onwards are removed.

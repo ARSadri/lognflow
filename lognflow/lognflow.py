@@ -36,20 +36,20 @@ before storing into the directory using log_var(name, var).
 
 """
 import time
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from   matplotlib import animation
-from   pathlib import Path as pathlib_Path
-from   itertools import product as itertools_product
-from   dataclasses import dataclass
-from   sys import platform as sys_platform
-from   os import system as os_system
-
-from   .utils import (
-    repr_raw, replace_all, select_directory, multichannel_to_frame)
-from   .plt_utils import plt_colorbar, plt_hist
-from   .logviewer import logviewer
+import numpy                                as np
+import matplotlib.pyplot                    as plt
+import matplotlib.gridspec                  as gridspec
+from   matplotlib          import animation
+from   pathlib             import Path      as pathlib_Path
+from   itertools           import product   as itertools_product
+from   dataclasses         import dataclass
+from   sys                 import platform  as sys_platform
+from   os                  import system    as os_system
+                           
+from   .utils              import (repr_raw, replace_all, select_directory, 
+                                   multichannel_to_frame, )
+from   .plt_utils          import plt_colorbar, plt_hist, plt_surface
+from   .logviewer          import logviewer
 
 @dataclass
 class varinlog:
@@ -216,7 +216,7 @@ class lognflow:
             return '.'.join(fpath_split[:-1])
 
     def copy(self, parameter_name, source, suffix = None,
-             time_tag: bool = None):
+             time_tag = False):
         """ copy into a new file
             Given a parameter_name, the second argument will be copied into
             the first. We will try syntaxes os_system('cp') and 'copy' for
@@ -241,7 +241,6 @@ class lognflow:
             flist = self.logged.get_flist(source, suffix)
         assert flist, 'source could not be found to copy'
 
-        time_tag = self.time_tag if (time_tag is None) else time_tag
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
         
@@ -962,6 +961,7 @@ class lognflow:
                        normalize = False,
                        image_format='jpeg', dpi=1200,
                        time_tag: bool = None, 
+                       return_figure = False,
                        **kwargs):
         """log a single histogram
             If you have a numpy array or a list of arrays (or indexable by
@@ -989,16 +989,19 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        plt_hist(parameter_value_list, 
-             n_bins = n_bins, alpha = alpha, 
-             normalize = normalize, 
-             labels_list = None, **kwargs)
+        fig, ax = plt_hist(parameter_value_list, 
+                           n_bins = n_bins, alpha = alpha, 
+                           normalize = normalize, 
+                           labels_list = None, **kwargs)
         
-        fpath = self.log_plt(
-            parameter_name = parameter_name, 
-            image_format=image_format, dpi=dpi,
-            time_tag = time_tag)
-        return fpath
+        if not return_figure:
+            fpath = self.log_plt(
+                parameter_name = parameter_name, 
+                image_format=image_format, dpi=dpi,
+                time_tag = time_tag)
+            return fpath
+        else:
+            return fig, ax
     
     def log_scatter3(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
@@ -1030,7 +1033,9 @@ class lognflow:
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
         else:
-            return fig
+            return fig, ax
+    
+    
     
     def log_surface(self, parameter_name: str,
                        parameter_value, image_format='jpeg', dpi=1200,
@@ -1051,13 +1056,8 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        from mpl_toolkits.mplot3d import Axes3D
-        n_r, n_c = parameter_value.shape
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
-                           np.arange(n_c, dtype='int'))
-        ax.plot_surface(X, Y, parameter_value, **kwargs)
+        fig, ax = plt_surface(parameter_value)
+        
         if not return_figure:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
@@ -1065,7 +1065,7 @@ class lognflow:
                 time_tag = time_tag)
             return fpath
         else:
-            return fig
+            return fig, ax
         
     def log_hexbin(self, parameter_name: str, parameter_value,
                    gridsize = 20, image_format='jpeg', dpi=1200,
@@ -1087,20 +1087,19 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        try:
-            plt.figure()
-            plt.hexbin(parameter_value[0], 
-                       parameter_value[1], 
-                       gridsize = gridsize)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.hexbin(parameter_value[0], 
+                   parameter_value[1], 
+                   gridsize = gridsize)
+        if return_figure:
             fpath = self.log_plt(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
                     time_tag = time_tag)
             return fpath
-        except:
-            self.log_text(None,
-                f'Cannot make the hexbin for variable {parameter_name}.')
-            return None
+        else:
+            return fig, ax
         
     def log_imshow(self, parameter_name: str, parameter_value, 
                    colorbar = True, remove_axis_ticks = True,
