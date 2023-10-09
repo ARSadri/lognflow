@@ -49,7 +49,7 @@ def test_get_images_as_stack():
     logger(stack_A.shape)
     logger(stack_B.shape)
     
-    logger.log_canvas('data_samples', [stack_A, stack_B], dpi = 300)
+    logger.log_imshow_series('data_samples', [stack_A, stack_B], dpi = 300)
 
     flist_A = logged.get_flist('A/')
     flist_B = logged.get_flist('B/')
@@ -66,7 +66,8 @@ def test_get_images_as_stack():
         dataset_A = logged.get_stack_of_files('A/', flist = flist_A_AB)
         dataset_B = logged.get_stack_of_files('B/', flist = flist_B_AB)
         
-        logger.log_canvas('data_samples', [dataset_A, dataset_B], dpi = 300)
+        logger.log_imshow_series('data_samples', 
+                                 [dataset_A, dataset_B], dpi = 300)
         _ = logger._loggers_dict['main_log.txt'].log_size
         logger('Size of the log file in bytes is: ' \
                + f'{_}')

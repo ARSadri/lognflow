@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+"""Tests for `lognflow` package."""
+import pytest
+
 import matplotlib.pyplot as plt
 import lognflow
 import numpy as np
@@ -40,9 +45,22 @@ def test_pltfig_to_numpy():
     ax[0].imshow(np.random.rand(100, 100))
     np_data = lognflow.plt_utils.pltfig_to_numpy(fig)
     print(np_data.shape)
-    
-    
+    plt.close()
+
+def test_imshow_series():
+    data = [np.random.rand(10, 100, 100),
+            np.random.rand(10, 10, 10)]
+    lognflow.plt_utils.imshow_series(data)
+    plt.show()
+
+def test_imshow_by_subplots():
+    data = np.random.rand(16, 100, 100)
+    lognflow.plt_utils.imshow_by_subplots(data)
+    plt.show()
+
 if __name__ == '__main__':
+    test_imshow_series()
+    test_imshow_by_subplots()
     test_plot_gaussian_gradient()
     test_numbers_as_images()
     test_pltfig_to_numpy()

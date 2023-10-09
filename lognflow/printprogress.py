@@ -52,6 +52,8 @@ class printprogress:
             n_steps = len(it)
             self.it = it
             self.yielding_data = True
+            self.yielding_data_call_warning = False
+        self.FLAG_first_tick = True
         
         self.print_function_kwargs = print_function_kwargs
         self.method = method
@@ -96,8 +98,15 @@ class printprogress:
     def _calc_ETA(self):
         if(self.method == 'linear'):
             passedTime = time() - self.startTime
-            remTimeS = passedTime * ( self.n_steps / self.ck - 1)
+            if self.ck > 0:
+                remTimeS = passedTime * ( self.n_steps / self.ck - 1)
+            else:
+                remTimeS = 356401
         
+            if (remTimeS < 1) & self.FLAG_first_tick:
+                remTimeS = 356401
+                self.FLAG_first_tick = False
+                
         return remTimeS
     
     def _make_progress(self, ck = 1):
@@ -154,8 +163,10 @@ class printprogress:
                 the remaining time in seconds will be provided at the output
         """
         if(self.yielding_data):
-            print('printprogress is used as a generator.'
-                  ' You can not call it.')
+            if not self.yielding_data_call_warning:
+                print('printprogress is used as an Iterator,'
+                      ' You can not call it.')
+                self.yielding_data_call_warning = True
         else:
             return self._make_progress(ck)
 
@@ -168,7 +179,11 @@ class printprogress:
     def __next__(self):
         if(self.yielding_data):
             if not self.FLAG_iter_ended:
-                self._make_progress()
+                if self.FLAG_first_tick:
+                    self._make_progress(0)
+                    self.FLAG_first_tick = False
+                else:
+                    self._make_progress()
                 if self.iter_ck == self.n_steps - 1:
                     self.FLAG_iter_ended = True
                 toret = self.it[self.iter_ck]

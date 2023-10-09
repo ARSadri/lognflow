@@ -184,3 +184,15 @@ History
 * to log MATLAB files, input must be a dictionary.
 * bug fixed in get_flist to return dirs only as well
 * all new features for Python 3.10 onwards are removed.
+
+0.10.3 (2023-11-01)
+-----------------
+* multiprocessor handles errors with maximum speed as all processes share error_event
+* multichannel_plots assume fitrst fimension is the channels not the last 
+* printprogress as iterator does not take the first __next__ as a tick
+* log_imshow takes meaningful input sizes to make one frame
+* log_imshow_by_subplots can put images in different places
+* log_imshow_series is the new name of the log_canvas
+* if there are multiple images the shape should be n_f x n_r x n_c
+* tests are added for all functions
+* tests for lognflow.utils is added

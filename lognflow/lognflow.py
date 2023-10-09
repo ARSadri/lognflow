@@ -35,21 +35,25 @@ numpy variables that don't change size can be buffered up to a certain size
 before storing into the directory using log_var(name, var).
 
 """
-import time
-import numpy                                as np
-import matplotlib.pyplot                    as plt
-import matplotlib.gridspec                  as gridspec
-from   matplotlib          import animation
-from   pathlib             import Path      as pathlib_Path
-from   itertools           import product   as itertools_product
-from   dataclasses         import dataclass
-from   sys                 import platform  as sys_platform
-from   os                  import system    as os_system
-                           
-from   .utils              import (repr_raw, replace_all, select_directory, 
-                                   multichannel_to_frame, )
-from   .plt_utils          import plt_colorbar, plt_hist, plt_surface
-from   .logviewer          import logviewer
+import  time
+import  numpy                                   as np
+import  matplotlib.pyplot                       as plt
+from    matplotlib          import animation    as matplotlib_animation
+from    pathlib             import Path         as pathlib_Path
+from    itertools           import product      as itertools_product
+from    sys                 import platform     as sys_platform
+from    os                  import system       as os_system
+from    dataclasses         import dataclass    
+from    .logviewer          import logviewer
+from    .utils              import (repr_raw,
+                                    replace_all,
+                                    select_directory, 
+                                    stack_to_frame)
+from    .plt_utils          import (plt_colorbar,
+                                    plt_hist,
+                                    plt_surface, 
+                                    imshow_series,
+                                    imshow_by_subplots)
 
 @dataclass
 class varinlog:
@@ -72,21 +76,18 @@ class textinlog:
 class lognflow:
     """Initialization
         
-        lognflow creates a directory/attribute called log_dir and puts all 
-        stored data in there, if logs_root is given. Otherwise give it log_dir
-        to use. If you type
+        lognflow creates a directory called and puts all logs in there.
         
-        logger = lognflow()
+        Where?
+        1: if logs_root is given, it makes a log_dir in it with a time_stamp.
+        2: if log_dir is given, it uses it directly.        
+        3: If you type::
+            logger = lognflow()
+        it will try to open a dialog to select a directory, if error occurs,
+        it will get a temp directory from the os and continues.
         
-        it will try to open a dialog to select a directory, except, it will
-        get a temp directory from the os and continue. 
-        
-        The lognflow construction can allow setting global settings that can
-        be overridden later by calling each of its methods as follows.
-        
-        .. note::
-            One of the variables ``logs_root`` or ``log_dir`` must be given.
-            if ``log_dir`` is given, ``logs_root`` is disregarded.
+        The lognflow allows setting global settings that can  be overridden
+        later by calling each of its methods as follows.
     
         :param logs_root: 
             This is the root directory for all logs.
@@ -825,7 +826,8 @@ class lognflow:
         fpath = self._get_fpath(param_dir, param_name, image_format, time_tag)
         
         try:
-            plt.savefig(fpath, format=image_format, dpi=dpi)
+            plt.savefig(fpath, format=image_format, dpi=dpi,
+                        bbox_inches='tight')
             if(close_plt):
                 plt.close()
             return fpath
@@ -835,65 +837,13 @@ class lognflow:
             self.log_text(
                 None, f'Cannot save the plt instance {parameter_name}.')
             return None
-     
-    def log_multichannel_by_subplots(self, 
-        parameter_name: str, 
-        parameter_value: np.ndarray,
-        frame_shape = None,
-        image_format='jpeg', 
-        dpi=1200, 
-        time_tag: bool = None,
-        colorbar = False,
-        remove_axis_ticks = True,
-        return_figure = False,
-        **kwargs):
-        """log multiple images as a tiled square
-            The image is logged using plt.imshow
-            
-            :param parameter_name: str
-                    examples: myvar or myscript/myvar
-                    parameter_name can be just a name e.g. myvar, or could be a
-                    path like name such as myscript/myvar.
-            :param parameter_value: np.array
-                    An np array of size n_r, n_c, n_ch, to be shown by imshow
-                    as a square tile of side length of n_ch**0.5
-            :param time_tag: bool
-                    Wheather if the time stamp is in the file name or not.
-                    
-        """
-        if not self.enabled: return
-        time_tag = self.time_tag if (time_tag is None) else time_tag
-            
-        n_r, n_c, n_ch = parameter_value.shape
-        
-        if(frame_shape is None):
-            n_ch_sq = int(np.ceil(n_ch ** 0.5))
-            n_ch_r, n_ch_c = (n_ch_sq, n_ch_sq)
-        else:
-            n_ch_r, n_ch_c = frame_shape
-        fig, ax = plt.subplots(n_ch_r,n_ch_c)
-        if(remove_axis_ticks):
-            plt.setp(ax, xticks=[], yticks=[])
-        for rcnt in range(n_ch_r):
-            for ccnt in range(n_ch_c):
-                imcnt = ccnt + rcnt * n_ch_c
-                if imcnt < n_ch:
-                    im = parameter_value[:,:, imcnt]
-                    im_ch = ax[rcnt, ccnt].imshow(im, **kwargs)
-                    if(colorbar):
-                        plt_colorbar(im_ch)
-        if not return_figure:
-            return self.log_plt(parameter_name = parameter_name,
-                         image_format=image_format, dpi=dpi,
-                         time_tag = time_tag)
-        else:
-            return fig
-            
+    
     def log_plot(self, parameter_name: str, 
                        parameter_value_list,
                        x_values = None,
-                       image_format='jpeg', dpi=1200,
+                       image_format='jpeg', dpi=1200, title = None,
                        time_tag: bool = None,
+                       return_figure = False,
                        **kwargs):
         """log a single plot
             If you have a numpy array or a list of arrays (or indexable by
@@ -918,40 +868,43 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        try:
-            if not isinstance(parameter_value_list, list):
-                parameter_value_list = [parameter_value_list]
-                
-            if(x_values is not None):
-                if not isinstance(x_values, list):
-                    x_values = [x_values]
+        if not isinstance(parameter_value_list, list):
+            parameter_value_list = [parameter_value_list]
             
-                if( not( (len(x_values) == len(parameter_value_list)) | \
-                         (len(x_values) == 1) )):
-                    self.log_text(
-                        self.log_name,
-                        f'x_values for {parameter_name} should have'\
-                        + ' length of 1 or the same as parameters list.')
-                    raise ValueError
-            
-            for list_cnt, parameter_value in enumerate(parameter_value_list):
-                if(x_values is None):
-                    plt.plot(parameter_value, **kwargs)
+        if(x_values is not None):
+            if not isinstance(x_values, list):
+                x_values = [x_values]
+        
+            if( not( (len(x_values) == len(parameter_value_list)) | \
+                     (len(x_values) == 1) )):
+                self.log_text(
+                    self.log_name,
+                    f'x_values for {parameter_name} should have'\
+                    + ' length of 1 or the same as parameters list.')
+                raise ValueError
+        
+        for list_cnt, parameter_value in enumerate(parameter_value_list):
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            if(x_values is None):
+                ax.plot(parameter_value, **kwargs)
+            else:
+                if(len(x_values) == len(parameter_value)):
+                    ax.plot(x_values[list_cnt], parameter_value, **kwargs)
                 else:
-                    if(len(x_values) == len(parameter_value)):
-                        plt.plot(x_values[list_cnt], parameter_value, **kwargs)
-                    else:
-                        plt.plot(x_values[0], parameter_value, **kwargs)
+                    ax.plot(x_values[0], parameter_value, **kwargs)
+        
+        if title is not None:
+            ax.set_title(title)
             
+        if not return_figure:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
-                        
             return fpath
-        except:
-            self.log_text(None, f'Cannot plot variable {parameter_name}.')
-            return None
+        else:
+            return fig, ax
     
     def log_hist(self, parameter_name: str, 
                        parameter_value_list,
@@ -959,7 +912,7 @@ class lognflow:
                        n_bins = 10,
                        alpha = 0.5,
                        normalize = False,
-                       image_format='jpeg', dpi=1200,
+                       image_format='jpeg', dpi=1200, title = None,
                        time_tag: bool = None, 
                        return_figure = False,
                        **kwargs):
@@ -992,8 +945,9 @@ class lognflow:
         fig, ax = plt_hist(parameter_value_list, 
                            n_bins = n_bins, alpha = alpha, 
                            normalize = normalize, 
-                           labels_list = None, **kwargs)
-        
+                           labels_list = labels_list, **kwargs)
+        if title is not None:
+            ax.set_title(title)
         if not return_figure:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
@@ -1004,8 +958,12 @@ class lognflow:
             return fig, ax
     
     def log_scatter3(self, parameter_name: str,
-                       parameter_value, image_format='jpeg', dpi=1200,
-                       time_tag: bool = None, return_figure = False):
+                     parameter_value, 
+                     image_format='jpeg', 
+                     dpi=1200,
+                     title = None,
+                     time_tag: bool = None, 
+                     return_figure = False):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
@@ -1027,6 +985,9 @@ class lognflow:
         ax.scatter(parameter_value[0], 
                    parameter_value[1], 
                    parameter_value[2])
+        
+        if title is not None:
+            ax.set_title(title)
         if not return_figure:
             return self.log_plt(
                 parameter_name = parameter_name, 
@@ -1035,10 +996,9 @@ class lognflow:
         else:
             return fig, ax
     
-    
-    
     def log_surface(self, parameter_name: str,
-                       parameter_value, image_format='jpeg', dpi=1200,
+                       parameter_value, image_format='jpeg', 
+                       dpi=1200, title = None,
                        time_tag: bool = None, return_figure = False, **kwargs):
         """log a surface in 3D
             surface plotting in 3D exactly similar to imshow but in 3D
@@ -1058,6 +1018,9 @@ class lognflow:
             
         fig, ax = plt_surface(parameter_value)
         
+        if title is not None:
+            ax.set_title(title)
+            
         if not return_figure:
             fpath = self.log_plt(
                 parameter_name = parameter_name, 
@@ -1068,8 +1031,8 @@ class lognflow:
             return fig, ax
         
     def log_hexbin(self, parameter_name: str, parameter_value,
-                   gridsize = 20, image_format='jpeg', dpi=1200,
-                   time_tag: bool = None):
+                   gridsize = 20, image_format='jpeg', dpi=1200, title = None,
+                   time_tag: bool = None, return_figure = False):
         """log a 2D histogram 
             The 2D histogram is made out of hexagonals
             
@@ -1092,7 +1055,10 @@ class lognflow:
         ax.hexbin(parameter_value[0], 
                    parameter_value[1], 
                    gridsize = gridsize)
-        if return_figure:
+        if title is not None:
+            ax.set_title(title)
+            
+        if not return_figure:
             fpath = self.log_plt(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
@@ -1102,11 +1068,19 @@ class lognflow:
             return fig, ax
         
     def log_imshow(self, parameter_name: str, parameter_value, 
+                   frame_shape : tuple = None,
                    colorbar = True, remove_axis_ticks = True,
                    image_format='jpeg', dpi=1200, cmap = 'viridis',
-                   time_tag: bool = None, borders = 0, **kwargs):
+                   title = None, time_tag: bool = None, borders = 0, 
+                   return_figure = False, **kwargs):
         """log an image
             The image is logged using plt.imshow
+            Accepted shapes are:
+                * (n, m) 
+                * (n, m,  3)
+                * (n_im, n_r, n_c)
+                * (n_im, n_r,  3,  1)
+                * (n_im, n_r, n_c, 3)
             
             :param parameter_name: str
                     examples: myvar or myscript/myvar
@@ -1115,43 +1089,40 @@ class lognflow:
             :param parameter_value: np.array
                     An np array of shape amongst the following:
                     * (n, m) 
-                    * (n, m, 3)
-                    * (n, m, ch)
-                    * (1, n, m, ch)
-                    * (n, m, 3, ch)
+                    * (n, m,  3)
+                    * (n_im, n_r, n_c)
+                    * (n_im, n_r,  3,  1)
+                    * (n_im, n_r, n_c, 3)
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
         """
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        parameter_value = parameter_value.squeeze()
         parameter_value_shape = parameter_value.shape
         n_dims = len(parameter_value_shape)
         
         FLAG_img_ready = False
-        use_multichannel_to_square = False
+        use_stack_to_frame = False
         if(n_dims == 2):
             FLAG_img_ready = True
         elif(n_dims == 3):
-            if(parameter_value_shape[2] == 3):
-                FLAG_img_ready = True
+            if(parameter_value_shape[2] != 3):
+                use_stack_to_frame = True
             else:
+                #warning that 3 dimensions as the last axis is RGB
                 FLAG_img_ready = True
-                use_multichannel_to_square = True
         elif(n_dims == 4):
-            if(parameter_value_shape[2] == 3):
-                FLAG_img_ready = True
-                use_multichannel_to_square = True
-            elif(parameter_value_shape[0] == 1):
-                FLAG_img_ready = True
-                use_multichannel_to_square = True
+                use_stack_to_frame = True
         
-        if(use_multichannel_to_square):
-            parameter_value = self. multichannel_to_square(
-                parameter_value, borders = borders)
-        if(FLAG_img_ready):
+        if(use_stack_to_frame):
+            parameter_value = stack_to_frame(
+                parameter_value, frame_shape = frame_shape, 
+                borders = borders)
+            if parameter_value is not None:
+                FLAG_img_ready = True
 
+        if(FLAG_img_ready):
             if(not np.iscomplexobj(parameter_value)):
                 fig, ax = plt.subplots()
                 im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
@@ -1173,80 +1144,111 @@ class lognflow:
                 ax[1].set_title('Imag')
                 if(remove_axis_ticks):
                     plt.setp(ax[0], xticks=[], yticks=[])
+                    ax[0].xaxis.set_ticks_position('none')
+                    ax[0].yaxis.set_ticks_position('none')
                     plt.setp(ax[1], xticks=[], yticks=[])
+                    ax[1].xaxis.set_ticks_position('none')
+                    ax[1].yaxis.set_ticks_position('none')
+            if title is not None:
+                ax.set_title(title)
                 
-            fpath = self.log_plt(
-                parameter_name = parameter_name, 
-                image_format=image_format, dpi=dpi,
-                time_tag = time_tag)
-            return fpath
+            if not return_figure:
+                fpath = self.log_plt(
+                        parameter_name = parameter_name, 
+                        image_format=image_format, dpi=dpi,
+                        time_tag = time_tag)
+                return fpath
+            else:
+                return fig, ax
         else:
             self.log_text(
                 self.log_name,
-                f'Cannot plot variable {parameter_name} with shape' + \
+                f'Cannot imshow variable {parameter_name} with shape' + \
                 f'{parameter_value.shape}')
             return
 
-    def _handle_images_stack(self, stack, borders = 0):
-        canv = None
-        if(len(stack.shape) == 2):
-            canv = np.expand_dims(stack, axis=0)
-        if(len(stack.shape) == 3):
-            if(stack.shape[2] == 3):
-                canv = np.expand_dims(stack, axis=0)
-            else:
-                canv = stack
-        if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-            canv = multichannel_to_frame(stack, borders = borders)
-        return canv
-    
-    def prepare_stack_of_images(self, 
-                                list_of_stacks, 
-                                borders = 0):
-        """Prepare the stack of images
-            If you wish to use the log_canvas, chances are you have a list
-            of stacks of images where one element, has many channels.
-            In that case, the channels can be tiled beside each other
-            to make one image for showing. This is very useful for ML apps.
-    
-            Each element of the list can appear as either:
-            n_row x n_clm if only one image is in the list 
-                          for all elements of stack
-            n_clm x n_ros x 3 if one RGB image is given
-            n_frm x n_row x n_clm if there are n_frm images 
-                                  for all elements of stack
-            n_frm x n_row x n_clm x n_ch if there are multiple images to be
-                                         shown. 
-                                         Channels will be tiled into square
-            n_frm x n_row x n_clm x n_ch x 3 if channels are in RGB
-    
-            :param list_of_stacks
-                    list_of_stacks would include arrays iteratable by their
-                    first dimension.
-            :param borders: float
-                    borders between tiles will be filled with this variable
-                    default: np.nan
+    def log_imshow_by_subplots(self, 
+        parameter_name: str, 
+        parameter_value: np.ndarray,
+        frame_shape = None,
+        grid_locations = None,
+        figsize = None,
+        im_size_factor = None,
+        im_sizes = None,
+        image_format='jpeg', 
+        dpi=1200, 
+        time_tag: bool = None,
+        colorbar = False,
+        remove_axis_ticks = True,
+        title = None,
+        cmap = None,
+        return_figure = False,
+        **kwargs):
+        """log multiple images in a tiled frame
+            The frame image is logged using plt.imshow
+            
+            Accepted shapes are:
+                * (n, m) 
+                * (n, m,  3)
+                * (n_im, n_r, n_c)
+                * (n_im, n_r,  3,  1)
+                * (n_im, n_r, n_c, 3)
+            
+            :param parameter_name: str
+                    examples: myvar or myscript/myvar
+                    parameter_name can be just a name e.g. myvar, or could be a
+                    path like name such as myscript/myvar.
+            :param parameter_value: np.array
+                    An np array of size n_f x n_r x n_c, to be shown by imshow
+                    as a square tile of side length of n_ch**0.5
+            :param frame_shape:
+                n_f images will be tiles according to thi tuple as shape.
+            :param grid_locations:
+                if this is of shape n_images x 2, then each subplot will be located
+                at a specific given location.
+                To make it beautiful, you better proveide figsize and im_sizes or 
+                im_size_factor to merely scale them to cover a small region between
+                0 and 1.
+            :param time_tag: bool
+                    Wheather if the time stamp is in the file name or not.
         """
-        if not self.enabled: return        
-        list_of_stacks = list(list_of_stacks)
-        for cnt, stack in enumerate(list_of_stacks):
-            stack = self._handle_images_stack(stack, borders = borders)
-            if(stack is None):
-                return
-            list_of_stacks[cnt] = stack
-        return(list_of_stacks)
+        if not self.enabled: return
+        time_tag = self.time_tag if (time_tag is None) else time_tag
 
-    def log_canvas(self, 
-                   parameter_name: str,
-                   list_of_stacks: list,
-                   list_of_masks = None,
-                   figsize_ratio = 1,
-                   text_as_colorbar = False,
-                   use_colorbar = False,
-                   image_format='jpeg', 
-                   cmap = 'viridis',
-                   dpi=1200,
-                   time_tag: bool = None):
+        fig, ax = imshow_by_subplots(stack = parameter_value,
+                                     frame_shape = frame_shape, 
+                                     grid_locations = grid_locations,
+                                     figsize = figsize,
+                                     im_size_factor = im_size_factor,
+                                     im_sizes = im_sizes,
+                                     colorbar = colorbar,
+                                     remove_axis_ticks = remove_axis_ticks,
+                                     title = title,
+                                     cmap = cmap,
+                                     **kwargs)
+                
+        if not return_figure:
+            fpath = self.log_plt(
+                    parameter_name = parameter_name, 
+                    image_format=image_format, dpi=dpi,
+                    time_tag = time_tag)
+            return fpath
+        else:
+            return fig, ax
+
+    def log_imshow_series(self, 
+                          parameter_name: str,
+                          list_of_stacks: list,
+                          list_of_masks = None,
+                          figsize_ratio = 1,
+                          text_as_colorbar = False,
+                          use_colorbar = False,
+                          cmap = 'viridis',
+                          list_of_titles = None,
+                          image_format='jpeg', 
+                          dpi=1200,
+                          time_tag: bool = None,
+                          return_figure = False):
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
@@ -1290,79 +1292,23 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        try:
-            _ = list_of_stacks.shape
-            list_of_stacks = [list_of_stacks]
-        except:
-            pass
-        n_stacks = len(list_of_stacks)
-        if(list_of_masks is not None):
-            n_masks = len(list_of_masks)
-            assert (n_masks == n_stacks), \
-                f'the number of masks, {n_masks} and ' \
-                + f'stacks {n_stacks} should be the same'
-        
-        n_imgs = list_of_stacks[0].shape[0]
-                
-        plt.figure(figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio))
-        gs1 = gridspec.GridSpec(n_stacks, n_imgs)
-        if(use_colorbar):
-            gs1.update(wspace=0.25, hspace=0)
+        fig, ax = imshow_series(list_of_stacks,
+                                list_of_masks = list_of_masks,
+                                figsize_ratio = figsize_ratio,
+                                text_as_colorbar = text_as_colorbar,
+                                use_colorbar = use_colorbar,
+                                cmap = cmap,
+                                list_of_titles = list_of_titles,
+                                )
+            
+        if not return_figure:
+            fpath = self.log_plt(
+                    parameter_name = parameter_name, 
+                    image_format=image_format, dpi=dpi,
+                    time_tag = time_tag)
+            return fpath
         else:
-            gs1.update(wspace=0.025, hspace=0) 
-        
-        for img_cnt in range(n_imgs):
-            for stack_cnt in range(n_stacks):
-                ax1 = plt.subplot(gs1[stack_cnt, img_cnt])
-                plt.axis('on')
-                ax1.set_xticklabels([])
-                ax1.set_yticklabels([])
-                data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
-                if(list_of_masks is not None):
-                    mask = list_of_masks[stack_cnt]
-                    if(mask is not None):
-                        if(data_canvas.shape == mask.shape):
-                            data_canvas[mask==0] = 0
-                            data_canvas_stat = data_canvas[mask>0]
-                else:
-                    data_canvas_stat = data_canvas.copy()
-                data_canvas_stat = data_canvas_stat[
-                    np.isnan(data_canvas_stat) == 0]
-                data_canvas_stat = data_canvas_stat[
-                    np.isinf(data_canvas_stat) == 0]
-                vmin = data_canvas_stat.min()
-                vmax = data_canvas_stat.max()
-                im = ax1.imshow(data_canvas, 
-                                vmin = vmin, 
-                                vmax = vmax,
-                                cmap = cmap)
-                if(text_as_colorbar):
-                    ax1.text(data_canvas.shape[0]*0,
-                             data_canvas.shape[1]*0.05,
-                             f'{data_canvas.max():.6f}', 
-                             color = 'yellow',
-                             fontsize = 2)
-                    ax1.text(data_canvas.shape[0]*0,
-                             data_canvas.shape[1]*0.5, 
-                             f'{data_canvas.mean():.6f}', 
-                             color = 'yellow',
-                             fontsize = 2)
-                    ax1.text(data_canvas.shape[0]*0,
-                             data_canvas.shape[1]*0.95, 
-                             f'{data_canvas.min():.6f}', 
-                             color = 'yellow',
-                             fontsize = 2)
-                if(use_colorbar):
-                    cbar = plt.colorbar(im, ax=ax1, fraction=0.046, pad=0.04)
-                    cbar.ax.tick_params(labelsize=1)
-                ax1.set_aspect('equal')
-                ax1.axis('off')
-        
-        fpath = self.log_plt(
-                parameter_name = parameter_name, 
-                image_format=image_format, dpi=dpi,
-                time_tag = time_tag)
-        return fpath
+            return fig, ax
 
     def log_confusion_matrix(self,
                              parameter_name: str,
@@ -1445,7 +1391,7 @@ class lognflow:
                    + 'misclass={:0.4f}'.format(accuracy, misclass))
         plt.title(title)
         plt.colorbar(im, fraction=0.046, pad=0.04)
-        plt.tight_layout()
+        
         fpath = self.log_plt(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
@@ -1482,12 +1428,13 @@ class lognflow:
             im = ax.imshow(img, animated=True)
             plt.xticks([]),plt.yticks([])
             ims.append([im])
-        ani = animation.ArtistAnimation(\
+        ani = matplotlib_animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit,
             repeat_delay = repeat_delay)
 
         ani.save(fpath, dpi = dpi, 
-                 writer = animation.PillowWriter(fps=int(1000/interval)))
+                 writer = matplotlib_animation.PillowWriter(
+                     fps=int(1000/interval)))
         return fpath
 
     def flush_all(self):
@@ -1515,6 +1462,12 @@ class lognflow:
                                parameter_value = parameter_value,
                                suffix = 'npz',
                                time_tag = time_tag)
+
+    def close(self):
+        try:
+            self.flush_all()
+        except:
+            pass
 
     def __call__(self, *args, **kwargs):
         """calling the object

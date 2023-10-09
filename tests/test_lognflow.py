@@ -7,6 +7,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from lognflow import lognflow, logviewer, printprogress, select_directory
+from lognflow.utils import stacks_to_frames
+
 import tempfile
 temp_dir = tempfile.gettempdir()
 
@@ -177,41 +179,37 @@ def test_log_hexbin():
 def test_log_imshow():
     logger = lognflow(temp_dir)
     logger('This is a test for log_imshow')    
-    logger.log_imshow('var3d', np.random.rand(100, 100))    
+    logger.log_imshow('var2d', np.random.rand(100, 100))    
+    logger.log_imshow('var2d_100_of_them', np.random.rand(25, 100, 100))
 
 def test_log_surface():
     logger = lognflow(temp_dir)
     logger('This is a test for log_surface')    
     logger.log_surface('var3d', np.random.rand(100, 100))    
 
-def test_prepare_stack_of_images():
+def test_log_imshow_series():
     """ 
         When we have 8 set of images, each is 100x100 and there are 9 of them 
         which will appear as 3x3 tile.
     """
-    stack_1 = np.random.rand(8, 100, 100, 9)
-    stack_1[:, :1, :, :] = np.nan
-    stack_1[:, :, :1, :] = np.nan
-    stack_1[:, -1:, :, :] = np.nan
-    stack_1[:, :, -1:, :] = np.nan
-    stack_2 = np.random.rand(8, 100, 100)
-    stack_3 = np.random.rand(8, 100, 100, 3, 9)
-    stack_3[:, :1] = np.nan
-    stack_3[:, :, :1] = np.nan
-    stack_3[:, -1:] = np.nan
-    stack_3[:, :, -1:] = np.nan
-    
-    list_of_stacks123 = [stack_1, stack_2, stack_3]
     logger = lognflow(temp_dir)
     logger('This is a test for prepare_stack_of_images')
-    list_of_stacks123 = logger.prepare_stack_of_images(list_of_stacks123)
-    logger.log_canvas('canvas_before_handling', list_of_stacks123)
+
+    stack_1 = np.random.rand(8, 9, 100, 100)
+    stack_1 = stacks_to_frames(stack_1)
+    stack_2 = np.random.rand(8, 100, 100)
+    stack_3 = np.random.rand(8, 9, 100, 100, 3)
+    stack_3 = stacks_to_frames(stack_3)
+    
+    list_of_stacks123 = [stack_1, stack_2, stack_3]
+    
+    logger.log_imshow_series('imshow_series_before_handling', list_of_stacks123)
     
     stack_4 = np.random.rand(1, 32, 32, 16)
-    l_stack4 = logger.prepare_stack_of_images(stack_4)
-    logger.log_canvas('just_one_canvas', l_stack4, cmap = 'cool')
+    stack_4 = stacks_to_frames(stack_4)
+    list_of_stacks = [stack_4]
+    logger.log_imshow_series('just_one_series', list_of_stacks, cmap = 'cool')
     
-def test_log_canvas():
     imgs=[]
     for _ in range(5):
         _imgs = np.random.rand(5, 100, 100)
@@ -219,9 +217,18 @@ def test_log_canvas():
         imgs.append(_imgs)
     
     logger = lognflow(temp_dir)
-    logger('This is a test for log_canvas')    
+    logger('This is a test for log_imshow_series')    
     logger(f'imgs.shape: {imgs[0].shape}')
 
+    logger.log_imshow_series(parameter_name = 'log_imshow_series\\', 
+                             list_of_stacks = imgs, 
+                             text_as_colorbar = True)
+
+def test_names_with_slashes_and_backslashes():
+    logger = lognflow(temp_dir)
+    logger('This is a test for test_names_with_slashes_and_backslashes')   
+
+    _imgs = np.random.rand(10, 10)
     logger.log_single(r'test_param1', _imgs)
     logger.log_single(r'test_param2/', _imgs)
     logger.log_single(r'test_param3\\', _imgs)
@@ -230,10 +237,6 @@ def test_log_canvas():
     logger.log_single(r'test_param4\d2/', _imgs)
     logger.log_single(r'test_param4\d2/e', _imgs)
 
-    logger.log_canvas(parameter_name = 'test_canvas\\', 
-                      list_of_stacks = imgs, 
-                      text_as_colorbar = True)
-    
 def test_log_confusion_matrix():
     from sklearn.metrics import confusion_matrix
     
@@ -322,17 +325,20 @@ def test_copy_list_of_files():
         var_check2 = logger.logged.get_single('myvar/var', file_index = test_cnt)
         assert var_check1 == var_check2
     
-def test_log_multichannel_by_subplots():
+def test_log_imshow_by_subplots():
     logger = lognflow(temp_dir)
-    logger('Well this is a test for log_multichannel_by_subplots')
-    images = np.random.rand(100, 100, 20)
-    logger.log_multichannel_by_subplots('images', images, (4, 5))
+    logger('Well this is a test for log_imshow_by_subplots')
+    images = np.random.rand(20, 100, 100)
+    logger.log_imshow_by_subplots('images', images, frame_shape = (4, 5))
 
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_log_multichannel_by_subplots()
+    test_log_imshow_series()
+    test_log_imshow_by_subplots()
+    test_log_imshow_complex()
+    test_log_imshow()
     test_replace_time_with_index()
     test_log_hist()
     test_copy_list_of_files()
@@ -341,13 +347,10 @@ if __name__ == '__main__':
     test_log_text()
     test_log_single()
     test_log_single_text()
-    test_log_imshow_complex()
-    test_log_imshow()
     test_log_surface()
     test_lognflow_conflict_in_names()
     test_rename()
     test_log_plot()
-    test_prepare_stack_of_images()
     test_logger()
     test_log_flush_period()
     test_log_var_without_time_stamp()
@@ -355,5 +358,5 @@ if __name__ == '__main__':
     test_log_scatter3()
     test_log_plt()
     test_log_hexbin()
-    test_log_canvas()
     test_log_confusion_matrix()
+    test_names_with_slashes_and_backslashes()

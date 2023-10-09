@@ -1,5 +1,6 @@
 from lognflow import multiprocessor
 import numpy as np
+import inspect
 
 def multiprocessor_targetFunc(inputs_to_iter_sliced, inputs_to_share):
     idx = inputs_to_iter_sliced[0]
@@ -13,6 +14,8 @@ def multiprocessor_targetFunc(inputs_to_iter_sliced, inputs_to_share):
     return(to_return1, 'median', to_return2)
     
 def test_multiprocessor():
+    print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
+
     N = 10000
     D = 1000
     data = (10+100*np.random.randn(N,D)).astype('int')
@@ -69,6 +72,7 @@ def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
     return(to_return)
 
 def test_multiprocessor_ccorr():
+    print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     data_shape = (1000, 2000)
     data1 = np.random.randn(*data_shape)
     data2 = 2 + 5 * np.random.randn(*data_shape)
@@ -80,9 +84,44 @@ def test_multiprocessor_ccorr():
     ccorr = multiprocessor(
         masked_cross_correlation, inputs_to_iter, inputs_to_share,
         test_mode = False)
-    print(f'ccorr: {ccorr}')
+
+def error_multiprocessor_targetFunc(inputs_to_iter_sliced, inputs_to_share):
+    idx = inputs_to_iter_sliced[0]
+    data, mask, op_type = inputs_to_share
+    _data = data[idx]
+    if(op_type=='median'):
+        to_return1 = np.median(_data[mask[idx]==1])
+        to_return1 = np.array([to_return1])
+    to_return2 = np.ones((int(10*np.random.rand(1)), 2, 2))
+    
+    if idx == 3000:
+        dsfee
+    
+    return(to_return1, 'median', to_return2)    
+
+def test_error_handling_in_multiprocessor():
+    print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
+    
+    N = 10000
+    D = 1000
+    data = (10+100*np.random.randn(N,D)).astype('int')
+    mask = (2*np.random.rand(N,D)).astype('int')
+    op_type = 'median'
+
+    inputs_to_share  = (data, mask, op_type)
+    inputs_to_iter = N
+    
+    stats = multiprocessor(
+        error_multiprocessor_targetFunc, inputs_to_iter, inputs_to_share,
+        verbose = True)
 
 if __name__ == '__main__':
     print('lets test', flush=True)
+    try:
+        test_error_handling_in_multiprocessor()
+    except Exception as e:
+        print('Error handled!')
+        print('Error was:')
+        print(e)
     test_multiprocessor()
     test_multiprocessor_ccorr()

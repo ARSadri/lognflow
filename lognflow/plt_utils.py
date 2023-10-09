@@ -1,5 +1,6 @@
 from .printprogress import printprogress
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.gridspec
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -38,14 +39,14 @@ def plt_hist(vectors_list,
                      label = f'{labels_list[vec_cnt]}', **kwargs)
     return fig, ax
 
-def plt_surface(parameter_value, **kwargs):
+def plt_surface(stack, **kwargs):
     from mpl_toolkits.mplot3d import Axes3D
-    n_r, n_c = parameter_value.shape
+    n_r, n_c = stack.shape
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
                        np.arange(n_c, dtype='int'))
-    ax.plot_surface(X, Y, parameter_value, **kwargs)
+    ax.plot_surface(X, Y, stack, **kwargs)
     return fig, ax
         
 def pltfig_to_numpy(fig):
@@ -233,5 +234,219 @@ class plot_gaussian_gradient:
         if(show_legend):
             plt.legend()
         plt.grid()
-        plt.tight_layout()
+        
         plt.show()
+
+def imshow_series(list_of_stacks, 
+                  list_of_masks = None,
+                  figsize_ratio = 1,
+                  text_as_colorbar = False,
+                  use_colorbar = False,
+                  cmap = 'viridis',
+                  list_of_titles = None,
+                  ):
+    """ imshow a stack of images or sets of images in a shelf
+        input must be a list or array of images
+        
+        Each element of the list can appear as either:
+        * n_im, n_r x n_c
+        * n_im, n_r x  3  x 1
+        * n_im, n_r x n_c x 3
+
+        :param list_of_stacks
+                list_of_stacks would include arrays iteratable by their
+                first dimension.
+        :param borders: float
+                borders between tiles will be filled with this variable
+                default: np.nan
+    """
+    n_stacks = len(list_of_stacks)
+    if(list_of_masks is not None):
+        assert len(list_of_masks) == n_stacks, \
+            f'the number of masks, {len(list_of_masks)} and ' \
+            + f'stacks {n_stacks} should be the same'
+    
+    # if list_of_titles is not None:
+    #     assert len(list_of_titles) == n_stacks, \
+    #         f'the number of titles, {len(list_of_titles)} and ' \
+    #         + f'stacks {n_stacks} should be the same'
+    
+    n_imgs = list_of_stacks[0].shape[0]
+    for ind, stack in enumerate(list_of_stacks):
+        assert stack.shape[0] == n_imgs, \
+            'All members of the given list should have same number of images.'
+        assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
+            f'The shape of the stack {ind} must have length 3 or 4, it has '\
+            f' shape of {stack.shape}. Perhaps you wanted to have only one set of'\
+            ' images. If thats the case, put that single image in a list.'
+            
+    fig = plt.figure(figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio))
+    gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs)
+    if(use_colorbar):
+        gs1.update(wspace=0.25, hspace=0)
+    else:
+        gs1.update(wspace=0.025, hspace=0) 
+    
+    for img_cnt in range(n_imgs):
+        for stack_cnt in range(n_stacks):
+            ax = plt.subplot(gs1[stack_cnt, img_cnt])
+            plt.axis('on')
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
+            if(list_of_masks is not None):
+                mask = list_of_masks[stack_cnt]
+                if(mask is not None):
+                    if(data_canvas.shape == mask.shape):
+                        data_canvas[mask==0] = 0
+                        data_canvas_stat = data_canvas[mask>0]
+            else:
+                data_canvas_stat = data_canvas.copy()
+            data_canvas_stat = data_canvas_stat[
+                np.isnan(data_canvas_stat) == 0]
+            data_canvas_stat = data_canvas_stat[
+                np.isinf(data_canvas_stat) == 0]
+            vmin = data_canvas_stat.min()
+            vmax = data_canvas_stat.max()
+            im = ax.imshow(data_canvas, 
+                            vmin = vmin, 
+                            vmax = vmax,
+                            cmap = cmap)
+            if(text_as_colorbar):
+                ax.text(data_canvas.shape[0]*0,
+                         data_canvas.shape[1]*0.05,
+                         f'{data_canvas.max():.6f}', 
+                         color = 'yellow',
+                         fontsize = 2)
+                ax.text(data_canvas.shape[0]*0,
+                         data_canvas.shape[1]*0.5, 
+                         f'{data_canvas.mean():.6f}', 
+                         color = 'yellow',
+                         fontsize = 2)
+                ax.text(data_canvas.shape[0]*0,
+                         data_canvas.shape[1]*0.95, 
+                         f'{data_canvas.min():.6f}', 
+                         color = 'yellow',
+                         fontsize = 2)
+            if(use_colorbar):
+                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                cbar.ax.tick_params(labelsize=1)
+            ax.set_aspect('equal')
+            ax.axis('off')
+        
+    
+    
+    return fig, None
+
+def imshow_by_subplots( 
+    stack,
+    frame_shape = None,
+    grid_locations = None,
+    figsize = None,
+    im_size_factor = None,
+    im_sizes = None,
+    colorbar = False,
+    remove_axis_ticks = True,
+    title = None,
+    cmap = None,
+    **kwargs):    
+    
+    stack_shape = stack.shape
+    n_dims = len(stack_shape)
+    
+    FLAG_img_ready = False
+    use_stack_to_frame = False
+    if(n_dims == 2):
+        FLAG_img_ready = True
+    elif(n_dims == 3):
+        if(stack_shape[2] != 3):
+            use_stack_to_frame = True
+        else:
+            #warning that 3 dimensions as the last axis is RGB
+            FLAG_img_ready = True
+    elif(n_dims == 4):
+            use_stack_to_frame = True
+    
+    if(use_stack_to_frame):
+        FLAG_img_ready = True
+
+    if(FLAG_img_ready):
+        if(np.iscomplexobj(stack)):
+            print('complex not supported in log_imshow_by_subplots')
+            return
+        else:                
+            n_f = stack.shape[0]
+            if grid_locations is None:
+                if(frame_shape is None):
+                    n_f_sq = int(np.ceil(n_f ** 0.5))
+                    n_f_r, n_f_c = (n_f_sq, n_f_sq)
+                else:
+                    n_f_r, n_f_c = frame_shape
+                
+                fig, ax = plt.subplots(n_f_r,n_f_c)
+                if(remove_axis_ticks):
+                    plt.setp(ax, xticks=[], yticks=[])
+                for rcnt in range(n_f_r):
+                    for ccnt in range(n_f_c):
+                        imcnt = ccnt + rcnt * n_f_c
+                        if imcnt < n_f:
+                            im = stack[imcnt]
+                            im_ch = ax[rcnt, ccnt].imshow(
+                                im, cmap = cmap, **kwargs)
+                            if(colorbar):
+                                plt_colorbar(im)
+                            if(remove_axis_ticks):
+                                plt.setp(ax, xticks=[], yticks=[])
+            else:
+                assert len(grid_locations) == n_f, \
+                    f'length of grid_locations: {grid_locations.shape} should '\
+                    f'be the same as number of images: {n_f}.'
+                assert len(grid_locations.shape) == 2, \
+                    'grid_locations should be n_f x 2, its shape is: '\
+                    f'{grid_locations.shape}.'
+                if background_image is not None:
+                    background_image = background_image.squeeze()
+                    assert len(background_image.shape) == 2, \
+                        'The background image should be a 2D image, its shape ' \
+                        f' is {background_image.shape}.'
+                        
+                if figsize is None:
+                    grid_locations_r_min = grid_locations[:, 0].min()
+                    grid_locations_r_max = grid_locations[:, 0].max()
+                    grid_locations_c_min = grid_locations[:, 1].min()
+                    grid_locations_c_max = grid_locations[:, 1].max()
+                    grid_size = (grid_locations_r_max - grid_locations_r_min,
+                                 grid_locations_c_max - grid_locations_c_min)
+                    figsize = (2, 2 * grid_size[1]/grid_size[0])
+                if im_sizes is None:
+                    if im_size_factor is None:
+                        im_size_factor = figsize[0] * figsize[1] / n_f
+                        im_sizes = (im_size_factor, 
+                                    im_size_factor * stack.shape[
+                                        2]/stack.shape[1]) 
+                
+                fig = plt.figure(figsize=figsize)
+                ax = fig.add_axes([0, 0, 1, 1])
+                if background_image is not None:
+                    ax.imshow(background_image)
+                if title is not None:
+                    ax.set_title(title)
+                for ccnt, coords in enumerate(grid_locations):
+                    pos = [coords[1], 1-coords[0], im_sizes[0], im_sizes[1]]
+                    ax_local = fig.add_axes(pos)
+                    im = ax_local.imshow(stack[ccnt], 
+                                   cmap = cmap, **kwargs)
+                    if(colorbar):
+                        plt_colorbar(im)
+                    if(remove_axis_ticks):
+                        plt.setp(ax_local, xticks=[], yticks=[])
+                        ax_local.xaxis.set_ticks_position('none')
+                        ax_local.yaxis.set_ticks_position('none')
+        
+        return fig, ax
+    else:
+        self.log_text(
+            self.log_name,
+            f'Cannot imshow variable {parameter_name} with shape' + \
+            f'{stack.shape}')
+        return

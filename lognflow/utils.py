@@ -107,19 +107,21 @@ def text_to_object(txt):
         obj_out = txt
     return obj_out
 
-def multichannel_to_frame(stack, frame_shape : tuple = None, borders = 0):
-    """ turn a stack of multi-channel images into a frame of images
+def stack_to_frame(stack, frame_shape : tuple = None, borders = 0):
+    """ turn a stack of images into a 2D frame of images
         This is very useful when lots of images need to be tiled
         against each other.
     
+        Note: if the last dimension is 3, all images are RGB, if you don't wish that
+        you have to add another dimension at the end by np.expand_dim(arr, axis = -1)
+    
         :param stack: np.ndarray
                 It must have the shape of either
-                n_r x n_c x n_ch
-                n_r x n_c x  3  x n_ch
-                n_f x n_r x n_c x n_ch
-                n_f x n_r x n_c x  3  x n_ch
+                n_im x n_r x n_c
+                n_im x n_r x  3  x  1
+                n_im x n_r x n_c x  3
                 
-            In both cases n_ch will be turned into a square tile
+            In all cases n_im will be turned into a frame
             Remember if you have N images to put into a square, the input
             shape should be 1 x n_r x n_c x N
         :param frame_shape: tuple
@@ -133,71 +135,80 @@ def multichannel_to_frame(stack, frame_shape : tuple = None, borders = 0):
         output
         ---------
             Since we have N channels to be laid into a square, the side
-            length woul be ceil(N**0.5)
-            it produces an np.array of shape n_f x n_r * S x n_c * S or
-            n_f x n_r * S x n_c * S x 3 in case of RGB input.
+            length would be ceil(N**0.5) if frame_shape is not given.
+            it produces an np.array of shape n_f x n_r * f_r x n_c * f_c or
+            n_f x n_r * f_r x n_c * f_c x 3 in case of an RGB input.
     """
-    if(len(stack.shape) == 4):
-        if(stack.shape[3] == 3):
-            stack = np.array([stack])
-    if(len(stack.shape) == 3):
-        stack = np.array([stack])
+    is_rgb = stack.shape[-1] == 3
     
-    if((len(stack.shape) == 4) | (len(stack.shape) == 5)):
-        if(len(stack.shape) == 4):
-            n_imgs, n_R, n_C, n_ch = stack.shape
-        if(len(stack.shape) == 5):
-            n_imgs, n_R, n_C, is_rgb, n_ch = stack.shape
-            if(is_rgb != 3):
-                return None
-        if(frame_shape is None):
-            square_side = int(np.ceil(np.sqrt(n_ch)))
-            frame_n_r, frame_n_c = (square_side, square_side)
-        else:
-            frame_n_r, frame_n_c = frame_shape
+    if(len(stack.shape) == 4):
+        if((stack.shape[2] == 3) & (stack.shape[3] == 1)):
+            stack = stack[..., 0]
+    
+    n_im, n_R, n_C = stack.shape[:3]
         
-        new_n_R = n_R * frame_n_r
-        new_n_C = n_C * frame_n_c
-        if(len(stack.shape) == 4):
-            canv = np.zeros((n_imgs, new_n_R, new_n_C), 
-                            dtype = stack.dtype)
-        if(len(stack.shape) == 5):
-            canv = np.zeros((n_imgs, new_n_R, new_n_C, 3),
-                             dtype = stack.dtype)
-        used_ch_cnt = 0
-        if(borders is not None):
-            stack[:,   :1      ] = borders
-            stack[:,   : ,   :1] = borders
-            stack[:, -1:       ] = borders
-            stack[:,   : , -1: ] = borders
-        
-        for rcnt in range(frame_n_r):
-            for ccnt in range(frame_n_c):
-                ch_cnt = rcnt + frame_n_c*ccnt
-                if (ch_cnt<n_ch):
-                    canv[:, rcnt*n_R: (rcnt + 1)*n_R,
-                            ccnt*n_C: (ccnt + 1)*n_C] = \
-                        stack[..., used_ch_cnt]
-                    used_ch_cnt += 1
+    if(len(stack.shape) == 4):
+        assert is_rgb, 'For a stack of images with axis 3, it should be 1 or 3.'
+
+    assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
+        f'The stack you provided can have specific shapes. it is {stack.shape}'
+
+    if(frame_shape is None):
+        square_side = int(np.ceil(np.sqrt(n_im)))
+        frame_n_r, frame_n_c = (square_side, square_side)
     else:
-        return None
-    return canv
+        frame_n_r, frame_n_c = frame_shape
+    n_R += 2
+    n_C += 2
+    new_n_R = n_R * frame_n_r
+    new_n_C = n_C * frame_n_c
+
+    if is_rgb:
+        frame = np.zeros((new_n_R, new_n_C, 3), dtype = stack.dtype)
+    else:
+        frame = np.zeros((new_n_R, new_n_C), dtype = stack.dtype)
+    used_ch_cnt = 0
+    if(borders is not None):
+        frame += borders
+    for rcnt in range(frame_n_r):
+        for ccnt in range(frame_n_c):
+            ch_cnt = rcnt + frame_n_c*ccnt
+            if (ch_cnt<n_im):
+                frame[rcnt*n_R + 1: (rcnt + 1)*n_R - 1,
+                      ccnt*n_C + 1: (ccnt + 1)*n_C - 1] = \
+                    stack[used_ch_cnt]
+                used_ch_cnt += 1
+    return frame
+
+def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
+    """ turn a list of stack of images into a list of frame of images
+        This is simply a list of calling stack_to_frame
+        :param stack_list:
+            It must have the shape of either
+            n_f x n_im x n_r x n_c
+            n_f x n_im x n_r x  3  x 1
+            n_f x n_im x n_r x n_c x 3
+
+    """    
+    return np.array([stack_to_frame(stack, 
+                           frame_shape = frame_shape, 
+                           borders = borders) for stack in stack_list])
 	
-class ssh_stablish:
+class ssh_system:
 	def __init__(self, hostname, username, password):
 		import paramiko
-
-		ssh_client = paramiko.SSHClient()
-		ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-		ssh_client.connect(hostname = hostname, 
+		self.ssh_client = paramiko.SSHClient()
+		self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+		self.ssh_client.connect(hostname = hostname, 
 						   username = username,
 						   password = password)
-		self.ssh_client = ssh_client
 	
-	def ssh_ls(self, ssh_client, path):
-		stdin, stdout, stderr = ssh_client.exec_command('ls ' + results_path)
+	def ssh_ls(self, path):
+		stdin, stdout, stderr = self.ssh_client.exec_command(
+            'ls ' + str(path))
 		ls_result = stdout.readlines()
 		return ls_result
 		
-	def ssh_scp(self, ssh_client, source, destination):
+	def ssh_scp(self, source, destination):
 		...
+        

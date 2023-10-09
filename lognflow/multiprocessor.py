@@ -9,14 +9,14 @@ from numpy import minimum     as np_minimum
 from numpy import concatenate as np_concatenate
 from numpy import argsort     as np_argsort
 
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue, cpu_count, Event
 
 from .printprogress import printprogress
 from psutil._compat import ChildProcessError
 
 def _multiprocessor_function_test_mode(
         inputs_to_iter_batch, targetFunction, \
-        inputs_to_share, theQ, procID_range):
+        inputs_to_share, theQ, procID_range, error_event):
     outputs = []
     for idx, procCnt in enumerate(procID_range):
         inputs_to_iter_sliced = ()
@@ -27,25 +27,28 @@ def _multiprocessor_function_test_mode(
         else:
             results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
         outputs.append(results)
-    theQ.put(list([procID_range, outputs, False]))
+    theQ.put([procID_range, outputs, False])
 
 def _multiprocessor_function(inputs_to_iter_batch, targetFunction, \
-        inputs_to_share, theQ, procID_range):
+        inputs_to_share, theQ, procID_range, error_event):
     outputs = []
     for idx, procCnt in enumerate(procID_range):
         inputs_to_iter_sliced = ()
         for iim in inputs_to_iter_batch:
             inputs_to_iter_sliced = inputs_to_iter_sliced + (iim[idx], )
         try:
+            assert not error_event.is_set()
             if inputs_to_share is None:
                 results = targetFunction(inputs_to_iter_sliced)
             else:
                 results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
             outputs.append(results)
         except Exception as e:
-            theQ.put(list([procID_range, None, True]))
+            if not error_event.is_set():
+                error_event.set()
+            theQ.put([np_array([procCnt]), None, True])
             return
-    theQ.put(list([procID_range, outputs, False]))
+    theQ.put([procID_range, outputs, False])
 
 def multiprocessor(
     targetFunction,
@@ -227,6 +230,9 @@ def multiprocessor(
         pBar = printprogress(n_pts, title = 
             f'Processing {n_pts} data points with {max_cpu} CPUs')
     any_error = False
+    
+    error_event = Event()
+    
     while(numProcessed<n_pts):
         if (not aQ.empty()):
             aQElement = aQ.get()
@@ -234,7 +240,7 @@ def multiprocessor(
             ret_result = aQElement[1]
             if ((not any_error) & aQElement[2]):
                 any_error = True
-                error_ret_procID_range = ret_procID_range.copy()
+                error_ret_procID = ret_procID_range.copy()
                 try:
                     pBar._end()
                 except:
@@ -269,7 +275,7 @@ def multiprocessor(
                 inputs_to_iter_batch = \
                     inputs_to_iter_batch + (iim[procID_arange], )
             _args = (inputs_to_iter_batch, ) + (
-                targetFunction, inputs_to_share, aQ, procID_arange)
+                targetFunction, inputs_to_share, aQ, procID_arange, error_event)
             
             if(test_mode):
                 _multiprocessor_function_test_mode(*_args)
@@ -285,15 +291,16 @@ def multiprocessor(
               'ChildProcessError regardless.')
         logger(f'We will call {targetFunction} ')
         logger('with the following index to slice the inputs:'
-              f' {error_ret_procID_range[0]} to {error_ret_procID_range[-1]}')
-        logger('to avoid this message set the legger arg to a dummy function')
+              f' {error_ret_procID[0]}')
+        logger('to avoid seeing this message, pass the argument called '\
+               'legger, it is print by default.')
         logger('-'*79)
         inputs_to_iter_batch = ()
         for iim in inputs_to_iter:
             inputs_to_iter_batch = \
-                inputs_to_iter_batch + (iim[error_ret_procID_range], )
+                inputs_to_iter_batch + (iim[error_ret_procID], )
         _args = (inputs_to_iter_batch, ) + (
-            targetFunction, inputs_to_share, aQ, error_ret_procID_range)
+            targetFunction, inputs_to_share, aQ, error_ret_procID, error_event)
         _multiprocessor_function_test_mode(*_args)
         raise ChildProcessError
     

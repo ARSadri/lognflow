@@ -219,7 +219,7 @@ class logviewer:
                     return(loadmat(var_path))
                 if(var_path.suffix == '.dm4'):
                     from hyperspy.api import load as hyperspy_api_load
-                    return hyperspy_api_load(filename)
+                    return hyperspy_api_load(var_path).data
                 if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
                     from tifffile import imread
                     return(imread(var_path))
@@ -239,8 +239,8 @@ class logviewer:
                 var_path = None
                 
         if var_path is None:
-            self.logger(f'{var_name} does not resemble the name of any file '
-                        f'or directory in the log_dir: {self.log_dir}')
+            self.logger(f'Looking for {var_name} failed. ' + \
+                        f'{var_path} is not in: {self.log_dir}')
     
     def get_stack_of_files(self, 
         var_name = None, flist = [], suffix = None, read_func = None):

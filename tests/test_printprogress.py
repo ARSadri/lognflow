@@ -7,6 +7,7 @@ import pytest
 from lognflow import lognflow, select_directory, logviewer, printprogress
 
 import numpy as np
+import time
 
 import tempfile
 temp_dir = tempfile.gettempdir()
@@ -33,7 +34,6 @@ def test_printprogress_ETA():
         print(ETA)
     
 def test_specific_timing():
-    import time
     logger = lognflow(temp_dir)
     N = 7812
     pprog = printprogress(N, title='Inference of 7812 points. ')
@@ -44,10 +44,11 @@ def test_specific_timing():
         pprog()
 
 def test_generator_type():
-    vec = np.arange(100)
+    vec = np.arange(12)
     sum = 0
     for _ in printprogress(vec):
         sum += _
+        time.sleep(0.1)
     print(f'sum: {sum}')
 
 if __name__ == '__main__':
@@ -55,7 +56,6 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     test_generator_type()
-    exit()
     test_printprogress()
     test_printprogress_ETA()
     test_specific_timing()
