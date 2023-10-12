@@ -185,7 +185,7 @@ History
 * bug fixed in get_flist to return dirs only as well
 * all new features for Python 3.10 onwards are removed.
 
-0.10.3 (2023-11-01)
+0.10.3 (2023-10-09)
 -----------------
 * multiprocessor handles errors with maximum speed as all processes share error_event
 * multichannel_plots assume fitrst fimension is the channels not the last 
@@ -196,3 +196,9 @@ History
 * if there are multiple images the shape should be n_f x n_r x n_c
 * tests are added for all functions
 * tests for lognflow.utils is added
+
+0.10.4 (2023-10-12)
+-----------------
+* get_flist returns whatever search pattern means for .glob
+* plt_tight_layout is removed and replaced by bbox
+* You can get name from file when file is within the log_dir root

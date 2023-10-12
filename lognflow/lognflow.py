@@ -43,12 +43,14 @@ from    pathlib             import Path         as pathlib_Path
 from    itertools           import product      as itertools_product
 from    sys                 import platform     as sys_platform
 from    os                  import system       as os_system
+from    tempfile            import gettempdir
 from    dataclasses         import dataclass    
 from    .logviewer          import logviewer
 from    .utils              import (repr_raw,
                                     replace_all,
                                     select_directory, 
-                                    stack_to_frame)
+                                    stack_to_frame,
+                                    name_from_file)
 from    .plt_utils          import (plt_colorbar,
                                     plt_hist,
                                     plt_surface, 
@@ -148,7 +150,6 @@ class lognflow:
         
         if(log_dir is None):
             if(logs_root is None):
-                from tempfile import gettempdir
                 logs_root = gettempdir()
                 try:
                     logs_root = select_directory(logs_root)
@@ -205,17 +206,8 @@ class lognflow:
             Given an fpath inside the logger log_dir, 
             what would be its equivalent parameter_name?
         """
-        fpath_str = str(fpath.absolute())
-        log_dir_str = None
-        if self.log_dir_str in fpath_str:
-            log_dir_str = self.log_dir_str
-        if (self.log_dir_str + '/') in fpath_str:
-            log_dir_str = self.log_dir_str + '/'
-        if log_dir_str:
-            fpath_name = fpath_str.split(log_dir_str)[-1]
-            fpath_split = fpath_name.split('.')
-            return '.'.join(fpath_split[:-1])
-
+        return name_from_file(self.log_dir_str, fpath)
+        
     def copy(self, parameter_name, source, suffix = None,
              time_tag = False):
         """ copy into a new file
@@ -798,7 +790,7 @@ class lognflow:
             else:
                 with open(fpath,'a') as fdata: 
                     fdata.write(str(parameter_value))
-        except:
+        except Exception as e:
             fpath = None
         return fpath
     

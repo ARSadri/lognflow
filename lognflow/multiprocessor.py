@@ -12,7 +12,6 @@ from numpy import argsort     as np_argsort
 from multiprocessing import Process, Queue, cpu_count, Event
 
 from .printprogress import printprogress
-from psutil._compat import ChildProcessError
 
 def _multiprocessor_function_test_mode(
         inputs_to_iter_batch, targetFunction, \

@@ -86,6 +86,7 @@ class printprogress:
         
         self._print_func(' ', end = '')
         self.len_prog_text = 0
+        self.remTimeS_perv = 0
     
     def _print_func(self, text, end='\n'):
         if (self.in_print_function is not None):
@@ -100,13 +101,11 @@ class printprogress:
             passedTime = time() - self.startTime
             if self.ck > 0:
                 remTimeS = passedTime * ( self.n_steps / self.ck - 1)
+                if (self.remTimeS_perv > 5) & (remTimeS > 5):
+                    remTimeS = 0.95*remTimeS + 0.05*self.remTimeS_perv
+                self.remTimeS_perv = remTimeS
             else:
-                remTimeS = 356401
-        
-            if (remTimeS < 1) & self.FLAG_first_tick:
-                remTimeS = 356401
-                self.FLAG_first_tick = False
-                
+                remTimeS = 1e+7
         return remTimeS
     
     def _make_progress(self, ck = 1):
@@ -125,28 +124,29 @@ class printprogress:
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
                     remTimeS = self._calc_ETA()
-                    if(remTimeS>356400): # less than 99d and more than 99h
-                        progStr = "%02d" % int(ceil(remTimeS/86400))
-                        self._print_func(progStr, end='')
-                        self._print_func('d', end='')
-                        self.len_prog_text += 3
-                    elif(remTimeS>5940): # less than 99h and more than 99m
-                        progStr = "%02d" % int(ceil(remTimeS/3600))
-                        self._print_func(progStr, end='')
-                        self._print_func('h', end='')
-                        self.len_prog_text += 3
-                    elif(remTimeS>99): # less than 99m and more than 99s
-                        progStr = "%02d" % int(ceil(remTimeS/60))
-                        self._print_func(progStr, end='')
-                        self._print_func('m', end='')
-                        self.len_prog_text += 3
-                    elif(remTimeS>=0): # less than 99s and more than 0
-                        progStr = "%02d" % int(ceil(remTimeS))
-                        self._print_func(progStr, end='')
-                        self._print_func('s', end='')
-                        self.len_prog_text += 3
-                    else:
-                        self._end()
+                    if remTimeS < 86400*100:
+                        if(remTimeS>356400): # less than 99d and more than 99h
+                            progStr = "%02d" % int(ceil(remTimeS/86400))
+                            self._print_func(progStr, end='')
+                            self._print_func('d', end='')
+                            self.len_prog_text += 3
+                        elif(remTimeS>5940): # less than 99h and more than 99m
+                            progStr = "%02d" % int(ceil(remTimeS/3600))
+                            self._print_func(progStr, end='')
+                            self._print_func('h', end='')
+                            self.len_prog_text += 3
+                        elif(remTimeS>99): # less than 99m and more than 99s
+                            progStr = "%02d" % int(ceil(remTimeS/60))
+                            self._print_func(progStr, end='')
+                            self._print_func('m', end='')
+                            self.len_prog_text += 3
+                        elif(remTimeS>=0): # less than 99s and more than 0
+                            progStr = "%02d" % int(ceil(remTimeS))
+                            self._print_func(progStr, end='')
+                            self._print_func('s', end='')
+                            self.len_prog_text += 3
+                        else:
+                            self._end()
             if((self.ck >= self.n_steps) | 
                (self.len_prog_text >= self.numTicks)):
                 self._end()

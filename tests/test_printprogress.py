@@ -51,6 +51,14 @@ def test_generator_type():
         time.sleep(0.1)
     print(f'sum: {sum}')
 
+def test_varying_periods():
+    vec = np.arange(60)
+    sum = 0
+    for _ in printprogress(vec):
+        sum += _
+        time.sleep(np.random.rand())
+    print(f'sum: {sum}')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
@@ -60,4 +68,5 @@ if __name__ == '__main__':
     test_printprogress_ETA()
     test_specific_timing()
     test_printprogress_with_logger()
-    exit()    
+    test_varying_periods()
+

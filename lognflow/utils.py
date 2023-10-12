@@ -1,9 +1,28 @@
 from re import sub as re_sub
 import numpy as np
-from unicodedata import normalize as unicodedata_normalize
 
 def dummy_function(*args, **kwargs): ...
 
+def name_from_file(log_dir, fpath):
+    """ 
+        Given an fpath inside the logger log_dir, 
+        what would be its equivalent parameter_name?
+    """
+    fpath_str = str(fpath.absolute())
+    try:
+        log_dir = str(log_dir.absolute())
+    except:
+        log_dir = str(log_dir)
+    log_dir_str = None
+    if log_dir in fpath_str:
+        log_dir_str = log_dir
+    if (log_dir + '/') in fpath_str:
+        log_dir_str = log_dir + '/'
+    if log_dir_str:
+        fpath_name = fpath_str.split(log_dir_str)[-1]
+        fpath_split = fpath_name.split('.')
+        return '.'.join(fpath_split[:-1])
+    
 def repr_raw(text):
     """ Raw text representation
         Returns a raw string representation of a text that has escape 

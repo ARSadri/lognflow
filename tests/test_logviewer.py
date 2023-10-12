@@ -13,6 +13,18 @@ from lognflow import (lognflow, select_directory,
 import tempfile
 temp_dir = tempfile.gettempdir()
 
+def test_get_flist_multiple_directories():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for test_multiple_directories_get_flist')
+    
+    logger.log_single('dir1/dir/var', np.random.rand(100))
+    logger.log_single('dir2/dir/var', np.random.rand(100))
+    logger.log_single('dir3/dir/var', np.random.rand(100))
+    
+    flist = logger.logged.get_flist('dir*/dir/var*.npy')
+    [print(_) for _ in flist]
+    [print(logger.logged.name_from_file(_)) for _ in flist]
+        
 def test_logviewer():
     logger = lognflow(temp_dir)
     logger('Well this is a test for logviewer')
@@ -112,6 +124,7 @@ def test_get_single_specific_fname():
 
 if __name__ == '__main__':
     temp_dir = select_directory()
+    test_get_flist_multiple_directories()
     test_get_single_specific_fname()
     test_get_images_as_stack()
     test_logviewer()

@@ -1,6 +1,7 @@
 import pathlib
 import numpy as np
-from .utils import replace_all, dummy_function
+from   matplotlib.pyplot import imread
+from   .utils            import replace_all, dummy_function, name_from_file
 
 class logviewer:
     """ log viewer
@@ -21,8 +22,16 @@ class logviewer:
             f'lognflow.logviewer| No such directory: '+ str(self.log_dir)
         self.logger = logger
         self.load = self.get_single
+        self.log_dir_str = str(self.log_dir.absolute())
     
-    def stop_logging(self):
+    def name_from_file(self, fpath):
+        """ 
+            Given an fpath inside the logger log_dir, 
+            what would be its equivalent parameter_name?
+        """
+        return name_from_file(self.log_dir_str, fpath)
+    
+    def disable_logger(self):
         self.logger = dummy_function
     
     def get_flist(self, var_name, suffix = None):
@@ -40,44 +49,47 @@ class logviewer:
         """
         var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
             .replace('\r', '\\r').replace('\b', '\\b')
+
+        flist = list((self.log_dir).glob(var_name))
         
-        if suffix is None:
-            if len(var_name.split('.')) > 1:
-                suffix = var_name.split('.')[-1]
-                name_before_suffix = var_name.split('.')[:-1]
-                if((len(name_before_suffix) == 1) & 
-                   (name_before_suffix[0] == '')):
-                    var_name = '*'
+        if not flist:
+            if suffix is None:
+                if len(var_name.split('.')) > 1:
+                    suffix = var_name.split('.')[-1]
+                    name_before_suffix = var_name.split('.')[:-1]
+                    if((len(name_before_suffix) == 1) & 
+                       (name_before_suffix[0] == '')):
+                        var_name = '*'
+                    else:
+                        var_name = ('.').join(var_name.split('.')[:-1])
                 else:
-                    var_name = ('.').join(var_name.split('.')[:-1])
+                    suffix = '*'
+    
+            suffix = suffix.strip('.')        
+    
+            flist = []            
+            if((self.log_dir / var_name).is_file()):
+                flist = [self.log_dir / var_name]
+            elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
+                flist = [self.log_dir / f'{var_name}.{suffix}']
             else:
-                suffix = '*'
-
-        suffix = suffix.strip('.')        
-
-        flist = []            
-        if((self.log_dir / var_name).is_file()):
-            flist = [self.log_dir / var_name]
-        elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
-            flist = [self.log_dir / f'{var_name}.{suffix}']
-        else:
-            _var_name = (self.log_dir / var_name).name
-            _var_dir = (self.log_dir / var_name).parent
-            search_patt = f'{_var_name}*.{suffix}'
-            search_patt = replace_all(search_patt, '**', '*')
-            flist = list(_var_dir.glob(search_patt))
-            if(len(flist) == 0):
-                search_patt = f'{_var_name}*.*'
+                _var_name = (self.log_dir / var_name).name
+                _var_dir = (self.log_dir / var_name).parent
+                search_patt = f'{_var_name}*.{suffix}'
                 search_patt = replace_all(search_patt, '**', '*')
                 flist = list(_var_dir.glob(search_patt))
-                if(len(flist) > 0):
-                    self.logger(
-                        'I Can not find the file with the given suffix, '\
-                        + 'but found some with a different suffix, '\
-                        + f'one file is: {flist[-1]}. This is what I'\
-                        + ' will return.' )
+                if(len(flist) == 0):
+                    search_patt = f'{_var_name}*.*'
+                    search_patt = replace_all(search_patt, '**', '*')
+                    flist = list(_var_dir.glob(search_patt))
+                    if(len(flist) > 0):
+                        self.logger(
+                            'I Can not find the file with the given suffix, '\
+                            + 'but found some with a different suffix, '\
+                            + f'one file is: {flist[-1]}. This is what I'\
+                            + ' will return.' )
                     
-        if(len(flist) > 0):
+        if(flist):
             flist.sort()
         else:
             var_dir = self.log_dir / var_name
@@ -227,7 +239,6 @@ class logviewer:
                     from torch import load as torch_load 
                     return(torch_load(var_path))
                 try:
-                    from matplotlib.pyplot import imread
                     img = imread(var_path)
                     return(img)
                 except:
@@ -238,7 +249,7 @@ class logviewer:
             else:
                 var_path = None
                 
-        if var_path is None:
+        if (var_path is None) & verbose:
             self.logger(f'Looking for {var_name} failed. ' + \
                         f'{var_path} is not in: {self.log_dir}')
     
@@ -292,7 +303,6 @@ class logviewer:
                     pass
             if(read_func is None):
                 try:
-                    from matplotlib.pyplot import imread
                     fdata = imread(flist[0])
                     read_func = imread
                 except:
