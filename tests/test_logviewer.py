@@ -35,48 +35,48 @@ def test_logviewer():
     print(logged.get_single('test_param'))
     print(logged.get_text())
 
-def test_get_images_as_stack():
+def test_get_stack_from_files():
     logger = lognflow(temp_dir)
     
     logger('Well this is a test for logviewer')
 
     for _ in range(5):
-        logger.log_imshow('A/', np.random.rand(100, 100), dpi = 300)
-        logger.log_imshow('B/', np.random.randn(100, 100), dpi = 300)
+        logger.log_single('A/', np.random.rand(100, 100))
+        logger.log_single('B/', np.random.randn(100, 100))
 
     logged = logviewer(logger.log_dir, logger)
 
-    flist_A = logged.get_flist('A/')
-    flist_B = logged.get_flist('B/')
+    flist_A = logged.get_flist('A/*')
+    flist_B = logged.get_flist('B/*')
     
     logger(flist_A)
     logger(flist_B)
     
-    logger.logged.replace_time_with_index('A/')
-    logger.logged.replace_time_with_index('B/')
-    
-    stack_A = logged.get_stack_of_files('A/')
-    stack_B = logged.get_stack_of_files('B/')
+    logger.logged.replace_time_with_index('A/*')
+    logger.logged.replace_time_with_index('B/*')
 
-    logger(stack_A.shape)
-    logger(stack_B.shape)
+    flist_A = logged.get_flist('A/*')
+    flist_B = logged.get_flist('B/*')
+    
+    logger(flist_A)
+    logger(flist_B)
+    
+    stack_A = logged.get_stack_from_files(flist = flist_A)
+    stack_B = logged.get_stack_from_files(flist = flist_B)
+
+    logger(f'stack_A.shape: {stack_A.shape}')
+    logger(f'stack_B.shape: {stack_B.shape}')
     
     logger.log_imshow_series('data_samples', [stack_A, stack_B], dpi = 300)
 
-    flist_A = logged.get_flist('A/')
-    flist_B = logged.get_flist('B/')
-    
-    logger(flist_A)
-    logger(flist_B)
-
-    flist_A_AB, flist_B_AB = logged.get_common_files('A/', 'B/')
+    flist_A_AB, flist_B_AB = logged.get_common_files('A/*', 'B/*')
     logger(flist_A_AB)
     logger(flist_B_AB)
     
     if(flist_A_AB):
         
-        dataset_A = logged.get_stack_of_files('A/', flist = flist_A_AB)
-        dataset_B = logged.get_stack_of_files('B/', flist = flist_B_AB)
+        dataset_A = logged.get_stack_from_files('A/*', flist = flist_A_AB)
+        dataset_B = logged.get_stack_from_files('B/*', flist = flist_B_AB)
         
         logger.log_imshow_series('data_samples', 
                                  [dataset_A, dataset_B], dpi = 300)
@@ -122,10 +122,24 @@ def test_get_single_specific_fname():
     
     assert vec_out == vec
 
+def test_get_stack_from_names():
+    logger = lognflow(temp_dir)
+    logger('test get single specific fname')
+    
+    logger.log_imshow('im1', np.random.randn(30, 30))
+    logger.log_imshow('im1', np.random.randn(20, 40))
+    
+    logged = logviewer(logger.log_dir)
+
+    images = logged.get_stack_from_names('im1')
+    
+    print(len(images))
+
 if __name__ == '__main__':
     temp_dir = select_directory()
+    test_get_stack_from_files()
+    test_get_stack_from_names()
     test_get_flist_multiple_directories()
     test_get_single_specific_fname()
-    test_get_images_as_stack()
     test_logviewer()
     test_text_to_object()

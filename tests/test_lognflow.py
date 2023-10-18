@@ -282,14 +282,14 @@ def test_replace_time_with_index():
     logged = logviewer(logger.log_dir, logger)
 
     flist = logged.get_flist('test_param')
-    data_in = logged.get_stack_of_files('test_param')
+    data_in = logged.get_stack_from_files('test_param')
     
     logger(flist)
 
     logger.logged.replace_time_with_index('test_param')
     
     flist = logged.get_flist('test_param')
-    data_out = logged.get_stack_of_files(flist = flist)
+    data_out = logged.get_stack_from_files(flist = flist)
     
     logger(flist)
     
@@ -318,7 +318,7 @@ def test_copy_list_of_files():
     logger.log_single('test/var', np.random.rand(10), suffix = 'json')
     logger.log_single('test/var', np.random.rand(10), suffix = 'txt')
     
-    logger.copy('myvar/', 'test/var', suffix = 'pdb', time_tag = False)
+    logger.copy('myvar/', 'test/var*', suffix = 'pdb', time_tag = False)
     
     for test_cnt in range(4):
         var_check1 = logger.logged.get_single('test/var', file_index = test_cnt)
@@ -331,17 +331,45 @@ def test_log_imshow_by_subplots():
     images = np.random.rand(20, 100, 100)
     logger.log_imshow_by_subplots('images', images, frame_shape = (4, 5))
 
+def test_copy():
+    logger1 = lognflow(temp_dir)
+    fpath = logger1('Well this is a test for test_copy')
+    
+    logger2 = lognflow(temp_dir)
+    logger2.copy('some_text.txt', fpath)
+
+def test_log_images_in_pdf():
+    logger = lognflow(temp_dir)
+    logger('test log images in pdf')
+    
+    logger.log_imshow('im1', np.random.randn(30, 30))
+    logger.log_imshow('im1', np.random.randn(20, 40))
+    
+    images = logger.logged.get_stack_from_names('im1')
+    logger.log_images_in_pdf(
+        'im1_all', parameter_value = images, time_tag = False)
+    
+def test_variables_to_pdf():
+    logger = lognflow(temp_dir)
+    logger('test log variables in pdf')
+    
+    logger.log_imshow('im1', np.random.randn(30, 30))
+    logger.log_imshow('im1', np.random.randn(20, 40))
+    logger.variables_to_pdf('im1_all', 'im1', time_tag = False)
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_copy_list_of_files()
+    test_log_images_in_pdf()
+    test_variables_to_pdf()
     test_log_imshow_series()
     test_log_imshow_by_subplots()
     test_log_imshow_complex()
     test_log_imshow()
     test_replace_time_with_index()
     test_log_hist()
-    test_copy_list_of_files()
     test_copy_file()
     test_log_var()
     test_log_text()
@@ -360,3 +388,4 @@ if __name__ == '__main__':
     test_log_hexbin()
     test_log_confusion_matrix()
     test_names_with_slashes_and_backslashes()
+    test_copy()

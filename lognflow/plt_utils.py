@@ -241,7 +241,7 @@ def imshow_series(list_of_stacks,
                   list_of_masks = None,
                   figsize_ratio = 1,
                   text_as_colorbar = False,
-                  use_colorbar = False,
+                  colorbar = False,
                   cmap = 'viridis',
                   list_of_titles = None,
                   ):
@@ -282,7 +282,7 @@ def imshow_series(list_of_stacks,
             
     fig = plt.figure(figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio))
     gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs)
-    if(use_colorbar):
+    if(colorbar):
         gs1.update(wspace=0.25, hspace=0)
     else:
         gs1.update(wspace=0.025, hspace=0) 
@@ -328,7 +328,7 @@ def imshow_series(list_of_stacks,
                          f'{data_canvas.min():.6f}', 
                          color = 'yellow',
                          fontsize = 2)
-            if(use_colorbar):
+            if(colorbar):
                 cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                 cbar.ax.tick_params(labelsize=1)
             ax.set_aspect('equal')

@@ -14,33 +14,40 @@ from multiprocessing import Process, Queue, cpu_count, Event
 from .printprogress import printprogress
 
 def _multiprocessor_function_test_mode(
-        inputs_to_iter_batch, targetFunction, \
-        inputs_to_share, theQ, procID_range, error_event):
+        iterables_batch, targetFunction, \
+        shareables, theQ, procID_range, error_event):
     outputs = []
     for idx, procCnt in enumerate(procID_range):
-        inputs_to_iter_sliced = ()
-        for iim in inputs_to_iter_batch:
-            inputs_to_iter_sliced = inputs_to_iter_sliced + (iim[idx], )
-        if inputs_to_share is None:
-            results = targetFunction(inputs_to_iter_sliced)
+        if len(iterables_batch) == 1:
+            iterables_sliced = iterables_batch[0][idx]
         else:
-            results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
+            iterables_sliced = ()
+            for iim in iterables_batch:
+                iterables_sliced = iterables_sliced + (iim[idx], )
+        if shareables is None:
+            results = targetFunction(iterables_sliced)
+        else:
+            results = targetFunction(iterables_sliced, shareables)
         outputs.append(results)
     theQ.put([procID_range, outputs, False])
 
-def _multiprocessor_function(inputs_to_iter_batch, targetFunction, \
-        inputs_to_share, theQ, procID_range, error_event):
+def _multiprocessor_function(iterables_batch, targetFunction, \
+        shareables, theQ, procID_range, error_event):
     outputs = []
     for idx, procCnt in enumerate(procID_range):
-        inputs_to_iter_sliced = ()
-        for iim in inputs_to_iter_batch:
-            inputs_to_iter_sliced = inputs_to_iter_sliced + (iim[idx], )
+        try:
+            if len(iterables_batch == 1):
+                iterables_sliced = iterables_batch[0][idx]
+        except:
+            iterables_sliced = ()
+            for iim in iterables_batch:
+                iterables_sliced = iterables_sliced + (iim[idx], )
         try:
             assert not error_event.is_set()
-            if inputs_to_share is None:
-                results = targetFunction(inputs_to_iter_sliced)
+            if shareables is None:
+                results = targetFunction(iterables_sliced)
             else:
-                results = targetFunction(inputs_to_iter_sliced, inputs_to_share)
+                results = targetFunction(iterables_sliced, shareables)
             outputs.append(results)
         except Exception as e:
             if not error_event.is_set():
@@ -51,8 +58,8 @@ def _multiprocessor_function(inputs_to_iter_batch, targetFunction, \
 
 def multiprocessor(
     targetFunction,
-    inputs_to_iter,
-    inputs_to_share     = None,
+    iterables,
+    shareables     = None,
     outputs             = None,
     max_cpu             = None,
     batchSize           = None,
@@ -105,12 +112,12 @@ def multiprocessor(
     How to use write your function
     ~~~~~~~~~~~~
     You need a function that takes two inputs:
-        inputs_to_iter_sliced:
-            When providing inputs_to_iter, we will send a single element of every
+        iterables_sliced:
+            When providing iterables, we will send a single element of every
             member of it to the function. If it is a numpy array, we will send
-            inputs_to_iter[i] to your function. if it is a tuple of a few arrays,
+            iterables[i] to your function. if it is a tuple of a few arrays,
             we send a tuple of a few slices: (arr[i], brr[i], ...)
-        inputs_to_share: All inputs that we are just passed to your function.
+        shareables: All inputs that we are just passed to your function.
     
     Example
     ~~~~~~~~~~~~
@@ -119,9 +126,9 @@ def multiprocessor(
     
         from lognflow import multiprocessor
     
-        def masked_cross_correlation(inputs_to_iter_sliced, inputs_to_share):
-            vec1, vec2 = inputs_to_iter_sliced
-            mask, statistics_func = inputs_to_share
+        def masked_cross_correlation(iterables_sliced, shareables):
+            vec1, vec2 = iterables_sliced
+            mask, statistics_func = shareables
             vec1 = vec1[_mask==1]
             vec2 = vec2[_mask==1]
             
@@ -144,18 +151,18 @@ def multiprocessor(
         mask = (2*np.random.rand(*data_shape)).astype('int')
         statistics_func = np.median
         
-        inputs_to_iter = (data1, data2)
-        inputs_to_share = (mask, op_type)
-        ccorr = multiprocessor(some_function, inputs_to_iter, inputs_to_share)
+        iterables = (data1, data2)
+        shareables = (mask, op_type)
+        ccorr = multiprocessor(some_function, iterables, shareables)
         print(f'ccorr: {ccorr}')
         
     input arguments
     ~~~~~~~~~~~~~~~
         targetFunction: Target function
-        inputs_to_iter: all iterabel inputs, We will pass them by indexing
-            them. if indices are not provideed, the len(inputs_to_iter[0])
+        iterables: all iterabel inputs, We will pass them by indexing
+            them. if indices are not provideed, the len(iterables[0])
             will be N.
-        inputs_to_share: all READ-ONLY inputs.... Notice: READ-ONLY 
+        shareables: all READ-ONLY inputs.... Notice: READ-ONLY 
         outputs: an indexable memory where we can just dump the output of 
             function in relevant indices.  For example a numpy
         max_cpu: max number of allowed CPU
@@ -170,28 +177,28 @@ def multiprocessor(
             multiprocessing of your task.
             default: False
     """
-    if inputs_to_share is not None:
-        if not isinstance(inputs_to_share, tuple):
-            inputs_to_share = (inputs_to_share, )
+    if shareables is not None:
+        if not isinstance(shareables, tuple):
+            shareables = (shareables, )
     
     try:
-        n_pts = int(inputs_to_iter)
-        assert n_pts == inputs_to_iter, \
-            'if inputs_to_iter is a single number, please provide an integer.'
-        inputs_to_iter = [np_arange(n_pts, dtype='int')]
+        n_pts = int(iterables)
+        assert n_pts == iterables, \
+            'if iterables is a single number, please provide an integer.'
+        iterables = [np_arange(n_pts, dtype='int')]
     except:
         try:
-            n_pts = inputs_to_iter.shape[0]
-            inputs_to_iter = [inputs_to_iter]
+            n_pts = iterables.shape[0]
+            iterables = [iterables]
         except:
             try:
-                n_pts = len(inputs_to_iter[0])
+                n_pts = len(iterables[0])
             except:
                 try:
-                    n_pts = inputs_to_iter[0].shape[0]
+                    n_pts = iterables[0].shape[0]
                 except Exception as e:
                     raise Exception(
-                        'You did not provide inputs_to_iter properly.'
+                        'You did not provide iterables properly.'
                         ' It should be either a list or tuple where all members'
                         ' have the same length (first dimensions) or it can be'
                         ' a numpy array to iterate over, or it can be an'
@@ -269,12 +276,12 @@ def multiprocessor(
             batchSize = np_minimum(default_batchSize, n_pts - procID)
             procID_arange = np_arange(procID, procID + batchSize, dtype = 'int')
 
-            inputs_to_iter_batch = ()
-            for iim in inputs_to_iter:
-                inputs_to_iter_batch = \
-                    inputs_to_iter_batch + (iim[procID_arange], )
-            _args = (inputs_to_iter_batch, ) + (
-                targetFunction, inputs_to_share, aQ, procID_arange, error_event)
+            iterables_batch = ()
+            for iim in iterables:
+                iterables_batch = \
+                    iterables_batch + (iim[procID_arange], )
+            _args = (iterables_batch, ) + (
+                targetFunction, shareables, aQ, procID_arange, error_event)
             
             if(test_mode):
                 _multiprocessor_function_test_mode(*_args)
@@ -294,12 +301,12 @@ def multiprocessor(
         logger('to avoid seeing this message, pass the argument called '\
                'legger, it is print by default.')
         logger('-'*79)
-        inputs_to_iter_batch = ()
-        for iim in inputs_to_iter:
-            inputs_to_iter_batch = \
-                inputs_to_iter_batch + (iim[error_ret_procID], )
-        _args = (inputs_to_iter_batch, ) + (
-            targetFunction, inputs_to_share, aQ, error_ret_procID, error_event)
+        iterables_batch = ()
+        for iim in iterables:
+            iterables_batch = \
+                iterables_batch + (iim[error_ret_procID], )
+        _args = (iterables_batch, ) + (
+            targetFunction, shareables, aQ, error_ret_procID, error_event)
         _multiprocessor_function_test_mode(*_args)
         raise ChildProcessError
     

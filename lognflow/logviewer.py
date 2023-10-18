@@ -1,6 +1,6 @@
 import pathlib
 import numpy as np
-from   matplotlib.pyplot import imread
+from   matplotlib.pyplot import imread as mpl_imread
 from   .utils            import replace_all, dummy_function, name_from_file
 
 class logviewer:
@@ -174,7 +174,7 @@ class logviewer:
                 txt = txt[0]
             return txt
 
-    def get_single(self, var_name, file_index = -1, 
+    def _get_single(self, var_name, file_index = -1, 
                    suffix = None, read_func = None, verbose = False):
         """ get a single variable
             return the value of a saved variable.
@@ -212,7 +212,7 @@ class logviewer:
                 if verbose:
                     self.logger(f'Loading {var_path}')
                 if read_func is not None:
-                    return read_func(var_path)
+                    return (read_func(var_path), var_path)
                 if(var_path.suffix == '.npz'):
                     buf = np.load(var_path)
                     try: #check if it is made by log_var
@@ -221,39 +221,75 @@ class logviewer:
                         data_array = buf['data_array']
                         data_array = data_array[time_array > 0]
                         time_array = time_array[time_array > 0]
-                        return((time_array, data_array))
+                        return((time_array, data_array), var_path)
                     except:
-                        return(buf)
+                        return(buf, var_path)
                 if(var_path.suffix == '.npy'):
-                    return(np.load(var_path))
+                    return(np.load(var_path), var_path)
                 if(var_path.suffix == '.mat'):
                     from scipy.io import loadmat
-                    return(loadmat(var_path))
+                    return(loadmat(var_path), var_path)
                 if(var_path.suffix == '.dm4'):
                     from hyperspy.api import load as hyperspy_api_load
-                    return hyperspy_api_load(var_path).data
+                    return (hyperspy_api_load(var_path).data, var_path)
                 if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
-                    from tifffile import imread
-                    return(imread(var_path))
+                    from tifffile import imread as tifffile_imread
+                    return(tifffile_imread(var_path), var_path)
                 if(var_path.suffix == '.torch'):      
                     from torch import load as torch_load 
-                    return(torch_load(var_path))
+                    return(torch_load(var_path), var_path)
                 try:
-                    img = imread(var_path)
-                    return(img)
+                    img = mpl_imread(var_path)
+                    return(img, var_path)
                 except:
                     pass
                 # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
-                #     return var_path.read_text()
-                return var_path.read_text()
+                #     return(var_path.read_text(), var_path)
+                try:
+                    txt = var_path.read_text()
+                    return(txt, var_path)
+                except:
+                    var_path = None
             else:
                 var_path = None
                 
         if (var_path is None) & verbose:
             self.logger(f'Looking for {var_name} failed. ' + \
                         f'{var_path} is not in: {self.log_dir}')
+        return None, None
     
-    def get_stack_of_files(self, 
+    def get_single(self, var_name, file_index = -1, 
+                   suffix = None, read_func = None, verbose = False,
+                   return_fpath = False):
+        """ get a single variable
+            return the value of a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param file_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+            :param read_func:
+                a function that takes the Posix path and returns data
+            .. note::
+                when reading a MATLAB file, the output is a dictionary.
+                Also when reading a npz except if it is made by log_var
+        """
+        get_single_data, fpath = self._get_single(
+            var_name = var_name, file_index = file_index, suffix = suffix, 
+            read_func = read_func, verbose = verbose)   
+        if return_fpath:
+            return get_single_data, fpath
+        else:
+            return get_single_data
+        
+    def get_stack_from_files(self, 
         var_name = None, flist = [], suffix = None, read_func = None):
        
         """ Get list or data of all files in a directory
@@ -303,25 +339,52 @@ class logviewer:
                     pass
             if(read_func is None):
                 try:
-                    fdata = imread(flist[0])
-                    read_func = imread
+                    fdata = mpl_imread(flist[0])
+                    read_func = mpl_imread
                 except:
                     pass
             try:
                 read_func(flist[0])
-            except e:
+            except Exception as e:
                 self.logger(f'The data file {flist[0]} could not be opened.'
                             'Please provide a read_function in the input.')
                 raise e
             dataset = [read_func(fpath) for fpath in flist]
             try:
-                dataset = np.array(dataset)
+                dataset_array = np.array(dataset)
             except:
-                pass
-            return(dataset)
+                dataset_array = dataset
+            return(dataset_array)
+
+    def get_stack_from_names(self, 
+             var_names = None, read_func = None, return_flist = False):
+        try:
+            var_names_str = str(var_names)
+        except:
+            pass
+        else:
+            var_names = [var_names]
+        assert var_names == list(var_names), \
+            'input should be a list of variable names'
+        dataset = []
+        flist = []
+        for name in var_names:
+            images_flist = self.get_flist(name)
+            if images_flist:
+                for file_index in range(len(images_flist)):
+                    data, fpath = self.get_single(
+                        name, file_index = file_index,
+                        read_func = read_func, return_fpath = True)
+                    if data is not None:
+                        dataset.append(data)
+                        flist.append(fpath)
+        if return_flist:
+            return dataset, flist
+        else:
+            return dataset
 
     def replace_time_with_index(self, var_name):
-        """ index in file names
+        """ index in file var_names
             lognflow uses time stamps to make new log files for a variable.
             That is done by putting time stamp after the name of the variable.
             This function changes all of the time stamps, sorted ascendingly,
@@ -350,7 +413,8 @@ class logviewer:
                 fpath_new = flist[fcnt].parent / fname_new
                 # self.log_text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
-        
+
+    
     def __repr__(self):
         return f'{self.log_dir}'
 

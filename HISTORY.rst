@@ -202,3 +202,10 @@ History
 * get_flist returns whatever search pattern means for .glob
 * plt_tight_layout is removed and replaced by bbox
 * You can get name from file when file is within the log_dir root
+
+0.10.5 (2023-10-18)
+-----------------
+* Added new files for readthedocs
+* copy() checks for proper use of arguments
+* __call__ returns fpath
+* loopprocessor is added

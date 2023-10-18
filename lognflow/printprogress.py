@@ -87,6 +87,7 @@ class printprogress:
         self._print_func(' ', end = '')
         self.len_prog_text = 0
         self.remTimeS_perv = 0
+        self.average_filter_coeff = 0
     
     def _print_func(self, text, end='\n'):
         if (self.in_print_function is not None):
@@ -101,8 +102,11 @@ class printprogress:
             passedTime = time() - self.startTime
             if self.ck > 0:
                 remTimeS = passedTime * ( self.n_steps / self.ck - 1)
-                if (self.remTimeS_perv > 5) & (remTimeS > 5):
-                    remTimeS = 0.95*remTimeS + 0.05*self.remTimeS_perv
+                if(self.average_filter_coeff):
+                    if (self.remTimeS_perv > 5) & (remTimeS > 5):
+                        remTimeS = (1 - self.average_filter_coeff)*remTimeS + \
+                                    self.average_filter_coeff*self.remTimeS_perv
+                
                 self.remTimeS_perv = remTimeS
             else:
                 remTimeS = 1e+7

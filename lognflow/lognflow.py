@@ -208,7 +208,7 @@ class lognflow:
         """
         return name_from_file(self.log_dir_str, fpath)
         
-    def copy(self, parameter_name, source, suffix = None,
+    def copy(self, parameter_name = None, source = None, suffix = None,
              time_tag = False):
         """ copy into a new file
             Given a parameter_name, the second argument will be copied into
@@ -226,14 +226,29 @@ class lognflow:
                 their new location.
         """
         if not self.enabled: return
-        
+        arg_err_msg = 'when using copy, the first argument is the final name '\
+                      ' after copy is finished. The second argument is ' \
+                      ' the absolute path of source file, str(fpath.absolute())'
+        if parameter_name is not None:
+            assert parameter_name == str(parameter_name), arg_err_msg
+        flist = []
         try:
-            if source.is_file():
-                flist = [source]
+            source_as_fpath = pathlib_Path(source)
+            if source_as_fpath.is_file():
+                flist = [source_as_fpath]
+            else:
+                raise ValueError
         except:
-            flist = self.logged.get_flist(source, suffix)
-        assert flist, 'source could not be found to copy'
+            try:
+                flist = self.logged.get_flist(source, suffix)
+            except Exception as e:
+                print(str(e))
+        assert flist, \
+            'source could not be found to copy. \n' + arg_err_msg
 
+        if parameter_name is None:
+            parameter_name = ''
+            
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
         
@@ -1059,9 +1074,12 @@ class lognflow:
         else:
             return fig, ax
         
-    def log_imshow(self, parameter_name: str, parameter_value, 
+    def log_imshow(self, 
+                   parameter_name: str, 
+                   parameter_value, 
                    frame_shape : tuple = None,
-                   colorbar = True, remove_axis_ticks = True,
+                   colorbar = True,
+                   remove_axis_ticks = True,
                    image_format='jpeg', dpi=1200, cmap = 'viridis',
                    title = None, time_tag: bool = None, borders = 0, 
                    return_figure = False, **kwargs):
@@ -1234,7 +1252,7 @@ class lognflow:
                           list_of_masks = None,
                           figsize_ratio = 1,
                           text_as_colorbar = False,
-                          use_colorbar = False,
+                          colorbar = False,
                           cmap = 'viridis',
                           list_of_titles = None,
                           image_format='jpeg', 
@@ -1275,7 +1293,7 @@ class lognflow:
             :param text_as_colorbar: bool
                     if True, max and mean and min of each image will be written
                     on it.
-            :param use_colorbar: bool
+            :param colorbar: bool
                     actual colorbar for each iamge will be shown
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -1288,7 +1306,7 @@ class lognflow:
                                 list_of_masks = list_of_masks,
                                 figsize_ratio = figsize_ratio,
                                 text_as_colorbar = text_as_colorbar,
-                                use_colorbar = use_colorbar,
+                                colorbar = colorbar,
                                 cmap = cmap,
                                 list_of_titles = list_of_titles,
                                 )
@@ -1301,6 +1319,43 @@ class lognflow:
             return fpath
         else:
             return fig, ax
+
+    def log_images_in_pdf(self,
+        parameter_name: str, 
+        parameter_value: list,
+        time_tag: bool = None,
+        dpi=1200, 
+        **kwargs):
+        
+        if not self.enabled: return
+        time_tag = self.time_tag if (time_tag is None) else time_tag
+            
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            parameter_name, 'pdf')
+        fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
+        
+        try:
+            from PIL import Image
+        except Eception as e:
+            print('install PIL by: --> pip install Pillow')
+            raise e
+        images = [Image.fromarray(_) for _ in parameter_value]
+        images[0].save(
+            fpath, "PDF" , 
+            resolution=dpi, 
+            save_all=True, 
+            append_images=images[1:],
+            **kwargs)
+        
+    def variables_to_pdf(self,
+                         parameter_name: str, 
+                         parameter_value: list,
+                         time_tag: bool = None,
+                         dpi = 1200,
+                         **kwargs):
+        images = self.logged.get_stack_from_names(parameter_value)
+        self.log_images_in_pdf(
+            parameter_name, images, time_tag, dpi, **kwargs)
 
     def log_confusion_matrix(self,
                              parameter_name: str,
@@ -1468,8 +1523,9 @@ class lognflow:
                 logger('Hello lognflow')
             The text (str(...)) will be passed to the main log text file.
         """
-        self.log_text(None, *args, **kwargs)
+        fpath = self.log_text(None, *args, **kwargs)
         self.flush_all()
+        return fpath
 
     def __del__(self):
         try:

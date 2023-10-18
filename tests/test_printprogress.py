@@ -13,9 +13,10 @@ import tempfile
 temp_dir = tempfile.gettempdir()
 
 def test_printprogress():
-    for N in list([2, 4, 8, 10, 20, 200, 2000, 20000, 20000000]):
+    for N in list([100, 200, 400, 1000, 2000, 4000, 6000]):
         pprog = printprogress(N)
         for _ in range(N):
+            time.sleep(0.01)
             pprog()
 
 def test_printprogress_with_logger():
@@ -63,8 +64,8 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_generator_type()
     test_printprogress()
+    test_generator_type()
     test_printprogress_ETA()
     test_specific_timing()
     test_printprogress_with_logger()
