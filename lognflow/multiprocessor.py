@@ -8,6 +8,7 @@ from numpy import zeros       as np_zeros
 from numpy import minimum     as np_minimum
 from numpy import concatenate as np_concatenate
 from numpy import argsort     as np_argsort
+from numpy import unique      as np_unique
 
 from multiprocessing import Process, Queue, cpu_count, Event
 
@@ -36,14 +37,13 @@ def _multiprocessor_function(iterables_batch, targetFunction, \
     outputs = []
     for idx, procCnt in enumerate(procID_range):
         try:
-            if len(iterables_batch == 1):
-                iterables_sliced = iterables_batch[0][idx]
-        except:
-            iterables_sliced = ()
-            for iim in iterables_batch:
-                iterables_sliced = iterables_sliced + (iim[idx], )
-        try:
             assert not error_event.is_set()
+            if len(iterables_batch) == 1:
+                iterables_sliced = iterables_batch[0][idx]
+            else:
+                iterables_sliced = ()
+                for iim in iterables_batch:
+                    iterables_sliced = iterables_sliced + (iim[idx], )
             if shareables is None:
                 results = targetFunction(iterables_sliced)
             else:
@@ -59,7 +59,7 @@ def _multiprocessor_function(iterables_batch, targetFunction, \
 def multiprocessor(
     targetFunction,
     iterables,
-    shareables     = None,
+    shareables          = None,
     outputs             = None,
     max_cpu             = None,
     batchSize           = None,
@@ -209,7 +209,7 @@ def multiprocessor(
         logger(f'inputs to iterate over are {n_pts}.')
 
     if(max_cpu is None):
-        max_cpu = cpu_count() - 1  #Let's keep one for the OS
+        max_cpu = cpu_count()
     default_batchSize = int(np_ceil(n_pts/max_cpu/2))
     if(batchSize is not None):
         if(default_batchSize >= batchSize):
@@ -315,42 +315,65 @@ def multiprocessor(
     else:
         sortArgs = np_argsort(Q_procID)
         ret_list = [outputs[i] for i in sortArgs]
-        firstInstance = ret_list[0]
-        if(  (not isinstance(firstInstance, list))
-           | (not isinstance(firstInstance, tuple))
-           | (not isinstance(firstInstance, dict))):
-            if(type(firstInstance).__module__ == np___name__):
-                outputs = np_array(ret_list)
-                return outputs
         
-        n_individualOutputs = len(ret_list[0])
-        outputs = []
-        for memberCnt in range(n_individualOutputs):
-            FLAG_output_is_numpy = False
-            if(concatenate_outputs):
-                firstInstance = ret_list[0][memberCnt]
-                if(type(firstInstance).__module__ == np___name__):
+        return_as_is = False
+        ret_entries_lens = []
+        for ret_entry in ret_list:
+            try:
+                _len = len(ret_entry)
+            except:
+                try:
+                    _len = ret_entry.size
+                except:
+                    return_as_is = True
+                else:
+                    ret_entries_lens.append(_len)
+            else:
+                ret_entries_lens.append(_len)
+        ret_entries_lens_unique = np_unique(ret_entries_lens)
+        if len(ret_entries_lens_unique) != 1:
+            return_as_is = True
+        
+        if return_as_is | (not concatenate_outputs):
+            return ret_list
+        else:
+            n_entries = ret_entries_lens_unique[0]
+            outputs = []
+            for element_cnt in range(n_entries):
+                element_all = []
+                is_not_nparray = False
+                is_numpy = False
+                shapes_are_not_the_same = False
+                shapes_are_the_same = False
+                for entry in ret_list:
+                    if n_entries > 1:
+                        instance = entry[element_cnt]
+                    else:
+                        instance = entry
                     try:
-                        _ = firstInstance.shape
+                        instance_size = instance.size
                     except:
-                        firstInstance = np.array([firstInstance])
-                    n_F = 0
-                    for ptCnt in range(0, n_pts):
-                        n_F += ret_list[ptCnt][memberCnt].shape[0]
-                    outShape = ret_list[ptCnt][memberCnt].shape[1:]
-                    _currentList = np_zeros(
-                        shape = ( (n_F,) + outShape ), 
-                        dtype = ret_list[0][memberCnt].dtype)
-                    n_F = 0
-                    for ptCnt in range(0, n_pts):
-                        ndarr = ret_list[ptCnt][memberCnt]
-                        _n_F = ndarr.shape[0]
-                        _currentList[n_F: n_F + _n_F] = ndarr
-                        n_F += _n_F
-                    FLAG_output_is_numpy = True
-            if(not FLAG_output_is_numpy):
-                _currentList = []
-                for ptCnt in range(n_pts):
-                    _currentList.append(ret_list[ptCnt][memberCnt])
-            outputs.append(_currentList)
-        return (outputs)
+                        is_not_nparray = True
+                    else:
+                        if instance_size == 0:
+                            is_not_nparray = True
+                        else:
+                            if not is_numpy:
+                                numpy_shape = instance.shape
+                            else:
+                                if numpy_shape == instance.shape:
+                                    shapes_are_the_same = True
+                                else:
+                                    shapes_are_not_the_same = True
+                            is_numpy = True
+                    element_all.append(instance)
+                if ((not is_not_nparray) & 
+                    is_numpy & 
+                    (not shapes_are_not_the_same) &
+                    shapes_are_the_same):
+                    element_all = np_array(element_all)
+                outputs.append(element_all)  
+            if n_entries == 1:
+                return outputs[0]
+            else:
+                return outputs

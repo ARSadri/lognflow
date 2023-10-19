@@ -209,3 +209,8 @@ History
 * copy() checks for proper use of arguments
 * __call__ returns fpath
 * loopprocessor is added
+
+0.10.6 (2023-10-19)
+-----------------
+* bugs fixed in multiprocessor and loopprocessor
+* tests added

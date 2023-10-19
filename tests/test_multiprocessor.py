@@ -3,13 +3,12 @@ import numpy as np
 import inspect
 
 def multiprocessor_targetFunc(iterables_sliced, shareables):
-    idx = iterables_sliced[0]
+    idx = iterables_sliced
     data, mask, op_type = shareables
     _data = data[idx]
     if(op_type=='median'):
         to_return1 = np.median(_data[mask[idx]==1])
-        to_return1 = np.array([to_return1])
-    to_return2 = np.ones((int(10*np.random.rand(1)), 2, 2))
+    to_return2 = np.ones((1 + int(9*np.random.rand(1)), 2, 2))
     
     return(to_return1, 'median', to_return2)
     
@@ -28,7 +27,6 @@ def test_multiprocessor():
     stats = multiprocessor(multiprocessor_targetFunc, 
                            iterables, shareables,
                            verbose = True)
-
     results = []
     for cnt in range(N):
         results.append(multiprocessor_targetFunc((cnt, ), shareables))
@@ -43,11 +41,13 @@ def test_multiprocessor():
     print('type(_ids) ', type(_ids))
     print('len(_ids) ', len(_ids))
     print('type(_ids[0]) ', type(_ids[0]))
-    print('_ids.shape ', _ids.shape)
+    print('_ids[0].shape ', _ids[0].shape)
     
     direct_medians = np.zeros(N)
     for cnt in range(N):
         direct_medians[cnt] = np.median(data[cnt, mask[cnt]==1])
+    
+    print(f'direct_medians.shape: {direct_medians.shape}')
     
     print(np.array([ medians, direct_medians] ).T)
     print('difference of results: ', (direct_medians - medians).sum())
@@ -84,9 +84,11 @@ def test_multiprocessor_ccorr():
     ccorr = multiprocessor(
         masked_cross_correlation, iterables, shareables,
         test_mode = False)
+    print(f'type(ccorr): {type(ccorr)}')
+    print(f'ccorr.shape: {ccorr.shape}')
 
 def error_multiprocessor_targetFunc(iterables_sliced, shareables):
-    idx = iterables_sliced[0]
+    idx = iterables_sliced
     data, mask, op_type = shareables
     _data = data[idx]
     if(op_type=='median'):
@@ -147,13 +149,13 @@ def compute(data, mask):
     # if (data>130).sum() > 0:
     #     asdf
         
-    return res
+    return res, 'asdf'
 
 def test_loopprocessor():
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
 
-    N = 16
-    D = 1000000
+    N = 8
+    D = 500000
     data = (100+10*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
 
@@ -167,16 +169,18 @@ def test_loopprocessor():
 
     results = np.zeros(N)
     for cnt in printprogress(range(N)):
-        results[cnt] = compute(data[cnt], mask[cnt])
+        results[cnt], _ = compute(data[cnt], mask[cnt])
 
-    print((results - results_mp).sum())
+    results_mp_0 = results_mp[0]
+
+    print((results - results_mp_0).sum())
     
 if __name__ == '__main__':
-    test_loopprocessor()
-    test_noslice_multiprocessor()
-    test_multiprocessor()
-    test_multiprocessor_ccorr()
     print('lets test', flush=True)
+    test_loopprocessor()
+    test_multiprocessor()
+    test_noslice_multiprocessor()
+    test_multiprocessor_ccorr()
     try:
         test_error_handling_in_multiprocessor()
     except Exception as e:

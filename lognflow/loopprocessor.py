@@ -1,4 +1,9 @@
 from multiprocessing import Process, Queue, cpu_count, Event
+from numpy import __name__    as np___name__
+from numpy import array       as np_array
+from numpy import zeros       as np_zeros
+from numpy import argsort     as np_argsort
+from numpy import unique      as np_unique
 
 def _loopprocessor_function_test_mode(
          targetFunction, theQ, procID_range, error_event, args, kwargs):
@@ -18,11 +23,11 @@ def _loopprocessor_function(
 class loopprocessor():
     def __init__(self, 
             targetFunction, n_cpu = None, test_mode = False, logger = print,
-            verbose = True):
+            concatenate_outputs = True, verbose = True):
         self.targetFunction = targetFunction
         self.test_mode = test_mode
         self.aQ = Queue()
-
+        self.concatenate_outputs = concatenate_outputs
         if(n_cpu is None):
             self.n_cpu = cpu_count()
         else:
@@ -118,4 +123,68 @@ class loopprocessor():
             raise ChildProcessError
         
         if (len(args) == 0) & (len(kwargs) == 0):
-            return self.outputs
+            sortArgs = np_argsort(self.Q_procID)
+            ret_list = [self.outputs[i] for i in sortArgs]
+            
+            return_as_is = False
+            ret_entries_lens = []
+            for ret_entry in ret_list:
+                try:
+                    _len = len(ret_entry)
+                except:
+                    try:
+                        _len = ret_entry.size
+                    except:
+                        return_as_is = True
+                    else:
+                        ret_entries_lens.append(_len)
+                else:
+                    ret_entries_lens.append(_len)
+            ret_entries_lens_unique = np_unique(ret_entries_lens)
+            if len(ret_entries_lens_unique) != 1:
+                return_as_is = True
+            
+            if return_as_is | (not self.concatenate_outputs):
+                self.outputs = ret_list
+                return self.outputs
+            else:
+                n_entries = ret_entries_lens_unique[0]
+                self.outputs = []
+                for element_cnt in range(n_entries):
+                    element_all = []
+                    is_not_nparray = False
+                    is_numpy = False
+                    shapes_are_not_the_same = False
+                    shapes_are_the_same = False
+                    for entry in ret_list:
+                        if n_entries > 1:
+                            instance = entry[element_cnt]
+                        else:
+                            instance = entry
+                        try:
+                            instance_size = instance.size
+                        except:
+                            is_not_nparray = True
+                        else:
+                            if instance_size == 0:
+                                is_not_nparray = True
+                            else:
+                                if not is_numpy:
+                                    numpy_shape = instance.shape
+                                else:
+                                    if numpy_shape == instance.shape:
+                                        shapes_are_the_same = True
+                                    else:
+                                        shapes_are_not_the_same = True
+                                is_numpy = True
+                        element_all.append(instance)
+                    if ((not is_not_nparray) & 
+                        is_numpy & 
+                        (not shapes_are_not_the_same) &
+                        shapes_are_the_same):
+                        element_all = np_array(element_all)
+                    self.outputs.append(element_all)  
+                if n_entries == 1:
+                    return self.outputs[0]
+                else:
+                    return self.outputs
