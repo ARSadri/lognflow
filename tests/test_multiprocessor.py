@@ -1,6 +1,9 @@
-from lognflow import multiprocessor, loopprocessor, printprogress
+from lognflow import (
+    multiprocessor, loopprocessor, printprogress)
+from lognflow.multiprocessor import multiprocessor_gen
 import numpy as np
 import inspect
+import time
 
 def multiprocessor_targetFunc(iterables_sliced, shareables):
     idx = iterables_sliced
@@ -113,6 +116,10 @@ def test_error_handling_in_multiprocessor():
     iterables = N
     shareables  = (data, mask, op_type)
     
+    print('             ------------------------------')
+    print('             NOTE: IT SHOULD RAISE AN ERROR')
+    print('             ------------------------------')
+    
     stats = multiprocessor(
         error_multiprocessor_targetFunc, iterables, shareables,
         verbose = True)
@@ -130,7 +137,7 @@ def noslice_multiprocessor_targetFunc(iterables_sliced, shareables):
 def test_noslice_multiprocessor():
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     
-    N = 10000
+    N = 1000
     D = 1000
     data = (10+100*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
@@ -142,48 +149,83 @@ def test_noslice_multiprocessor():
     stats = multiprocessor(
         noslice_multiprocessor_targetFunc, iterables, shareables, verbose = True)
 
+
+############################################
+
 def compute(data, mask):
     for _ in range(400):
         res = np.median(data[mask==1])
         
-    # if (data>130).sum() > 0:
+    # if (data>147).sum() > 0:
     #     asdf
         
     return res, 'asdf'
 
+def compute_arg_scatterer(iterables_sliced):
+    return compute(*iterables_sliced)
+
 def test_loopprocessor():
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
 
-    N = 8
-    D = 500000
+    N = 16
+    D = 100000
     data = (100+10*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
 
-    print('-'*80)
-    print('beggining of loop processor')
-    print('-'*80)
-    compute_mp = loopprocessor(compute)
+    time_of_start = time.time()
+    results_mp = multiprocessor(
+        compute_arg_scatterer, iterables = (data, mask), 
+        shareables = None, verbose = True)
+    results_mp = results_mp[0]
+    mp_period = time.time() - time_of_start
+    
+    time_of_start = time.time()
+    compute_lp = loopprocessor(compute)
     for cnt in printprogress(range(N)):
-        compute_mp(data[cnt], mask[cnt])
-    results_mp = compute_mp()
+        results_lp = compute_lp(data[cnt], mask[cnt])
+        
+    results_lp = compute_lp()[0]
+    lp_period = time.time() - time_of_start
+
+    time_of_start = time.time()
+    results = np.zeros(N)
+    for cnt in printprogress(range(N)):
+        results[cnt], _ = compute(data[cnt], mask[cnt])
+    sp_period = time.time() - time_of_start
+    
+    print((results - results_lp).sum())
+    print((results - results_mp).sum())
+    
+    print(f'multiprocessor period: {mp_period}')
+    print(f'loopprocessor period: {lp_period}')
+    print(f'serial processing period: {sp_period}')
+    
+def test_multiprocessor_gen():
+    N = 8
+    D = 100000
+    data = (100+10*np.random.randn(N,D)).astype('int')
+    mask = (2*np.random.rand(N,D)).astype('int')
+
+    results_mp_gen = multiprocessor_gen(
+        compute_arg_scatterer, iterables = (data, mask), 
+        shareables = None, verbose = False)
+    for arrivals in results_mp_gen:
+        results_mp, IDs = arrivals
+        print(IDs)
+    results_mp = results_mp[0]
 
     results = np.zeros(N)
     for cnt in printprogress(range(N)):
         results[cnt], _ = compute(data[cnt], mask[cnt])
-
-    results_mp_0 = results_mp[0]
-
-    print((results - results_mp_0).sum())
+    
+    print((results - results_mp).sum())
+    print('-'*80)
     
 if __name__ == '__main__':
     print('lets test', flush=True)
     test_loopprocessor()
+    test_multiprocessor_gen()
     test_multiprocessor()
     test_noslice_multiprocessor()
     test_multiprocessor_ccorr()
-    try:
-        test_error_handling_in_multiprocessor()
-    except Exception as e:
-        print('Error handled!')
-        print('Error was:')
-        print(e)
+    test_error_handling_in_multiprocessor()

@@ -214,3 +214,8 @@ History
 -----------------
 * bugs fixed in multiprocessor and loopprocessor
 * tests added
+
+0.10.7 (2023-11-01)
+-----------------
+* multiprocessor_gen is a generator that yields the list of arrived results
+* get_flist and thus get_single do not put asterisks on their own.

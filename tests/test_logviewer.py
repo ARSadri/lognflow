@@ -32,7 +32,7 @@ def test_logviewer():
     logger.log_single('test_param', np.random.rand(100))
     
     logged = logviewer(logger.log_dir, logger)
-    print(logged.get_single('test_param'))
+    print(logged.get_single('test_param*'))
     print(logged.get_text())
 
 def test_get_stack_from_files():
@@ -131,7 +131,7 @@ def test_get_stack_from_names():
     
     logged = logviewer(logger.log_dir)
 
-    images = logged.get_stack_from_names('im1')
+    images = logged.get_stack_from_names('im1*')
     
     print(len(images))
 

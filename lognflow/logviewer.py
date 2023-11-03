@@ -75,20 +75,9 @@ class logviewer:
             else:
                 _var_name = (self.log_dir / var_name).name
                 _var_dir = (self.log_dir / var_name).parent
-                search_patt = f'{_var_name}*.{suffix}'
+                search_patt = f'{_var_name}.{suffix}'
                 search_patt = replace_all(search_patt, '**', '*')
                 flist = list(_var_dir.glob(search_patt))
-                if(len(flist) == 0):
-                    search_patt = f'{_var_name}*.*'
-                    search_patt = replace_all(search_patt, '**', '*')
-                    flist = list(_var_dir.glob(search_patt))
-                    if(len(flist) > 0):
-                        self.logger(
-                            'I Can not find the file with the given suffix, '\
-                            + 'but found some with a different suffix, '\
-                            + f'one file is: {flist[-1]}. This is what I'\
-                            + ' will return.' )
-                    
         if(flist):
             flist.sort()
         else:
@@ -174,7 +163,7 @@ class logviewer:
                 txt = txt[0]
             return txt
 
-    def _get_single(self, var_name, file_index = -1, 
+    def _get_single(self, var_name, file_index = None, 
                    suffix = None, read_func = None, verbose = False):
         """ get a single variable
             return the value of a saved variable.
@@ -202,11 +191,20 @@ class logviewer:
         var_path = None
         if flist:
             if len(flist)>1:
-                if verbose:
-                    self.logger(  f'There are {len(flist)} files, logged with'
-                                + f' name {var_name}.'
-                                + f' The given index is {file_index}.')
-            var_path = flist[file_index]
+                if file_index is not None:
+                    if verbose:
+                        self.logger(
+                            f'There are {len(flist)} files, logged with'
+                            + f' name {var_name}.'
+                            + f' The given index is {file_index}.')
+                    var_path = flist[file_index]
+                else:
+                    self.logger('-'*60)
+                    self.logger(
+                        f'There are {len(flist)} files, logged with'
+                        + f' name {var_name} but the index is not given.')
+                    self.logger('-'*60)
+                    return None
     
             if(var_path.is_file()):
                 if verbose:
