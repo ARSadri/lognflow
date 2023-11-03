@@ -219,3 +219,7 @@ History
 -----------------
 * multiprocessor_gen is a generator that yields the list of arrived results
 * get_flist and thus get_single do not put asterisks on their own.
+
+0.10.8 (2023-11-03)
+------------------
+* a bug fixed in get_flist

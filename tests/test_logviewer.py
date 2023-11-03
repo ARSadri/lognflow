@@ -38,11 +38,11 @@ def test_logviewer():
 def test_get_stack_from_files():
     logger = lognflow(temp_dir)
     
-    logger('Well this is a test for logviewer')
+    logger('Well this is a test for get_stack_from_files')
 
     for _ in range(5):
-        logger.log_single('A/', np.random.rand(100, 100))
-        logger.log_single('B/', np.random.randn(100, 100))
+        logger.log_single('A/img', np.random.rand(100, 100))
+        logger.log_single('B/img', np.random.randn(100, 100))
 
     logged = logviewer(logger.log_dir, logger)
 
@@ -52,8 +52,8 @@ def test_get_stack_from_files():
     logger(flist_A)
     logger(flist_B)
     
-    logger.logged.replace_time_with_index('A/*')
-    logger.logged.replace_time_with_index('B/*')
+    logger.logged.replace_time_with_index('A/img')
+    logger.logged.replace_time_with_index('B/img')
 
     flist_A = logged.get_flist('A/*')
     flist_B = logged.get_flist('B/*')
@@ -70,8 +70,8 @@ def test_get_stack_from_files():
     logger.log_imshow_series('data_samples', [stack_A, stack_B], dpi = 300)
 
     flist_A_AB, flist_B_AB = logged.get_common_files('A/*', 'B/*')
-    logger(flist_A_AB)
-    logger(flist_B_AB)
+    logger(f'flist_A_AB: {flist_A_AB}')
+    logger(f'flist_B_AB: {flist_B_AB}')
     
     if(flist_A_AB):
         

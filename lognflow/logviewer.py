@@ -190,7 +190,9 @@ class logviewer:
         flist = self.get_flist(var_name, suffix)
         var_path = None
         if flist:
-            if len(flist)>1:
+            if len(flist) == 1:
+                var_path = flist[0]
+            else:
                 if file_index is not None:
                     if verbose:
                         self.logger(
@@ -381,7 +383,7 @@ class logviewer:
         else:
             return dataset
 
-    def replace_time_with_index(self, var_name):
+    def replace_time_with_index(self, var_name, verbose = False):
         """ index in file var_names
             lognflow uses time stamps to make new log files for a variable.
             That is done by putting time stamp after the name of the variable.
@@ -398,18 +400,20 @@ class logviewer:
         else:
             var_fname = var_dir.name
             var_dir = var_dir.parent
-            flist = list(var_dir.glob(f'{var_fname}_*.*'))
+            flist = list(var_dir.glob(f'{var_fname}*'))
         if flist:
             flist.sort()
             fcnt_width = len(str(len(flist)))
             for fcnt, fpath in enumerate(flist):
-                # self.log_text(None, f'Changing {flist[fcnt].name}')
+                if verbose:
+                    self.log_text(None, f'Changing {flist[fcnt].name}')
                 fname_new = ''
                 if(var_fname is not None):
                     fname_new = var_fname + '_'
                 fname_new += f'{fcnt:0{fcnt_width}d}' + flist[fcnt].suffix
                 fpath_new = flist[fcnt].parent / fname_new
-                # self.log_text(None, f'To {fpath_new.name}')
+                if verbose:
+                    self.log_text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
 
     
