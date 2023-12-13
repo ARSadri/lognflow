@@ -223,3 +223,12 @@ History
 0.10.8 (2023-11-03)
 ------------------
 * a bug fixed in get_flist
+
+0.10.9 (2023-12-01)
+------------------
+* a bug fixed in name generator when suffix is given
+* copy returns destination path
+* exists_ok can be given to make the log_dir of lognflow
+* added get_namelist and its test
+* bug fixed in plt_utils
+* plt_imshow added to plt_utils

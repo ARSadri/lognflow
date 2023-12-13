@@ -180,11 +180,13 @@ def test_loopprocessor():
     mp_period = time.time() - time_of_start
     
     time_of_start = time.time()
+    
     compute_lp = loopprocessor(compute)
     for cnt in printprogress(range(N)):
         results_lp = compute_lp(data[cnt], mask[cnt])
-        
-    results_lp = compute_lp()[0]
+    results_lp = compute_lp()
+    
+    results_lp = results_lp[0]
     lp_period = time.time() - time_of_start
 
     time_of_start = time.time()

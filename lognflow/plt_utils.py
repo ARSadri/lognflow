@@ -17,6 +17,42 @@ def plt_colorbar(mappable):
     cbar = fig.colorbar(mappable, cax=cax)
     return cbar
 
+def plt_imshow(img, 
+               colorbar = True, 
+               remove_axis_ticks = False, 
+               title = None, 
+               cmap = None, 
+               **kwargs):
+    if(not np.iscomplexobj(img)):
+        fig, ax = plt.subplots()
+        im = ax.imshow(img, cmap = cmap, **kwargs)
+        if(colorbar):
+            plt_colorbar(im)
+        if(remove_axis_ticks):
+            plt.setp(ax, xticks=[], yticks=[])
+    else:
+        fig, ax = plt.subplots(1, 2)
+        im = ax[0].imshow(np.abs(parameter_value), 
+                          cmap = cmap, **kwargs)
+        if(colorbar):
+            plt_colorbar(im)
+        ax[0].set_title('Amplitude')    
+        im = ax[1].imshow(np.angle(parameter_value), 
+                          cmap = cmap, **kwargs)
+        if(colorbar):
+            plt_colorbar(im)
+        ax[1].set_title('Phase')
+        if(remove_axis_ticks):
+            plt.setp(ax[0], xticks=[], yticks=[])
+            ax[0].xaxis.set_ticks_position('none')
+            ax[0].yaxis.set_ticks_position('none')
+            plt.setp(ax[1], xticks=[], yticks=[])
+            ax[1].xaxis.set_ticks_position('none')
+            ax[1].yaxis.set_ticks_position('none')
+    if title is not None:
+        ax.set_title(title)
+    return fig, ax
+
 def plt_hist(vectors_list, 
              n_bins = 10, alpha = 0.5, normalize = False, 
              labels_list = None, **kwargs):
@@ -245,7 +281,7 @@ def imshow_series(list_of_stacks,
                   cmap = 'viridis',
                   list_of_titles = None,
                   ):
-    """ imshow a stack of images or sets of images in a shelf
+    """ imshow a stack of images or sets of images in a shelf,
         input must be a list or array of images
         
         Each element of the list can appear as either:
@@ -390,9 +426,8 @@ def imshow_by_subplots(
                     for ccnt in range(n_f_c):
                         imcnt = ccnt + rcnt * n_f_c
                         if imcnt < n_f:
-                            im = stack[imcnt]
-                            im_ch = ax[rcnt, ccnt].imshow(
-                                im, cmap = cmap, **kwargs)
+                            im = ax[rcnt, ccnt].imshow(
+                                stack[imcnt], cmap = cmap, **kwargs)
                             if(colorbar):
                                 plt_colorbar(im)
                             if(remove_axis_ticks):

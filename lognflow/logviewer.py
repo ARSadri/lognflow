@@ -88,6 +88,24 @@ class logviewer:
                 flist.sort()
         return flist
 
+    def get_namelist(self, var_name, suffix = None):
+        """ get logger names of files
+            return the list of names for a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+        """
+        nlist = self.get_flist(var_name, suffix)
+        if nlist:
+            nlist = [name_from_file(self.log_dir_str, fpath) for fpath in nlist]
+        return nlist
+
     def get_common_files(self, var_name_A, var_name_B, suffix = None,
                                flist_A = None, flist_B = None):
         """ get common files in two directories
@@ -246,7 +264,7 @@ class logviewer:
                 # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
                 #     return(var_path.read_text(), var_path)
                 try:
-                    txt = var_path.read_text()
+                    txt = var_path.read_text(errors = 'ignore')
                     return(txt, var_path)
                 except:
                     var_path = None

@@ -361,13 +361,13 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_log_imshow(); exit()
     test_copy_list_of_files()
     test_log_images_in_pdf()
     test_variables_to_pdf()
     test_log_imshow_series()
     test_log_imshow_by_subplots()
     test_log_imshow_complex()
-    test_log_imshow()
     test_replace_time_with_index()
     test_log_hist()
     test_copy_file()

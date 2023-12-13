@@ -55,7 +55,8 @@ from    .plt_utils          import (plt_colorbar,
                                     plt_hist,
                                     plt_surface, 
                                     imshow_series,
-                                    imshow_by_subplots)
+                                    imshow_by_subplots,
+                                    plt_imshow)
 
 @dataclass
 class varinlog:
@@ -111,6 +112,9 @@ class lognflow:
             put at the end of the log_dir name.
         :type log_prefix: str
         
+        :param exist_ok:
+            if False, if log_dir exists it raises an error
+        
         :param print_text: 
             If True, everything that is logged as text will be printed as well
         :type print_text: bool
@@ -139,6 +143,7 @@ class lognflow:
                  log_dir          : pathlib_Path = None,
                  log_dir_prefix   : str          = None,
                  log_dir_suffix   : str          = None,
+                 exist_ok         : bool         = True,
                  time_tag         : bool         = True,
                  print_text       : bool         = True,
                  main_log_name    : str          = 'main_log',
@@ -177,10 +182,8 @@ class lognflow:
                     self._init_time = time.time()
         else:
             self.log_dir = pathlib_Path(log_dir)
-        if(not self.log_dir.is_dir()):
-            self.log_dir.mkdir(parents = True, exist_ok = True)
-        assert self.log_dir.is_dir(), \
-            f'Could not access the log directory {self.log_dir}'
+
+        self.log_dir.mkdir(parents = True, exist_ok = exist_ok)
         
         self.logged = logviewer(self.log_dir, self)
         
@@ -266,6 +269,7 @@ class lognflow:
                 os_system(f'cp {fpath} {fpath_dest}')
             elif sys_platform == "win32":
                 os_system(f'copy {fpath} {fpath_dest}')
+        return fpath_dest
             
     @property
     def time_stamp(self):
@@ -406,6 +410,8 @@ class lognflow:
             if(suffix is None):
                 fpath = _param_dir / f'{fname}'
             else:
+                while suffix[0] == '.':
+                    suffix = suffix[1:]
                 fpath = _param_dir / f'{fname}.{suffix}'
             return fpath
         else:
@@ -915,9 +921,9 @@ class lognflow:
     
     def log_hist(self, parameter_name: str, 
                        parameter_value_list,
-                       labels_list = None,
                        n_bins = 10,
                        alpha = 0.5,
+                       labels_list = None,
                        normalize = False,
                        image_format='jpeg', dpi=1200, title = None,
                        time_tag: bool = None, 
@@ -1058,7 +1064,7 @@ class lognflow:
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111)
         ax.hexbin(parameter_value[0], 
                    parameter_value[1], 
                    gridsize = gridsize)
@@ -1133,34 +1139,12 @@ class lognflow:
                 FLAG_img_ready = True
 
         if(FLAG_img_ready):
-            if(not np.iscomplexobj(parameter_value)):
-                fig, ax = plt.subplots()
-                im = ax.imshow(parameter_value, cmap = cmap, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im)
-                if(remove_axis_ticks):
-                    plt.setp(ax, xticks=[], yticks=[])
-            else:
-                fig, ax = plt.subplots(1, 2)
-                im = ax[0].imshow(np.real(parameter_value), 
-                                  cmap = cmap, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im)
-                ax[0].set_title('Real')    
-                im = ax[1].imshow(np.imag(parameter_value), 
-                                  cmap = cmap, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im)
-                ax[1].set_title('Imag')
-                if(remove_axis_ticks):
-                    plt.setp(ax[0], xticks=[], yticks=[])
-                    ax[0].xaxis.set_ticks_position('none')
-                    ax[0].yaxis.set_ticks_position('none')
-                    plt.setp(ax[1], xticks=[], yticks=[])
-                    ax[1].xaxis.set_ticks_position('none')
-                    ax[1].yaxis.set_ticks_position('none')
-            if title is not None:
-                ax.set_title(title)
+            plt_imshow(parameter_value, 
+                       colorbar = colorbar, 
+                       remove_axis_ticks = remove_axis_ticks, 
+                       title = title,
+                       cmap = cmap,
+                       **kwargs)
                 
             if not return_figure:
                 fpath = self.log_plt(
