@@ -5,6 +5,7 @@ import pytest
 
 import matplotlib.pyplot as plt
 import lognflow
+from lognflow.plt_utils import plt_imshow, complex2hsv_colorbar
 import numpy as np
 
 def test_numbers_as_images():
@@ -58,7 +59,18 @@ def test_imshow_by_subplots():
     lognflow.plt_utils.imshow_by_subplots(data)
     plt.show()
 
+def test_plt_imshow():
+    data = np.random.rand(100, 100) + 1j * np.random.rand(100, 100)
+    plt_imshow(data, cmap = 'complex')
+    plt.show()
+    
+def test_complex2hsv_colorbar():
+    complex2hsv_colorbar()
+    plt.show()
+
 if __name__ == '__main__':
+    test_complex2hsv_colorbar()
+    test_plt_imshow()
     test_imshow_series()
     test_imshow_by_subplots()
     test_plot_gaussian_gradient()

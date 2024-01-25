@@ -115,7 +115,7 @@ class loopprocessor():
             self.logger('with the following index to slice the inputs:'
                   f' {error_ret_procID[0]}')
             self.logger('to avoid seeing this message, pass the argument called '\
-                   'legger, it is print by default.')
+                   'logger, it is print by default.')
             self.logger('-'*79)
             _loopprocessor_function_test_mode(
                 self.targetFunction, self.aQ, 

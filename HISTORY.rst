@@ -232,3 +232,8 @@ History
 * added get_namelist and its test
 * bug fixed in plt_utils
 * plt_imshow added to plt_utils
+
+0.10.10 (2024-01-25)
+------------------
+* rgb2hsv is added
+* plt_imshow supports complex color map and is bug free

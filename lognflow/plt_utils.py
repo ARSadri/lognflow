@@ -3,6 +3,46 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.gridspec
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import hsv_to_rgb
+
+def complex2hsv(data_complex, vmin = None, vmax = None):
+    # Routine to visualise complex array as 2D image with colour conveying
+    # phase information
+
+    sy, sx = data_complex.shape
+
+    sat = np.abs(data_complex)
+    if vmin is None:
+        vmin = sat.min()
+    if vmax is None:        
+        vmax = sat.max()
+    sat = (sat-vmin)/(vmax-vmin)
+    
+    hue = (np.angle(data_complex)+np.pi)/(2*np.pi)
+    a, b = np.divmod(hue,1.0)
+    
+    H = np.zeros((sx, sy, 3))
+    H[:,:,0] = b
+    H[:,:,1] = np.ones([sx, sy])
+    H[:,:,2] = sat
+    
+    return hsv_to_rgb(H)
+
+def complex2hsv_colorbar():
+    xx, yy = np.meshgrid(
+        np.linspace(-1, 1, 1000), 
+        np.linspace(-1, 1, 1000))    
+    conv = complex2hsv(xx + 1j*yy, vmax = 1)
+
+    xx, yy = np.meshgrid(
+        np.linspace(-1, 1, 1000), 
+        np.linspace(-1, 1, 1000))
+    conv[(xx**2 + yy **2)>1] = 1
+    
+    fig, ax = plt.subplots()
+    im = ax.imshow(conv)
+    ax.axis('off')
+    return fig, ax
 
 def plt_colorbar(mappable):
     """ Add colobar to the current axis 
@@ -21,7 +61,7 @@ def plt_imshow(img,
                colorbar = True, 
                remove_axis_ticks = False, 
                title = None, 
-               cmap = None, 
+               cmap = None,
                **kwargs):
     if(not np.iscomplexobj(img)):
         fig, ax = plt.subplots()
@@ -31,24 +71,35 @@ def plt_imshow(img,
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
     else:
-        fig, ax = plt.subplots(1, 2)
-        im = ax[0].imshow(np.abs(parameter_value), 
-                          cmap = cmap, **kwargs)
-        if(colorbar):
-            plt_colorbar(im)
-        ax[0].set_title('Amplitude')    
-        im = ax[1].imshow(np.angle(parameter_value), 
-                          cmap = cmap, **kwargs)
-        if(colorbar):
-            plt_colorbar(im)
-        ax[1].set_title('Phase')
-        if(remove_axis_ticks):
-            plt.setp(ax[0], xticks=[], yticks=[])
-            ax[0].xaxis.set_ticks_position('none')
-            ax[0].yaxis.set_ticks_position('none')
-            plt.setp(ax[1], xticks=[], yticks=[])
-            ax[1].xaxis.set_ticks_position('none')
-            ax[1].yaxis.set_ticks_position('none')
+        if cmap == 'complex':
+            converted = complex2hsv(img)
+            fig, ax = plt.subplots()
+            im = ax.imshow(converted, cmap = 'hsv', **kwargs)
+            if(colorbar):
+                plt_colorbar(im)
+                
+            if(remove_axis_ticks):
+                plt.setp(ax, xticks=[], yticks=[])
+            
+        else:
+            fig, ax = plt.subplots(1, 2)
+            im = ax[0].imshow(np.abs(img), 
+                              cmap = cmap, **kwargs)
+            if(colorbar):
+                plt_colorbar(im)
+            ax[0].set_title('Amplitude')    
+            im = ax[1].imshow(np.angle(img), 
+                              cmap = cmap, **kwargs)
+            if(colorbar):
+                plt_colorbar(im)
+            ax[1].set_title('Phase')
+            if(remove_axis_ticks):
+                plt.setp(ax[0], xticks=[], yticks=[])
+                ax[0].xaxis.set_ticks_position('none')
+                ax[0].yaxis.set_ticks_position('none')
+                plt.setp(ax[1], xticks=[], yticks=[])
+                ax[1].xaxis.set_ticks_position('none')
+                ax[1].yaxis.set_ticks_position('none')
     if title is not None:
         ax.set_title(title)
     return fig, ax

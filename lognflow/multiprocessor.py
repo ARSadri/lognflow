@@ -137,7 +137,7 @@ def _reraise_any_error(
     logger('with the following index to slice the inputs:'
           f' {error_ret_procID[0]}')
     logger('to avoid seeing this message, pass the argument called '\
-           'legger, it is print by default.')
+           'logger, it is print by default.')
     logger('-'*79)
     iterables_batch = ()
     for iim in iterables:
