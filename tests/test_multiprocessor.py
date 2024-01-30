@@ -168,7 +168,7 @@ def test_loopprocessor():
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
 
     N = 16
-    D = 100000
+    D = 1000000
     data = (100+10*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
 

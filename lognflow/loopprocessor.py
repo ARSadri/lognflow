@@ -23,7 +23,7 @@ def _loopprocessor_function(
 class loopprocessor():
     def __init__(self, 
             targetFunction, n_cpu = None, test_mode = False, logger = print,
-            concatenate_outputs = True, verbose = True):
+            concatenate_outputs = True, verbose = True, n_processes = 0):
         self.targetFunction = targetFunction
         self.test_mode = test_mode
         self.aQ = Queue()
@@ -33,9 +33,15 @@ class loopprocessor():
         else:
             self.n_cpu = n_cpu
         self.verbose = verbose
-        if(self.verbose):
+        self.n_processes = n_processes
+        if self.verbose:
             self.logger = logger
             self.logger(f'lognflow loopprocessor initialized with {self.n_cpu} CPUs.')
+            if self.n_processes:
+                assert self.n_processes > 0
+                assert self.n_processes == int(self.n_processes)
+                from .printprogress import printprogress
+                self.pBar = printprogress(self.n_processes)
 
         self.outputs_is_given = False
         self.outputs = []
@@ -68,6 +74,8 @@ class loopprocessor():
                 ret_result = aQElement[1]
                 if ((not self.any_error) & aQElement[2]):
                     self.any_error = True
+                    if self.n_processes:
+                        del self.pBar
                     self.empty_queue = True
                     error_ret_procID = ret_procID_range.copy()
                     self.logger('')
@@ -78,6 +86,8 @@ class loopprocessor():
                     for ret_procID, result in zip(ret_procID_range, ret_result):
                         self.Q_procID.append(ret_procID)
                         self.outputs.append(result)
+                        if self.n_processes:
+                            self.pBar()
                 elif(self.numBusyCores):
                     self.logger(f'Number of busy cores: {self.numBusyCores}')
     
