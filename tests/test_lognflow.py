@@ -12,6 +12,20 @@ from lognflow.utils import stacks_to_frames
 import tempfile
 temp_dir = tempfile.gettempdir()
 
+def test_log_counter():
+    logger = lognflow(temp_dir)
+    logger('This is a test for putting counter instead of time_stamp')
+    logger.log_single('testa', 'testa', time_tag = False)
+    logger.log_single('testb', 'testb', time_tag = True)
+    logger.log_single('testb', 'test3', time_tag = True)
+    logger.log_single('testc', 'test4', time_tag = 'counter')
+    logger.log_single('testc', 'test5', time_tag = 'counter')
+    logger.log_single('testc', 'test6', time_tag = 'counter')
+    logger.log_single('testd', 'test7', time_tag = 'counter_and_time')
+    logger.log_single('testd', 'test8', time_tag = 'counter_and_time')
+    logger.log_single('testd', 'test9', time_tag = 'counter_and_time')
+    
+    
 def test_lognflow_conflict_in_names():
     logger = lognflow(temp_dir)
     logger('This is a test for conflict in names')
@@ -361,7 +375,8 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_log_imshow(); exit()
+    test_log_counter(); exit()
+    test_log_imshow()
     test_copy_list_of_files()
     test_log_images_in_pdf()
     test_variables_to_pdf()

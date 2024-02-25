@@ -238,3 +238,10 @@ History
 * rgb2hsv is added
 * plt_imshow supports complex color map and is bug free
 * added printprogress to loopprocessor
+
+0.11.0 (2024-02-25)
+------------------
+* is_builtin_collection is added for multiprocessor concatenation
+* setting time_tag to 'counter' or 'counter&time' will count filenames instead of time
+* plt_violinplot was added
+* plt_imhist is added 

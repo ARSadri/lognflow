@@ -5,7 +5,7 @@ import pytest
 
 import matplotlib.pyplot as plt
 import lognflow
-from lognflow.plt_utils import plt_imshow, complex2hsv_colorbar
+from lognflow.plt_utils import plt_imshow, complex2hsv_colorbar, plt_imhist
 import numpy as np
 
 def test_numbers_as_images():
@@ -68,7 +68,19 @@ def test_complex2hsv_colorbar():
     complex2hsv_colorbar()
     plt.show()
 
+def test_plt_imhist():
+    img = np.zeros((100, 100))
+    indsi, indsj = np.where(img == 0)
+    mask = ((indsi - 30)**2 + (indsj - 30)**2)**0.5 > 15
+    mask = mask.reshape(*img.shape)
+    img[mask == 0] = np.random.randn(int((mask == 0).sum()))
+    img[mask == 1] = 10 + np.random.randn(int((mask == 1).sum()))
+    plt_imhist(img, 
+               kwargs_for_imshow = {'cmap' : 'jet'}, 
+               kwargs_for_hist = {'bins': 40})
+
 if __name__ == '__main__':
+    test_plt_imhist(); exit()
     test_complex2hsv_colorbar()
     test_plt_imshow()
     test_imshow_series()

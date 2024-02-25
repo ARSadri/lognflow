@@ -1,9 +1,11 @@
 from .printprogress import printprogress
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import matplotlib.gridspec
 import numpy as np
+
 import matplotlib.pyplot as plt
+import matplotlib.gridspec
 from matplotlib.colors import hsv_to_rgb
+from matplotlib.widgets import RangeSlider, Slider
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def complex2hsv(data_complex, vmin = None, vmax = None):
     # Routine to visualise complex array as 2D image with colour conveying
@@ -57,6 +59,98 @@ def plt_colorbar(mappable):
     cbar = fig.colorbar(mappable, cax=cax)
     return cbar
 
+def plt_violinplot(
+        dataset:list, positions, facecolor = None, edgecolor = None, 
+        alpha = 0.5, label = None, fig_and_ax : tuple = None, 
+        plt_violinplot_kwargs = {}):
+    
+    if(fig_and_ax is None):
+        fig, ax = plt.subplots(1)
+    else:
+        fig, ax = fig_and_ax
+    violin_parts = ax.violinplot(dataset, positions, **plt_violinplot_kwargs)
+    for partname in ('cbars','cmins','cmaxes','cmeans','cmedians','bodies'):
+        vp = violin_parts.get(partname, [])
+        if partname == 'bodies':
+            for vp_body in vp:
+                vp_body.set_facecolor(facecolor)
+                vp_body.set_edgecolor(edgecolor)
+                vp_body.set_alpha(alpha)
+        else:
+            if isinstance(vp, list):
+                for v in vp:
+                    v.set_edgecolor(facecolor)
+            else:
+                vp.set_edgecolor(facecolor)
+    return fig, ax
+
+class plt_imhist:
+    def __init__(self, in_image, figsize=(12, 6),
+                 kwargs_for_imshow = {}, kwargs_for_hist = {}):
+        # Adjust figsize to provide more space if needed
+        self.fig, axs = plt.subplots(
+            1, 2, figsize = figsize,
+            gridspec_kw={'width_ratios': [5, 1], 'wspace': 0.1})
+        self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)  
+        # Leave space on the right for the slider
+        
+        # Display the image
+        self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
+        axs[0].axis('off')  # Hide axes for the image
+        
+        cm = self.im.get_cmap()
+        
+        # Histogram
+        n, bins = np.histogram(in_image.ravel(), **kwargs_for_hist)
+        bin_centres = 0.5 * (bins[:-1] + bins[1:])
+        axs[1].barh(
+            bin_centres, n, height=(bins[1]-bins[0]),
+            color=cm((bin_centres - bin_centres.min()) /
+                         (bin_centres.max() - bin_centres.min())))
+        axs[1].invert_xaxis()  # Invert x-axis to have the histogram vertical
+        
+        axs[1].yaxis.set_visible(True)  # Make sure the y-axis is visible
+        axs[1].xaxis.set_visible(False)  # Hide the x-axis
+        
+        # Create slider axes on the right side of the histogram
+        slider_ax = self.fig.add_axes(
+            [0.88, 0.1, 0.02, 0.8], facecolor='lightgoldenrodyellow')
+        self.slider = RangeSlider(
+            slider_ax, '', in_image.min(), in_image.max(),
+            valinit=[in_image.min(), in_image.max()], orientation='vertical')
+        self.slider.label.set_visible(False)
+        self.slider.valtext.set_visible(False)  
+        
+        self.lower_limit_line = axs[1].axhline(
+            self.slider.val[0], color='k', linestyle='--')
+        self.upper_limit_line = axs[1].axhline(
+            self.slider.val[1], color='k', linestyle='--')
+
+        # Initial text annotations for vmin and vmax
+        self.vmin_text = axs[1].text(0.5, self.slider.val[0], f'{self.slider.val[0]:.2f}',
+                                     transform=axs[1].get_yaxis_transform(),
+                                     ha='right', va='bottom', color='k')
+        self.vmax_text = axs[1].text(0.5, self.slider.val[1], f'{self.slider.val[1]:.2f}',
+                                     transform=axs[1].get_yaxis_transform(),
+                                     ha='right', va='top', color='k')
+
+        self.slider.on_changed(self.update)
+        
+        plt.show()
+
+    def update(self, val):
+        self.im.set_clim(val[0], val[1])
+        self.lower_limit_line.set_ydata([val[0], val[0]])
+        self.upper_limit_line.set_ydata([val[1], val[1]])
+        
+        # Update text annotations to reflect the new vmin and vmax
+        self.vmin_text.set_position((0.5, val[0]))
+        self.vmin_text.set_text(f'{val[0]:.2f}')
+        self.vmax_text.set_position((0.5, val[1]))
+        self.vmax_text.set_text(f'{val[1]:.2f}')
+        
+        self.fig.canvas.draw_idle()
+        
 def plt_imshow(img, 
                colorbar = True, 
                remove_axis_ticks = False, 

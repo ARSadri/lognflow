@@ -50,13 +50,15 @@ from    .utils              import (repr_raw,
                                     replace_all,
                                     select_directory, 
                                     stack_to_frame,
-                                    name_from_file)
+                                    name_from_file,
+                                    is_builtin_collection)
 from    .plt_utils          import (plt_colorbar,
                                     plt_hist,
                                     plt_surface, 
                                     imshow_series,
                                     imshow_by_subplots,
                                     plt_imshow)
+from    typing              import  Union
 
 @dataclass
 class varinlog:
@@ -129,25 +131,27 @@ class lognflow:
         :type log_flush_period: int
                 
         :param time_tag:
-            File names can carry time_tags in time.time() format. This 
+            File names can carry time_tags in time.time() format or indices. This 
             is pretty much the most fundamental contribution of lognflow beside
-            carrying the folders around. By default all file names will stop
-            having time tag if you set it here to False here. Itherwise,
-            all file names will have time tag unless stated at each logging by
-            log_... functions.
+            carrying the folders and files paths around. By default all file names
+            will stop having time tag if you set it here to False. Otherwise,
+            all file names will have time tag unless given argument at each logging 
+            function sets it to False. It can also be a string. options are 'counter'
+            or 'count_and_time' or 'counter&time'. If you use counter, instead of time
+            stamps, it will simple put an index that counts up after each logging.
         :type time_tag: bool
     """
     
     def __init__(self, 
-                 logs_root        : pathlib_Path = None,
-                 log_dir          : pathlib_Path = None,
-                 log_dir_prefix   : str          = None,
-                 log_dir_suffix   : str          = None,
-                 exist_ok         : bool         = True,
-                 time_tag         : bool         = True,
-                 print_text       : bool         = True,
-                 main_log_name    : str          = 'main_log',
-                 log_flush_period : int          = 10):
+                 logs_root        : pathlib_Path     = None,
+                 log_dir          : pathlib_Path     = None,
+                 log_dir_prefix   : str              = None,
+                 log_dir_suffix   : str              = None,
+                 exist_ok         : bool             = True,
+                 time_tag         : Union[bool, str] = True,
+                 print_text       : bool             = True,
+                 main_log_name    : str              = 'main_log',
+                 log_flush_period : int              = 10):
         self._init_time = time.time()
         self.time_tag = time_tag
         self.log_dir_prefix = log_dir_prefix
@@ -197,6 +201,7 @@ class lognflow:
     
         self.log_dir_str = str(self.log_dir.absolute())
         self.enabled = True
+        self.counted_vars = {}
         
     def disable(self):
         self.enabled = False
@@ -393,26 +398,50 @@ class lognflow:
                    suffix: str = None, time_tag: bool = None) -> pathlib_Path:
         
         time_tag = self.time_tag if (time_tag is None) else time_tag
+        assert isinstance(time_tag, (bool, str)), \
+            'Argument time_tag must be a boolean or a string.'
+
+        if time_tag == True:
+            counter_tag = False
+        elif time_tag == False:
+            counter_tag = False
+        elif time_tag.lower() == 'counter':
+            time_tag = False
+            counter_tag = True
+        elif ((time_tag.lower() == 'counter_and_time') |
+            (time_tag.lower() == 'counter&time')):
+            time_tag = True
+            counter_tag = True
         
         _param_dir = self.log_dir / param_dir
+        time_stamp_str = f'{self.time_stamp:>6.6f}'
+        if(counter_tag):
+            var_fullname = param_dir + '/' + param_name
+            self.counted_vars[var_fullname] = self.counted_vars.get(
+                var_fullname, 0) + 1
+            counter_tag_str = str(self.counted_vars[var_fullname])
         
         if(not _param_dir.is_dir()):
             _param_dir.mkdir(parents = True, exist_ok = True)
             
         if(param_name is not None):
             if(len(param_name) > 0):
-                fname = f'{param_name}'
+                if(counter_tag):
+                    param_name += '_' + counter_tag_str
                 if(time_tag):
-                    fname += f'_{self.time_stamp:>6.6f}'
+                    param_name += '_' + time_stamp_str
             else:
-                fname = f'{self.time_stamp:>6.6f}'
-                
+                if(counter_tag):
+                    param_name = counter_tag_str
+                else:
+                    param_name = time_stamp_str
+
             if(suffix is None):
-                fpath = _param_dir / f'{fname}'
+                fpath = _param_dir / param_name
             else:
                 while suffix[0] == '.':
                     suffix = suffix[1:]
-                fpath = _param_dir / f'{fname}.{suffix}'
+                fpath = _param_dir / (param_name + '.' + suffix)
             return fpath
         else:
             return _param_dir
@@ -440,7 +469,6 @@ class lognflow:
         
         log_dirnamesuffix = self._get_dirnamesuffix(
             param_dir, param_name, suffix)
-        
         
         fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
         self._loggers_dict[log_dirnamesuffix] = textinlog(
@@ -881,8 +909,10 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        if not isinstance(parameter_value_list, list):
+        if not is_builtin_collection(parameter_value_list):
             parameter_value_list = [parameter_value_list]
+        else:
+            parameter_value_list = list(parameter_value_list)
             
         if(x_values is not None):
             if not isinstance(x_values, list):

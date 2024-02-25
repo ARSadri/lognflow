@@ -13,6 +13,12 @@ from numpy import unique      as np_unique
 from multiprocessing import Process, Queue, cpu_count, Event
 
 from .printprogress import printprogress
+from .utils import is_builtin_collection
+
+def _to_collection(returned_obj):
+    if not is_builtin_collection(returned_obj):
+        return [returned_obj]
+    return returned_obj
 
 def _multiprocessor_function_test_mode(
         iterables_batch, targetFunction, \
@@ -29,7 +35,7 @@ def _multiprocessor_function_test_mode(
             results = targetFunction(iterables_sliced)
         else:
             results = targetFunction(iterables_sliced, shareables)
-        outputs.append(results)
+        outputs.append(_to_collection(results))
     theQ.put([procID_range, outputs, False])
 
 def _multiprocessor_function(iterables_batch, targetFunction, \
@@ -48,7 +54,7 @@ def _multiprocessor_function(iterables_batch, targetFunction, \
                 results = targetFunction(iterables_sliced)
             else:
                 results = targetFunction(iterables_sliced, shareables)
-            outputs.append(results)
+            outputs.append(_to_collection(results))
         except Exception as e:
             if not error_event.is_set():
                 error_event.set()
@@ -63,7 +69,7 @@ def _prepare_outpus(outputs, Q_procID, concatenate_outputs, outputs_is_given):
         sortArgs = np_argsort(Q_procID)
         ret_Q_procID = [Q_procID[i] for i in sortArgs]
         ret_list = [outputs[i] for i in sortArgs]
-        
+
         return_as_is = False
         ret_entries_lens = []
         for ret_entry in ret_list:
@@ -94,10 +100,7 @@ def _prepare_outpus(outputs, Q_procID, concatenate_outputs, outputs_is_given):
                 shapes_are_not_the_same = False
                 shapes_are_the_same = False
                 for entry in ret_list:
-                    if n_entries > 1:
-                        instance = entry[element_cnt]
-                    else:
-                        instance = entry
+                    instance = entry[element_cnt]
                     try:
                         instance_size = instance.size
                     except:

@@ -4,17 +4,25 @@ from numpy import array       as np_array
 from numpy import zeros       as np_zeros
 from numpy import argsort     as np_argsort
 from numpy import unique      as np_unique
+from .utils import is_builtin_collection
+
+def _to_collection(returned_obj):
+    if not is_builtin_collection(returned_obj):
+        return [returned_obj]
+    return returned_obj
 
 def _loopprocessor_function_test_mode(
          targetFunction, theQ, procID_range, error_event, args, kwargs):
     results = targetFunction(*args, **kwargs)
+    results = _to_collection(results)
     theQ.put([procID_range, [results], False])
 
 def _loopprocessor_function(
         targetFunction, theQ, procID_range, error_event, args, kwargs):
     try:
-        result = targetFunction(*args, **kwargs)
-        theQ.put([procID_range, [result], False])
+        results = targetFunction(*args, **kwargs)
+        results = _to_collection(results)
+        theQ.put([procID_range, [results], False])
     except Exception as e:
         if not error_event.is_set():
             error_event.set()
@@ -167,10 +175,7 @@ class loopprocessor():
                     shapes_are_not_the_same = False
                     shapes_are_the_same = False
                     for entry in ret_list:
-                        if n_entries > 1:
-                            instance = entry[element_cnt]
-                        else:
-                            instance = entry
+                        instance = entry[element_cnt]
                         try:
                             instance_size = instance.size
                         except:

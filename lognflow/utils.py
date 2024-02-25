@@ -3,6 +3,35 @@ import numpy as np
 
 def dummy_function(*args, **kwargs): ...
 
+def is_builtin_collection(obj):
+    """
+    Determine if an object is a strictly built-in Python collection.
+    
+    This function uses a heuristic based on the object type's module being either 'builtins',
+    'collections', or 'collections.abc', excluding strings and bytes explicitly, to identify
+    if the given object is a built-in collection type (list, tuple, dict, set). It checks if the
+    object belongs to one of Python's built-in collection modules and possesses both __len__ and
+    __iter__ methods, which are typical characteristics of collections.
+    
+    Args:
+        obj: The object to be checked.
+    
+    Returns:
+        bool: True if the object is a built-in Python collection (excluding strings and bytes),
+              False otherwise.
+    
+    Note:
+        This function aims to exclude objects from external libraries (e.g., NumPy arrays) that,
+        while iterable and having a __len__ method, are not considered built-in Python collections.
+    """
+    obj_type = type(obj)
+    module = obj_type.__module__
+    if ( (module not in ('builtins', 'collections', 'collections.abc'))
+         | isinstance(obj, (str, bytes)) 
+        ):
+        return False
+    return hasattr(obj, '__len__') and hasattr(obj, '__iter__')
+
 def name_from_file(log_dir, fpath):
     """ 
         Given an fpath inside the logger log_dir, 
