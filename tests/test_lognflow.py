@@ -320,7 +320,7 @@ def test_copy_file():
     logger.copy('myvar/varvar', fpath, suffix = 'pdb', 
              time_tag= True)
     
-    var_check = logger.logged.get_single('myvar/varvar')
+    var_check = logger.logged.get_single('myvar/varvar*')
     assert str(var) == var_check
     
 def test_copy_list_of_files():
@@ -352,14 +352,14 @@ def test_copy():
     logger2 = lognflow(temp_dir)
     logger2.copy('some_text.txt', fpath)
 
-def test_log_images_in_pdf():
+def test_log_images_to_pdf():
     logger = lognflow(temp_dir)
     logger('test log images in pdf')
     
     logger.log_imshow('im1', np.random.randn(30, 30))
     logger.log_imshow('im1', np.random.randn(20, 40))
     
-    images = logger.logged.get_stack_from_names('im1')
+    images = logger.logged.get_stack_from_names('im1*.*')
     logger.log_images_in_pdf(
         'im1_all', parameter_value = images, time_tag = False)
     
@@ -369,23 +369,30 @@ def test_variables_to_pdf():
     
     logger.log_imshow('im1', np.random.randn(30, 30))
     logger.log_imshow('im1', np.random.randn(20, 40))
-    logger.variables_to_pdf('im1_all', 'im1', time_tag = False)
+    logger.variables_to_pdf('im1_all', 'im1*.*', time_tag = False)
+
+def test_log_code():
+    logger = lognflow(temp_dir)
+    logger('test log variables in pdf')
+    
+    logger.log_code(__file__)
 
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_log_counter(); exit()
+    test_variables_to_pdf(); exit()
+    test_log_images_to_pdf()
+    test_copy_file()
+    test_log_code()    
+    test_log_counter()
     test_log_imshow()
     test_copy_list_of_files()
-    test_log_images_in_pdf()
-    test_variables_to_pdf()
     test_log_imshow_series()
     test_log_imshow_by_subplots()
     test_log_imshow_complex()
     test_replace_time_with_index()
     test_log_hist()
-    test_copy_file()
     test_log_var()
     test_log_text()
     test_log_single()
@@ -404,3 +411,4 @@ if __name__ == '__main__':
     test_log_confusion_matrix()
     test_names_with_slashes_and_backslashes()
     test_copy()
+    test_log_code()

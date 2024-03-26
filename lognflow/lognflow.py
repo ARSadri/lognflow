@@ -42,6 +42,7 @@ from    matplotlib          import animation    as matplotlib_animation
 from    pathlib             import Path         as pathlib_Path
 from    itertools           import product      as itertools_product
 from    sys                 import platform     as sys_platform
+from    sys                 import argv         as sys_argv
 from    os                  import system       as os_system
 from    tempfile            import gettempdir
 from    dataclasses         import dataclass    
@@ -208,6 +209,14 @@ class lognflow:
         
     def enable(self):
         self.enabled = True
+    
+    def log_code(self, code_fpath = None):
+        """ log code, pass __file__
+        """
+        if code_fpath is None:
+            code_fpath = sys_argv[0]
+        code_fpath = pathlib_Path(code_fpath)
+        self.copy(code_fpath.name, code_fpath)
     
     def name_from_file(self, fpath):
         """ 
@@ -1228,11 +1237,11 @@ class lognflow:
             :param frame_shape:
                 n_f images will be tiles according to thi tuple as shape.
             :param grid_locations:
-                if this is of shape n_images x 2, then each subplot will be located
-                at a specific given location.
-                To make it beautiful, you better proveide figsize and im_sizes or 
-                im_size_factor to merely scale them to cover a small region between
-                0 and 1.
+                if this is of shape n_images x 2, then each subplot will be 
+                located at a specific given location.
+                To make it beautiful, you better proveide figsize and im_sizes
+                or  im_size_factor to merely scale them to cover a small region 
+                between 0 and 1.
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
         """

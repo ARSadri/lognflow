@@ -245,3 +245,9 @@ History
 * setting time_tag to 'counter' or 'counter&time' will count filenames instead of time
 * plt_violinplot was added
 * plt_imhist is added 
+
+0.11.1 (2024-03-26)
+------------------
+* plt_imshow_by_subplots takes stacks as well now.
+* log_code is added, pass __file__ for current script to be logged.
+* multiple plt_imhist is possible

@@ -85,7 +85,7 @@ def plt_violinplot(
     return fig, ax
 
 class plt_imhist:
-    def __init__(self, in_image, figsize=(12, 6),
+    def __init__(self, in_image, figsize=(12, 6), title = None,
                  kwargs_for_imshow = {}, kwargs_for_hist = {}):
         # Adjust figsize to provide more space if needed
         self.fig, axs = plt.subplots(
@@ -96,6 +96,8 @@ class plt_imhist:
         
         # Display the image
         self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
+        if title is not None:
+            axs[0].set_title(title)
         axs[0].axis('off')  # Hide axes for the image
         
         cm = self.im.get_cmap()
@@ -136,8 +138,6 @@ class plt_imhist:
 
         self.slider.on_changed(self.update)
         
-        plt.show()
-
     def update(self, val):
         self.im.set_clim(val[0], val[1])
         self.lower_limit_line.set_ydata([val[0], val[0]])
@@ -417,7 +417,10 @@ class plot_gaussian_gradient:
         plt.grid()
         
         plt.show()
-
+        
+    def __call__(self, *args, **kwargs):
+        self.addPlot(*args, **kwargs)
+        
 def imshow_series(list_of_stacks, 
                   list_of_masks = None,
                   figsize_ratio = 1,
@@ -624,9 +627,3 @@ def imshow_by_subplots(
                         ax_local.yaxis.set_ticks_position('none')
         
         return fig, ax
-    else:
-        self.log_text(
-            self.log_name,
-            f'Cannot imshow variable {parameter_name} with shape' + \
-            f'{stack.shape}')
-        return
