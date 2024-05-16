@@ -1,10 +1,19 @@
-from lognflow import (
-    multiprocessor, loopprocessor, printprogress)
+from lognflow import multiprocessor, loopprocessor, printprogress
 from lognflow.multiprocessor import multiprocessor_gen
 import numpy as np
 import inspect
 import time
 
+def randgen(_):
+    print(_)
+    n_data =  int(10000*np.random.rand())
+    randn = np.random.rand(n_data)
+    return randn
+
+def test_simple_randgen():
+    results = multiprocessor(randgen, np.arange(100))
+    print(results)
+    
 def multiprocessor_targetFunc(iterables_sliced, shareables):
     idx = iterables_sliced
     data, mask, op_type = shareables
@@ -24,11 +33,9 @@ def test_multiprocessor():
     mask = (2*np.random.rand(N,D)).astype('int')
     op_type = 'median'
 
-    shareables  = (data, mask, op_type)
-    iterables = N
-    
     stats = multiprocessor(multiprocessor_targetFunc, 
-                           iterables, shareables,
+                           iterables = N,
+                           shareables = (data, mask, op_type),
                            verbose = True)
     results = []
     for cnt in range(N):
@@ -225,9 +232,11 @@ def test_multiprocessor_gen():
     
 if __name__ == '__main__':
     print('lets test', flush=True)
+    test_simple_randgen()
     test_loopprocessor()
     test_multiprocessor_gen()
     test_multiprocessor()
     test_noslice_multiprocessor()
     test_multiprocessor_ccorr()
     test_error_handling_in_multiprocessor()
+

@@ -372,20 +372,20 @@ def multiprocessor(
             
         if((procID<n_pts) & (numBusyCores < max_cpu) & (not any_error)):
             batchSize = np_minimum(default_batchSize, n_pts - procID)
-            procID_arange = np_arange(procID, procID + batchSize, dtype = 'int')
+            procID_range = np_arange(procID, procID + batchSize, dtype = 'int')
 
             iterables_batch = ()
             for iim in iterables:
                 iterables_batch = \
-                    iterables_batch + (iim[procID_arange], )
+                    iterables_batch + (iim[procID_range], )
             _args = (iterables_batch, ) + (
-                targetFunction, shareables, aQ, procID_arange, error_event)
+                targetFunction, shareables, aQ, procID_range, error_event)
             
             if(test_mode):
                 _multiprocessor_function_test_mode(*_args)
             else:
                 Process(target = _multiprocessor_function, args = _args).start()
-            procID += batchSize
+            procID += len(procID_range)
             numBusyCores += 1
     
     if(any_error):        
@@ -410,7 +410,7 @@ def multiprocessor_gen(
     """ multiprocessor_gen makes the use of multiprocessing in Python easy
     
         It is exactly the same as multiprocessor, however, it yields the
-        2-tuple of (results, ID) when a result arrive. You have to use it
+        2-tuple of (results, ID) when a result arrives. You have to use it
         like a normal generator in a for loop. Look at the above multiprocessor
         for documentation on parameters and look at the tests for 
         multiprocessor_gen for an example how to use a generator in Python.
@@ -520,20 +520,20 @@ def multiprocessor_gen(
                 
         if((procID<n_pts) & (numBusyCores < max_cpu) & (not any_error)):
             batchSize = np_minimum(default_batchSize, n_pts - procID)
-            procID_arange = np_arange(procID, procID + batchSize, dtype = 'int')
+            procID_range = np_arange(procID, procID + batchSize, dtype = 'int')
 
             iterables_batch = ()
             for iim in iterables:
                 iterables_batch = \
-                    iterables_batch + (iim[procID_arange], )
+                    iterables_batch + (iim[procID_range], )
             _args = (iterables_batch, ) + (
-                targetFunction, shareables, aQ, procID_arange, error_event)
+                targetFunction, shareables, aQ, procID_range, error_event)
             
             if(test_mode):
                 _multiprocessor_function_test_mode(*_args)
             else:
                 Process(target = _multiprocessor_function, args = _args).start()
-            procID += batchSize
+            procID += len(procID_range)
             numBusyCores += 1
     
     if(any_error):        

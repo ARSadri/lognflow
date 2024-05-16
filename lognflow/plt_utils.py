@@ -420,14 +420,18 @@ class plot_gaussian_gradient:
         
     def __call__(self, *args, **kwargs):
         self.addPlot(*args, **kwargs)
-        
+
 def imshow_series(list_of_stacks, 
                   list_of_masks = None,
+                  figsize = None,
                   figsize_ratio = 1,
                   text_as_colorbar = False,
                   colorbar = False,
                   cmap = 'viridis',
-                  list_of_titles = None,
+                  list_of_titles_columns = None,
+                  list_of_titles_rows = None,
+                  fontsize = None,
+                  transpose = False,
                   ):
     """ imshow a stack of images or sets of images in a shelf,
         input must be a list or array of images
@@ -438,7 +442,7 @@ def imshow_series(list_of_stacks,
         * n_im, n_r x n_c x 3
 
         :param list_of_stacks
-                list_of_stacks would include arrays iteratable by their
+                list_of_stacks would include arrays iterable by their
                 first dimension.
         :param borders: float
                 borders between tiles will be filled with this variable
@@ -449,23 +453,38 @@ def imshow_series(list_of_stacks,
         assert len(list_of_masks) == n_stacks, \
             f'the number of masks, {len(list_of_masks)} and ' \
             + f'stacks {n_stacks} should be the same'
-    
-    # if list_of_titles is not None:
-    #     assert len(list_of_titles) == n_stacks, \
-    #         f'the number of titles, {len(list_of_titles)} and ' \
-    #         + f'stacks {n_stacks} should be the same'
-    
+     
     n_imgs = list_of_stacks[0].shape[0]
     for ind, stack in enumerate(list_of_stacks):
         assert stack.shape[0] == n_imgs, \
-            'All members of the given list should have same number of images.'
+            'All members of the given list should have same number of images.' \
+            + f' while the stack indexed as {ind} has length {len(stack)}'
         assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
             f'The shape of the stack {ind} must have length 3 or 4, it has '\
             f' shape of {stack.shape}. Perhaps you wanted to have only one set of'\
             ' images. If thats the case, put that single image in a list.'
+
+    if (list_of_titles_columns is not None):
+        assert len(list_of_titles_columns) == n_stacks, \
+            'len(list_of_titles_columns) should be len(list_of_stacks)' \
+            + f' but it is {len(list_of_titles_columns)}.'
+    if (list_of_titles_rows is not None):
+        assert len(list_of_titles_rows) == n_imgs, \
+            'len(list_of_titles_rows) should be len(list_of_stacks[0])' \
+            + f' but it is {len(list_of_titles_rows)}.'
             
-    fig = plt.figure(figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio))
-    gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs)
+    if figsize is None:
+        figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio)
+        if transpose:
+            figsize = (n_stacks*figsize_ratio,n_imgs*figsize_ratio)
+    if fontsize is None:
+        fontsize = int(max(figsize)/4)
+    
+    fig = plt.figure(figsize = figsize)
+    if transpose:
+        gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs)
+    else:
+        gs1 = matplotlib.gridspec.GridSpec(n_imgs, n_stacks)
     if(colorbar):
         gs1.update(wspace=0.25, hspace=0)
     else:
@@ -473,7 +492,10 @@ def imshow_series(list_of_stacks,
     
     for img_cnt in range(n_imgs):
         for stack_cnt in range(n_stacks):
-            ax = plt.subplot(gs1[stack_cnt, img_cnt])
+            if transpose:
+                ax = plt.subplot(gs1[stack_cnt, img_cnt])
+            else:
+                ax = plt.subplot(gs1[img_cnt, stack_cnt])
             plt.axis('on')
             ax.set_xticklabels([])
             ax.set_yticklabels([])
@@ -501,25 +523,29 @@ def imshow_series(list_of_stacks,
                          data_canvas.shape[1]*0.05,
                          f'{data_canvas.max():.6f}', 
                          color = 'yellow',
-                         fontsize = 2)
+                         fontsize = fontsize)
                 ax.text(data_canvas.shape[0]*0,
                          data_canvas.shape[1]*0.5, 
                          f'{data_canvas.mean():.6f}', 
                          color = 'yellow',
-                         fontsize = 2)
+                         fontsize = fontsize)
                 ax.text(data_canvas.shape[0]*0,
                          data_canvas.shape[1]*0.95, 
                          f'{data_canvas.min():.6f}', 
                          color = 'yellow',
-                         fontsize = 2)
+                         fontsize = fontsize)
+            ax.set_aspect('equal')
+            if (list_of_titles_columns is not None):
+                if img_cnt == 0:
+                    ax.set_title(list_of_titles_columns[stack_cnt])
+            if (list_of_titles_rows is not None):
+                if stack_cnt == 0:
+                    ax.set_ylabel(list_of_titles_rows[img_cnt])
+            if (img_cnt > 0) & (stack_cnt > 0):
+                ax.axis('off')
             if(colorbar):
                 cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                 cbar.ax.tick_params(labelsize=1)
-            ax.set_aspect('equal')
-            ax.axis('off')
-        
-    
-    
     return fig, None
 
 def imshow_by_subplots( 

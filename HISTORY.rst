@@ -251,3 +251,9 @@ History
 * plt_imshow_by_subplots takes stacks as well now.
 * log_code is added, pass __file__ for current script to be logged.
 * multiple plt_imhist is possible
+
+0.11.2 (2024-05-03)
+------------------
+* imshow_series supports both orientations
+* get_stack_from_names returns np array if possible
+* imshow_series now takes titles for columns and rows

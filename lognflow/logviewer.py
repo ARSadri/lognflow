@@ -259,8 +259,7 @@ class logviewer:
                 try:
                     img = mpl_imread(var_path)
                     return(img, var_path)
-                except:
-                    pass
+                except: pass
                 # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
                 #     return(var_path.read_text(), var_path)
                 try:
@@ -353,14 +352,12 @@ class logviewer:
                 try:
                     fdata = np.load(flist[0])
                     read_func = np.load
-                except:
-                    pass
+                except: pass
             if(read_func is None):
                 try:
                     fdata = mpl_imread(flist[0])
                     read_func = mpl_imread
-                except:
-                    pass
+                except: pass
             try:
                 read_func(flist[0])
             except Exception as e:
@@ -378,8 +375,7 @@ class logviewer:
              var_names = None, read_func = None, return_flist = False):
         try:
             var_names_str = str(var_names)
-        except:
-            pass
+        except: pass
         else:
             var_names = [var_names]
         assert var_names == list(var_names), \
@@ -396,6 +392,11 @@ class logviewer:
                     if data is not None:
                         dataset.append(data)
                         flist.append(fpath)
+
+        try:
+            dataset = np.array(dataset)
+        except: pass
+                        
         if return_flist:
             return dataset, flist
         else:

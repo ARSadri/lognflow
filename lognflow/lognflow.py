@@ -49,7 +49,7 @@ from    dataclasses         import dataclass
 from    .logviewer          import logviewer
 from    .utils              import (repr_raw,
                                     replace_all,
-                                    select_directory, 
+                                    select_directory,
                                     stack_to_frame,
                                     name_from_file,
                                     is_builtin_collection)
@@ -137,8 +137,8 @@ class lognflow:
             carrying the folders and files paths around. By default all file names
             will stop having time tag if you set it here to False. Otherwise,
             all file names will have time tag unless given argument at each logging 
-            function sets it to False. It can also be a string. options are 'counter'
-            or 'count_and_time' or 'counter&time'. If you use counter, instead of time
+            function sets it to False. It can also be a string. options are 'index'
+            or 'time_and_index'. If you use indexer, instead of time
             stamps, it will simple put an index that counts up after each logging.
         :type time_tag: bool
     """
@@ -151,7 +151,7 @@ class lognflow:
                  exist_ok         : bool             = True,
                  time_tag         : Union[bool, str] = True,
                  print_text       : bool             = True,
-                 main_log_name    : str              = 'main_log',
+                 main_log_name    : str              = 'log',
                  log_flush_period : int              = 10):
         self._init_time = time.time()
         self.time_tag = time_tag
@@ -411,37 +411,36 @@ class lognflow:
             'Argument time_tag must be a boolean or a string.'
 
         if time_tag == True:
-            counter_tag = False
+            index_tag = False
         elif time_tag == False:
-            counter_tag = False
-        elif time_tag.lower() == 'counter':
+            index_tag = False
+        elif (time_tag.lower() == 'index'):
             time_tag = False
-            counter_tag = True
-        elif ((time_tag.lower() == 'counter_and_time') |
-            (time_tag.lower() == 'counter&time')):
+            index_tag = True
+        elif (time_tag.lower() == 'time_and_index'):
             time_tag = True
-            counter_tag = True
+            index_tag = True
         
         _param_dir = self.log_dir / param_dir
         time_stamp_str = f'{self.time_stamp:>6.6f}'
-        if(counter_tag):
+        if(index_tag):
             var_fullname = param_dir + '/' + param_name
             self.counted_vars[var_fullname] = self.counted_vars.get(
                 var_fullname, 0) + 1
-            counter_tag_str = str(self.counted_vars[var_fullname])
+            index_tag_str = str(self.counted_vars[var_fullname])
         
         if(not _param_dir.is_dir()):
             _param_dir.mkdir(parents = True, exist_ok = True)
             
         if(param_name is not None):
             if(len(param_name) > 0):
-                if(counter_tag):
-                    param_name += '_' + counter_tag_str
+                if(index_tag):
+                    param_name += '_' + index_tag_str
                 if(time_tag):
                     param_name += '_' + time_stamp_str
             else:
-                if(counter_tag):
-                    param_name = counter_tag_str
+                if(index_tag):
+                    param_name = index_tag_str
                 else:
                     param_name = time_stamp_str
 
@@ -1273,11 +1272,14 @@ class lognflow:
                           parameter_name: str,
                           list_of_stacks: list,
                           list_of_masks = None,
+                          figsize = None,
                           figsize_ratio = 1,
                           text_as_colorbar = False,
                           colorbar = False,
                           cmap = 'viridis',
                           list_of_titles = None,
+                          fontsize = None,
+                          transpose = False,
                           image_format='jpeg', 
                           dpi=1200,
                           time_tag: bool = None,
@@ -1327,11 +1329,14 @@ class lognflow:
             
         fig, ax = imshow_series(list_of_stacks,
                                 list_of_masks = list_of_masks,
+                                figsize = figsize,
                                 figsize_ratio = figsize_ratio,
                                 text_as_colorbar = text_as_colorbar,
                                 colorbar = colorbar,
                                 cmap = cmap,
                                 list_of_titles = list_of_titles,
+                                fontsize = fontsize,
+                                transpose = transpose,
                                 )
             
         if not return_figure:
@@ -1496,7 +1501,7 @@ class lognflow:
         ims = []
         for img in stack:    
             im = ax.imshow(img, animated=True)
-            plt.xticks([]),plt.yticks([])
+            ax.axis('off')
             ims.append([im])
         ani = matplotlib_animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit,
