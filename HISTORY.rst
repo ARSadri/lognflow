@@ -257,3 +257,7 @@ History
 * imshow_series supports both orientations
 * get_stack_from_names returns np array if possible
 * imshow_series now takes titles for columns and rows
+
+0.11.3 (2024-05-17)
+-----------------
+* imshow_series supports titles for rows and coloumns

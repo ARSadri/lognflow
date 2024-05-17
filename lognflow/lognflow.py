@@ -1277,7 +1277,8 @@ class lognflow:
                           text_as_colorbar = False,
                           colorbar = False,
                           cmap = 'viridis',
-                          list_of_titles = None,
+                          list_of_titles_columns = None,
+                          list_of_titles_rows = None,
                           fontsize = None,
                           transpose = False,
                           image_format='jpeg', 
@@ -1327,17 +1328,17 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        fig, ax = imshow_series(list_of_stacks,
+        fig, ax = imshow_series(list_of_stacks, 
                                 list_of_masks = list_of_masks,
                                 figsize = figsize,
                                 figsize_ratio = figsize_ratio,
                                 text_as_colorbar = text_as_colorbar,
                                 colorbar = colorbar,
                                 cmap = cmap,
-                                list_of_titles = list_of_titles,
+                                list_of_titles_columns = list_of_titles_columns,
+                                list_of_titles_rows = list_of_titles_rows,
                                 fontsize = fontsize,
-                                transpose = transpose,
-                                )
+                                transpose = transpose)
             
         if not return_figure:
             fpath = self.log_plt(
