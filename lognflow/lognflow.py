@@ -38,6 +38,7 @@ before storing into the directory using log_var(name, var).
 import  time
 import  numpy                                   as np
 import  matplotlib.pyplot                       as plt
+from    matplotlib.pyplot   import imread       as mpl_imread
 from    matplotlib          import animation    as matplotlib_animation
 from    pathlib             import Path         as pathlib_Path
 from    itertools           import product      as itertools_product
@@ -52,13 +53,15 @@ from    .utils              import (repr_raw,
                                     select_directory,
                                     stack_to_frame,
                                     name_from_file,
-                                    is_builtin_collection)
+                                    is_builtin_collection,
+                                    dummy_function)
 from    .plt_utils          import (plt_colorbar,
                                     plt_hist,
                                     plt_surface, 
                                     imshow_series,
                                     imshow_by_subplots,
-                                    plt_imshow)
+                                    plt_imshow,
+                                    plt_scatter3)
 from    typing              import  Union
 
 @dataclass
@@ -188,9 +191,7 @@ class lognflow:
         else:
             self.log_dir = pathlib_Path(log_dir)
 
-        self.log_dir.mkdir(parents = True, exist_ok = exist_ok)
-        
-        self.logged = logviewer(self.log_dir, self)
+        self.logged = self
         
         self._print_text = print_text
         self._loggers_dict = {}
@@ -203,6 +204,8 @@ class lognflow:
         self.log_dir_str = str(self.log_dir.absolute())
         self.enabled = True
         self.counted_vars = {}
+        
+        self.load = self.get_single
         
     def disable(self):
         self.enabled = False
@@ -224,7 +227,13 @@ class lognflow:
             what would be its equivalent parameter_name?
         """
         return name_from_file(self.log_dir_str, fpath)
-        
+    
+    def file_from_name(self, parameter_name):
+        """ file from name
+            given a parameter_name, it returns log_dir / parameter_name
+        """
+        return self.log_dir / parameter_name
+    
     def copy(self, parameter_name = None, source = None, suffix = None,
              time_tag = False):
         """ copy into a new file
@@ -431,6 +440,8 @@ class lognflow:
         
         if(not _param_dir.is_dir()):
             _param_dir.mkdir(parents = True, exist_ok = True)
+        if self.logged is None:
+            self.logged = logviewer(self.log_dir, self)
             
         if(param_name is not None):
             if(len(param_name) > 0):
@@ -1014,7 +1025,9 @@ class lognflow:
                      dpi=1200,
                      title = None,
                      time_tag: bool = None, 
-                     return_figure = False):
+                     return_figure = False,
+                     make_animation = False,
+                     **kwargs):
         """log a single scatter in 3D
             Scatter plotting in 3D
             
@@ -1030,22 +1043,29 @@ class lognflow:
         """
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
-            
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(parameter_value[0], 
-                   parameter_value[1], 
-                   parameter_value[2])
-        
-        if title is not None:
-            ax.set_title(title)
-        if not return_figure:
-            return self.log_plt(
-                parameter_name = parameter_name, 
-                image_format=image_format, dpi=dpi,
-                time_tag = time_tag)
+
+        if make_animation:
+            fig, ax, stack = plt_scatter3(
+                parameter_value, title = title,
+                make_animation = True, **kwargs)
         else:
-            return fig, ax
+            fig, ax = plt_scatter3(
+                parameter_value, title = title, **kwargs)
+            
+        if not return_figure:
+            if make_animation:
+                self.log_animation(
+                    parameter_name, stack, dpi=dpi, time_tag = time_tag) 
+            else:
+                return self.log_plt(
+                    parameter_name = parameter_name, 
+                    image_format = image_format, dpi=dpi,
+                    time_tag = time_tag)
+        else:
+            if make_animation:
+                return fig, ax, stack
+            else:
+                return fig, ax
     
     def log_surface(self, parameter_name: str,
                        parameter_value, image_format='jpeg', 
@@ -1555,6 +1575,481 @@ class lognflow:
         fpath = self.log_text(None, *args, **kwargs)
         self.flush_all()
         return fpath
+
+    #towards supporting all that logging supports
+    def debug(self, text_to_log):
+        self.log_text('debug', text_to_log, time_tag = False)
+    def info(self):
+        self.log_text('info', text_to_log, time_tag = False)
+    def warning(self):
+        self.log_text('warning', text_to_log, time_tag = False)
+    def error(self):
+        self.log_text('error', text_to_log, time_tag = False)
+    def critical(self):
+        self.log_text('critical', text_to_log, time_tag = False)
+    def exception(self):
+        self.log_text('exception', text_to_log, time_tag = False)
+
+
+    def assert_log_dir(self):
+        if not self.log_dir.is_dir():
+            print('~'*60)
+            print(f'lognflow.logdir: No such directory: '+ str(self.log_dir))
+            if self.not_exist_ok:
+                print(f'You probably initialized lognflow to read first.'\
+                      ' You have not logged anything in the log directory.'
+                      ' You probably have entereed a wrong directory name'
+                      ' for an existing logger or not provided log_dir in'
+                      ' the input and used the first argument which is'
+                      ' logs_root. Use log_dir as input to read from a '
+                      ' directory without logging anything.')
+            print('~'*60)
+            assert self.log_dir.is_dir()
+
+    def name_from_file(self, fpath):
+        """ 
+            Given an fpath inside the logger log_dir, 
+            what would be its equivalent parameter_name?
+        """
+        self.assert_log_dir()
+        return name_from_file(self.log_dir_str, fpath)
+    
+    # def disable_logger(self):
+    #     self.logger = dummy_function
+    
+    def log_torch_dict(self, name, x):
+        if isinstance(x, dict):
+            for key in x.keys():
+                log_dict(name+'/'+key, x[key])
+        else:
+            self.log_single(name, x.detach().cpu().numpy())
+
+    def get_torch_dict(self, name):
+        self.assert_log_dir()
+        flist = self.logged.get_flist(name)
+        for fpath in flist:
+            if fpath.is_file():
+                vname = self.name_from_file(fpath)
+                out = self.logged.get_single(vname)
+                return torch.from_numpy(out).cuda()
+            if fpath.is_dir():
+                fpath_str = str(fpath.absolute())
+                vname = fpath_str.split(str(self.log_dir))[1][1:]
+                flist_dir = self.logged.get_flist(vname + '/*')
+                output = {}
+                for fpath_inner in flist_dir:
+                    key = fpath_inner.stem
+                    output[key] = get_dict(vname + '/' + fpath_inner.name)
+                return output
+        return None    
+    
+    def get_flist(self, var_name, suffix = None):
+        """ get list of files
+            return the list of files for a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+        """
+        self.assert_log_dir()
+        var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
+            .replace('\r', '\\r').replace('\b', '\\b')
+
+        flist = list((self.log_dir).glob(var_name))
+        
+        if not flist:
+            if suffix is None:
+                if len(var_name.split('.')) > 1:
+                    suffix = var_name.split('.')[-1]
+                    name_before_suffix = var_name.split('.')[:-1]
+                    if((len(name_before_suffix) == 1) & 
+                       (name_before_suffix[0] == '')):
+                        var_name = '*'
+                    else:
+                        var_name = ('.').join(var_name.split('.')[:-1])
+                else:
+                    suffix = '*'
+    
+            suffix = suffix.strip('.')        
+    
+            flist = []            
+            if((self.log_dir / var_name).is_file()):
+                flist = [self.log_dir / var_name]
+            elif((self.log_dir / f'{var_name}.{suffix}').is_file()):
+                flist = [self.log_dir / f'{var_name}.{suffix}']
+            else:
+                _var_name = (self.log_dir / var_name).name
+                _var_dir = (self.log_dir / var_name).parent
+                search_patt = f'{_var_name}.{suffix}'
+                search_patt = replace_all(search_patt, '**', '*')
+                flist = list(_var_dir.glob(search_patt))
+        if(flist):
+            flist.sort()
+        else:
+            var_dir = self.log_dir / var_name
+            if(var_dir.is_dir()):
+                flist = list(var_dir.glob('*'))
+            if(len(flist) > 0):
+                flist.sort()
+        return flist
+
+    def get_namelist(self, var_name, suffix = None):
+        """ get logger names of files
+            return the list of names for a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+        """
+        self.assert_log_dir()
+        nlist = self.get_flist(var_name, suffix)
+        if nlist:
+            nlist = [name_from_file(self.log_dir_str, fpath) for fpath in nlist]
+        return nlist
+
+    def get_common_files(self, var_name_A, var_name_B, suffix = None,
+                               flist_A = None, flist_B = None):
+        """ get common files in two directories
+        
+            It happens often in ML that there are two directories, A and B,
+            and we are interested to get the flist in both that is common 
+            between them. returns a tuple of two lists of files.
+            
+            Parameters
+            ----------
+            :param var_name_A:
+                directory A name
+            :param var_name_B:
+                directory B name
+        """
+        self.assert_log_dir()
+        if not flist_A:
+            flist_A = self.get_flist(var_name_A, suffix)
+        if not flist_B:
+            flist_B = self.get_flist(var_name_B, suffix)
+        
+        suffix_A = flist_A[0].suffix
+        suffix_B = flist_B[0].suffix 
+        parent_A = flist_A[0].parent
+        parent_B = flist_B[0].parent
+        
+        fstems_A = [_fst.stem for _fst in flist_A]
+        fstems_B = [_fst.stem for _fst in flist_B]
+        
+        fstems_A_set = set(fstems_A)
+        fstems_B_set = set(fstems_B)
+        common_stems = list(fstems_A_set.intersection(fstems_B_set))
+
+        flist_A_new = [parent_A / (common_stem + suffix_A) \
+                          for common_stem in common_stems]
+        flist_B_new = [parent_B / (common_stem + suffix_B) \
+                          for common_stem in common_stems]
+
+        return(flist_A_new, flist_B_new)
+
+    def get_text(self, log_name='main_log', flist = None, suffix = 'txt',
+                       file_index = -1):
+        """ get text log files
+            Given the log_name, this function returns the text therein.
+
+            Parameters
+            ----------
+            :param log_name:
+                the log name. If not given then it is the main log.
+            :param flist:
+                you can give a file list in Posix paths, for text files
+            :param suffix: str
+                to search for specifi files
+            :param file_index: int or list[int]
+                a number or a list of numbers for the index of the file 
+                to include, default: -1
+
+        """
+        self.assert_log_dir()
+        if isinstance(file_index, int):
+            file_index = [file_index]
+        if not flist:
+            flist = self.get_flist(log_name, suffix)
+        n_files = len(flist)
+        if (n_files>0):
+            txt = []
+            for fcnt in file_index:
+                with open(flist[int(fcnt)]) as f_txt:
+                    txt.append(f_txt.readlines())
+            if(n_files == 1):
+                txt = txt[0]
+            return txt
+
+    def _get_single(self, var_name, file_index = None, 
+                   suffix = None, read_func = None, verbose = False):
+        """ get a single variable
+            return the value of a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param file_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+            :param read_func:
+                a function that takes the Posix path and returns data
+            .. note::
+                when reading a MATLAB file, the output is a dictionary.
+                Also when reading a npz except if it is made by log_var
+        """
+        self.assert_log_dir()
+        assert file_index == int(file_index), \
+                    f'file_index {file_index} must be an integer'
+        flist = self.get_flist(var_name, suffix)
+        var_path = None
+        if flist:
+            if len(flist) == 1:
+                var_path = flist[0]
+            else:
+                if file_index is not None:
+                    if verbose:
+                        self.log_text(None, 
+                            f'There are {len(flist)} files, logged with'
+                            + f' name {var_name}.'
+                            + f' The given index is {file_index}.')
+                    var_path = flist[file_index]
+                else:
+                    self.log_text(None, '-'*60)
+                    self.log_text(None, 
+                        f'There are {len(flist)} files, logged with'
+                        + f' name {var_name} but the index is not given.')
+                    self.log_text(None, '-'*60)
+                    return None
+    
+            if(var_path.is_file()):
+                if verbose:
+                    self.log_text(None, f'Loading {var_path}')
+                if read_func is not None:
+                    return (read_func(var_path), var_path)
+                if(var_path.suffix == '.npz'):
+                    buf = np.load(var_path)
+                    try: #check if it is made by log_var
+                        assert len(buf.files) == 2
+                        time_array = buf['time_array']
+                        data_array = buf['data_array']
+                        data_array = data_array[time_array > 0]
+                        time_array = time_array[time_array > 0]
+                        return((time_array, data_array), var_path)
+                    except:
+                        return(buf, var_path)
+                if(var_path.suffix == '.npy'):
+                    return(np.load(var_path), var_path)
+                if(var_path.suffix == '.mat'):
+                    from scipy.io import loadmat
+                    return(loadmat(var_path), var_path)
+                if(var_path.suffix == '.dm4'):
+                    from hyperspy.api import load as hyperspy_api_load
+                    return (hyperspy_api_load(var_path).data, var_path)
+                if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
+                    from tifffile import imread as tifffile_imread
+                    return(tifffile_imread(var_path), var_path)
+                if(var_path.suffix == '.torch'):      
+                    from torch import load as torch_load 
+                    return(torch_load(var_path), var_path)
+                try:
+                    img = mpl_imread(var_path)
+                    return(img, var_path)
+                except: pass
+                # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
+                #     return(var_path.read_text(), var_path)
+                try:
+                    txt = var_path.read_text(errors = 'ignore')
+                    return(txt, var_path)
+                except:
+                    var_path = None
+            else:
+                var_path = None
+                
+        if (var_path is None) & verbose:
+            self.log_text(None, f'Looking for {var_name} failed. ' + \
+                        f'{var_path} is not in: {self.log_dir}')
+        return None, None
+    
+    def get_single(self, var_name, file_index = -1, 
+                   suffix = None, read_func = None, verbose = False,
+                   return_fpath = False):
+        """ get a single variable
+            return the value of a saved variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param file_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+            :param read_func:
+                a function that takes the Posix path and returns data
+            .. note::
+                when reading a MATLAB file, the output is a dictionary.
+                Also when reading a npz except if it is made by log_var
+        """
+        self.assert_log_dir()
+        get_single_data, fpath = self._get_single(
+            var_name = var_name, file_index = file_index, suffix = suffix, 
+            read_func = read_func, verbose = verbose)   
+        if return_fpath:
+            return get_single_data, fpath
+        else:
+            return get_single_data
+        
+    def get_stack_from_files(self, 
+        var_name = None, flist = [], suffix = None, read_func = None):
+       
+        """ Get list or data of all files in a directory
+       
+            This function gives the list of paths of all files in a directory
+            for a single variable.
+
+            Parameters
+            ----------
+            :param var_name:
+                The directory or variable name to look for the files
+            :type var_name: str
+           
+            :param flist:
+                list of Paths, if data is returned, this flist input can limit
+                the data requested to this list.
+            :type flist: list
+           
+            :param suffix:
+                the suffix of files to look for, e.g. 'txt'
+            :type siffix: str
+           
+            :param read_func:
+                the function that takes the posix path of a file and returns
+                the data in there.
+           
+            Output
+            ----------
+                It returns a list of data in all files or a numpy array if 
+                concatenation of all is possible.
+        """
+        self.assert_log_dir()
+        if not flist:
+            flist = self.get_flist(var_name, suffix)
+        else:
+            flist = list(flist)
+            assert pathlib_Path(flist[0]).is_file(), \
+                f'File not found: {flist[0]}. You can use logviewer get_flist'
+        
+        if flist:
+            n_files = len(flist)
+            if(read_func is None):
+                try:
+                    fdata = np.load(flist[0])
+                    read_func = np.load
+                except: pass
+            if(read_func is None):
+                try:
+                    fdata = mpl_imread(flist[0])
+                    read_func = mpl_imread
+                except: pass
+            try:
+                read_func(flist[0])
+            except Exception as e:
+                self.log_text(None, f'The data file {flist[0]} could not be opened.'
+                            'Please provide a read_function in the input.')
+                raise e
+            dataset = [read_func(fpath) for fpath in flist]
+            try:
+                dataset_array = np.array(dataset, dtype=dataset[0].dtype)
+            except:
+                dataset_array = dataset
+            return(dataset_array)
+
+    def get_stack_from_names(self, 
+             var_names = None, read_func = None, return_flist = False):
+        self.assert_log_dir()
+        try:
+            var_names_str = str(var_names)
+        except: pass
+        else:
+            var_names = [var_names]
+        assert var_names == list(var_names), \
+            'input should be a list of variable names'
+        dataset = []
+        flist = []
+        for name in var_names:
+            images_flist = self.get_flist(name)
+            if images_flist:
+                for file_index in range(len(images_flist)):
+                    data, fpath = self.get_single(
+                        name, file_index = file_index,
+                        read_func = read_func, return_fpath = True)
+                    if data is not None:
+                        dataset.append(data)
+                        flist.append(fpath)
+
+        try:
+            dataset = np.array(dataset, dtype=dataset[0].dtype)
+        except: pass
+                        
+        if return_flist:
+            return dataset, flist
+        else:
+            return dataset
+
+    def replace_time_with_index(self, var_name, verbose = False):
+        """ index in file var_names
+            lognflow uses time stamps to make new log files for a variable.
+            That is done by putting time stamp after the name of the variable.
+            This function changes all of the time stamps, sorted ascendingly,
+            by indices.
+            
+            :param var_name:
+                variable name
+        """
+        self.assert_log_dir()
+        var_dir = self.log_dir / var_name
+        if(var_dir.is_dir()):
+            var_fname = None
+            flist = list(var_dir.glob(f'*.*'))
+        else:
+            var_fname = var_dir.name
+            var_dir = var_dir.parent
+            flist = list(var_dir.glob(f'{var_fname}'))
+            if (len(flist) == 0) & (not ('*' in var_fname)):
+                self.log_text(None, 
+                    'lognflow, replace_time_with_index:' +\
+                    'the given pattern has no * and no files were found')
+        if flist:
+            flist.sort()
+            fcnt_width = len(str(len(flist)))
+            for fcnt, fpath in enumerate(flist):
+                if verbose:
+                    self.log_text(None, f'Changing {flist[fcnt].name}')
+                fname_new = fpath.name.split(fpath.stem.split('_')[-1])
+                fname_new = \
+                    fname_new[0] + f'{fcnt:0{fcnt_width}d}' + fname_new[1]
+                fpath_new = flist[fcnt].parent / fname_new
+                if verbose:
+                    self.log_text(None, f'To {fpath_new.name}')
+                flist[fcnt].rename(fpath_new)
 
     def __del__(self):
         try:

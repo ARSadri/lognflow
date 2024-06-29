@@ -169,7 +169,8 @@ class printprogress:
         if(self.yielding_data):
             if not self.yielding_data_call_warning:
                 print('printprogress is used as an Iterator,'
-                      ' You can not call it.')
+                      ' You can not call it. Perhaps you gave it a list,'
+                      ' rather than the length of the list as the first arg.')
                 self.yielding_data_call_warning = True
         else:
             return self._make_progress(ck)

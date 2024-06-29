@@ -134,26 +134,26 @@ History
 * all loggers can take the suffix as the extension in the parameter_name
 
 0.8.3 (2023-08-02)
------------------
+------------------
 * critical bug fixed in log_var to support v0.8.2
 
 0.8.4 (2023-08-03)
------------------
+------------------
 * variable names that are pecular will always be fixed first.
 * suffix can be read form the file name.
 * time_tag will always accompany file name unless stated otherwised.
 
 0.8.5 (2023-08-04)
------------------
+------------------
 * Some functions can go to utils and be mentioned in the __init__
 * a bug was fixed in printprogress.
 
 0.8.6 (2023-08-04)
------------------
+------------------
 * plt_utils was not added tp 0.8.5
 
 0.9.0 (2023-08-09)
------------------
+------------------
 * copy() is now possible from a file or a variable name into another
 * default suffix in get_flist is *
 * logviewer.get_stack_of_files is only useful for reading data.
@@ -161,24 +161,24 @@ History
 * moved multichannel_to_frame to utils
 
 0.9.1 (2023-08-25)
------------------
+------------------
 * bug removed from plt_utils numbers_as_images_4D.
 * bug removed from printprogress when number of steps is very small.
 
 0.10.0 (2023-09-01)
------------------
+-------------------
 * I added multiprocessor to lognflow
 * bug fixed in logviewer
 
 0.10.1 (2023-09-12)
------------------
+-------------------
 * multi_channel_by_subplots bug fixed for non-square shape
 * default colormap is viridis everywhere
 * multiprocessor heavily debugged and made a lot easier to use
 * better tests added for multiprocessor
 
 0.10.2 (2023-10-04)
------------------
+-------------------
 * printprogress can be used as an iterator, test added
 * time_tag is False by default for copy()
 * to log MATLAB files, input must be a dictionary.
@@ -186,7 +186,7 @@ History
 * all new features for Python 3.10 onwards are removed.
 
 0.10.3 (2023-10-09)
------------------
+-------------------
 * multiprocessor handles errors with maximum speed as all processes share error_event
 * multichannel_plots assume fitrst fimension is the channels not the last 
 * printprogress as iterator does not take the first __next__ as a tick
@@ -198,34 +198,34 @@ History
 * tests for lognflow.utils is added
 
 0.10.4 (2023-10-12)
------------------
+-------------------
 * get_flist returns whatever search pattern means for .glob
 * plt_tight_layout is removed and replaced by bbox
 * You can get name from file when file is within the log_dir root
 
 0.10.5 (2023-10-18)
------------------
+-------------------
 * Added new files for readthedocs
 * copy() checks for proper use of arguments
 * __call__ returns fpath
 * loopprocessor is added
 
 0.10.6 (2023-10-19)
------------------
+-------------------
 * bugs fixed in multiprocessor and loopprocessor
 * tests added
 
 0.10.7 (2023-11-01)
------------------
+-------------------
 * multiprocessor_gen is a generator that yields the list of arrived results
 * get_flist and thus get_single do not put asterisks on their own.
 
 0.10.8 (2023-11-03)
-------------------
+-------------------
 * a bug fixed in get_flist
 
 0.10.9 (2023-12-01)
-------------------
+-------------------
 * a bug fixed in name generator when suffix is given
 * copy returns destination path
 * exists_ok can be given to make the log_dir of lognflow
@@ -234,30 +234,39 @@ History
 * plt_imshow added to plt_utils
 
 0.10.10 (2024-01-30)
-------------------
+--------------------
 * rgb2hsv is added
 * plt_imshow supports complex color map and is bug free
 * added printprogress to loopprocessor
 
 0.11.0 (2024-02-25)
-------------------
+-------------------
 * is_builtin_collection is added for multiprocessor concatenation
 * setting time_tag to 'counter' or 'counter&time' will count filenames instead of time
 * plt_violinplot was added
 * plt_imhist is added 
 
 0.11.1 (2024-03-26)
-------------------
+-------------------
 * plt_imshow_by_subplots takes stacks as well now.
 * log_code is added, pass __file__ for current script to be logged.
 * multiple plt_imhist is possible
 
 0.11.2 (2024-05-03)
-------------------
+-------------------
 * imshow_series supports both orientations
 * get_stack_from_names returns np array if possible
 * imshow_series now takes titles for columns and rows
 
 0.11.3 (2024-05-17)
------------------
+-------------------
 * imshow_series supports titles for rows and coloumns
+
+0.12.0 (2024-06-29)
+-------------------
+* plt_imshow takes portrait = True as input 
+* a few other bugs are fixed
+* plt-scatter3 is added
+* afterall, I am removing logviewer, all functions are in lognflow
+* inheriting logging is in my TODO list but 5 basic functions are added.
+

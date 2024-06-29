@@ -6,24 +6,25 @@ import pytest
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from lognflow import lognflow, logviewer, printprogress, select_directory
+from lognflow import (
+    lognflow, printprogress, select_directory, text_to_object)
 from lognflow.utils import stacks_to_frames
 
 import tempfile
 temp_dir = tempfile.gettempdir()
 
-def test_log_counter():
+def test_log_index():
     logger = lognflow(temp_dir)
-    logger('This is a test for putting counter instead of time_stamp')
+    logger('This is a test for putting index instead of time_stamp')
     logger.log_single('testa', 'testa', time_tag = False)
     logger.log_single('testb', 'testb', time_tag = True)
     logger.log_single('testb', 'test3', time_tag = True)
-    logger.log_single('testc', 'test4', time_tag = 'counter')
-    logger.log_single('testc', 'test5', time_tag = 'counter')
-    logger.log_single('testc', 'test6', time_tag = 'counter')
-    logger.log_single('testd', 'test7', time_tag = 'counter_and_time')
-    logger.log_single('testd', 'test8', time_tag = 'counter_and_time')
-    logger.log_single('testd', 'test9', time_tag = 'counter_and_time')
+    logger.log_single('testc', 'test4', time_tag = 'index')
+    logger.log_single('testc', 'test5', time_tag = 'index')
+    logger.log_single('testc', 'test6', time_tag = 'index')
+    logger.log_single('testd', 'test7', time_tag = 'time_and_index')
+    logger.log_single('testd', 'test8', time_tag = 'time_and_index')
+    logger.log_single('testd', 'test9', time_tag = 'time_and_index')
     
     
 def test_lognflow_conflict_in_names():
@@ -173,7 +174,8 @@ def test_log_scatter3():
     logger = lognflow(temp_dir)
     logger('This is a test for log_scatter3')    
     
-    logger.log_scatter3('var3d', var3d)    
+    logger.log_scatter3('var3d', var3d.T)
+    logger.log_scatter3('var3d_animation', var3d.T, make_animation=True)
     
 def test_log_plt():
     plt.imshow(np.random.rand(100, 100))
@@ -287,23 +289,21 @@ def test_log_imshow_complex():
     
 def test_replace_time_with_index():
     logger = lognflow(temp_dir)
-    logger('Well this is a test for logviewer')
+    logger('Well this is a test for reading using logger')
     
     for _ in range(5):
         logger.log_single('test_param', np.array([_]))
         logger.log_single('testy/t', np.array([_]))
     
-    logged = logviewer(logger.log_dir, logger)
-
-    flist = logged.get_flist('test_param')
-    data_in = logged.get_stack_from_files('test_param')
+    flist = logger.get_flist('test_param*')
+    data_in = logger.get_stack_from_files('test_param*')
     
     logger(flist)
 
-    logger.logged.replace_time_with_index('test_param')
+    logger.replace_time_with_index('test_param*')
     
-    flist = logged.get_flist('test_param')
-    data_out = logged.get_stack_from_files(flist = flist)
+    flist = logger.get_flist('test_param*')
+    data_out = logger.get_stack_from_files(flist = flist)
     
     logger(flist)
     
@@ -312,7 +312,7 @@ def test_replace_time_with_index():
 
 def test_copy_file():
     logger = lognflow(temp_dir)
-    logger('Well this is a test for logviewer')
+    logger('Well this is a test for copying files')
     
     var = np.random.rand(10)
     fpath = logger.log_single('var', var, suffix = 'txt')
@@ -320,12 +320,12 @@ def test_copy_file():
     logger.copy('myvar/varvar', fpath, suffix = 'pdb', 
              time_tag= True)
     
-    var_check = logger.logged.get_single('myvar/varvar*')
+    var_check = logger.get_single('myvar/varvar*')
     assert str(var) == var_check
     
 def test_copy_list_of_files():
     logger = lognflow(temp_dir)
-    logger('Well this is a test for logviewer')
+    logger('Well this is a test for copy list of files')
     
     logger.log_single('test/var', np.random.rand(10), suffix = 'txt')
     logger.log_single('test/var', np.random.rand(10), suffix = 'fasta')
@@ -335,8 +335,8 @@ def test_copy_list_of_files():
     logger.copy('myvar/', 'test/var*', suffix = 'pdb', time_tag = False)
     
     for test_cnt in range(4):
-        var_check1 = logger.logged.get_single('test/var', file_index = test_cnt)
-        var_check2 = logger.logged.get_single('myvar/var', file_index = test_cnt)
+        var_check1 = logger.get_single('test/var', file_index = test_cnt)
+        var_check2 = logger.get_single('myvar/var', file_index = test_cnt)
         assert var_check1 == var_check2
     
 def test_log_imshow_by_subplots():
@@ -359,7 +359,7 @@ def test_log_images_to_pdf():
     logger.log_imshow('im1', np.random.randn(30, 30))
     logger.log_imshow('im1', np.random.randn(20, 40))
     
-    images = logger.logged.get_stack_from_names('im1*.*')
+    images = logger.get_stack_from_names('im1*.*')
     logger.log_images_in_pdf(
         'im1_all', parameter_value = images, time_tag = False)
     
@@ -377,22 +377,136 @@ def test_log_code():
     
     logger.log_code(__file__)
 
+def test_get_flist_multiple_directories():
+    logger = lognflow(temp_dir)
+    logger('Well this is a test for test_multiple_directories_get_flist')
+    
+    logger.log_single('dir1/dir/var', np.random.rand(100))
+    logger.log_single('dir2/dir/var', np.random.rand(100))
+    logger.log_single('dir3/dir/var', np.random.rand(100))
+    
+    flist = logger.get_flist('dir*/dir/var*.npy')
+    [print(_) for _ in flist]
+    [print(logger.name_from_file(_)) for _ in flist]
+        
+def test_get_stack_from_files():
+    logger = lognflow(temp_dir)
+    
+    logger('Well this is a test for get_stack_from_files')
+
+    for _ in range(5):
+        logger.log_single('A/img', np.random.rand(100, 100))
+        logger.log_single('B/img', np.random.randn(100, 100))
+
+    flist_A = logger.get_flist('A/*')
+    flist_B = logger.get_flist('B/*')
+    
+    logger(flist_A)
+    logger(flist_B)
+    
+    logger.replace_time_with_index('A/img')
+    logger.replace_time_with_index('B/img')
+
+    flist_A = logger.get_flist('A/*')
+    flist_B = logger.get_flist('B/*')
+    
+    logger(flist_A)
+    logger(flist_B)
+    
+    stack_A = logger.get_stack_from_files(flist = flist_A)
+    stack_B = logger.get_stack_from_files(flist = flist_B)
+
+    logger(f'stack_A.shape: {stack_A.shape}')
+    logger(f'stack_B.shape: {stack_B.shape}')
+    
+    logger.log_imshow_series('data_samples', [stack_A, stack_B], dpi = 300)
+
+    flist_A_AB, flist_B_AB = logger.get_common_files('A/*', 'B/*')
+    logger(f'flist_A_AB: {flist_A_AB}')
+    logger(f'flist_B_AB: {flist_B_AB}')
+    
+    if(flist_A_AB):
+        
+        dataset_A = logger.get_stack_from_files('A/*', flist = flist_A_AB)
+        dataset_B = logger.get_stack_from_files('B/*', flist = flist_B_AB)
+        
+        logger.log_imshow_series('data_samples', 
+                                 [dataset_A, dataset_B], dpi = 300)
+        _ = logger._loggers_dict['main_log.txt'].log_size
+        logger('Size of the log file in bytes is: ' \
+               + f'{_}')
+
+def test_text_to_object():
+    logger = lognflow(temp_dir, time_tag = False)
+    test_list = ['asdf', 1243, "dd"]
+    logger.log_single('test_list', test_list, suffix = 'txt')
+    
+    test_dict = {"one": "asdf", 'two': 1243, 'thre': "dd"}
+    logger.log_single('test_dict', test_dict, suffix = 'txt')
+    
+    flist = logger.get_flist('*')
+    print(flist)
+    for file_name_input in flist:
+        print('='*60)
+        print(f'file name: {file_name_input}')
+        with open(file_name_input, 'r') as opened_txt:
+            txt = opened_txt.read()
+        print('text read from the file:')
+        print(txt)
+        print('- '*30)
+        ext_obj = text_to_object(txt)
+        print(f'Extracted object is of type {type(ext_obj)}:')
+        print(ext_obj)
+
+def test_get_single_specific_fname():
+    logger = lognflow(temp_dir)
+    logger('test get single specific fname')
+    
+    vec = np.array([1])
+    logger.log_single('vec', vec, time_tag = False)
+
+    vec2 = np.array([2])
+    logger.log_single('vec2', vec2, time_tag = False)
+    
+    vec_out = logger.get_single('vec.npy')
+    
+    assert vec_out == vec
+
+def test_get_stack_from_names():
+    logger = lognflow(temp_dir)
+    logger('test get single specific fname')
+    
+    logger.log_imshow('im1', np.random.randn(30, 30))
+    logger.log_imshow('im1', np.random.randn(20, 40))
+    
+    images = logger.get_stack_from_names('im1*')
+    
+    print(len(images))
+
+def test_depricated_logviewer():
+    logger = lognflow(temp_dir)
+    logger('testing the depricated logviewer')
+    
+    logger.log_single('test', 1)
+    print(logger.logged.get_single('test*'))
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_variables_to_pdf(); exit()
+    #tests about reading back
+    test_replace_time_with_index()
+    test_log_hist()
+    test_variables_to_pdf()
     test_log_images_to_pdf()
     test_copy_file()
     test_log_code()    
-    test_log_counter()
+    test_log_index()
     test_log_imshow()
     test_copy_list_of_files()
     test_log_imshow_series()
     test_log_imshow_by_subplots()
     test_log_imshow_complex()
-    test_replace_time_with_index()
-    test_log_hist()
     test_log_var()
     test_log_text()
     test_log_single()
@@ -404,11 +518,17 @@ if __name__ == '__main__':
     test_logger()
     test_log_flush_period()
     test_log_var_without_time_stamp()
-    test_log_animation()
     test_log_scatter3()
+    test_log_animation()
     test_log_plt()
     test_log_hexbin()
     test_log_confusion_matrix()
     test_names_with_slashes_and_backslashes()
     test_copy()
     test_log_code()
+    test_get_stack_from_files()
+    test_get_stack_from_names()
+    test_get_flist_multiple_directories()
+    test_get_single_specific_fname()
+    test_text_to_object()
+    test_depricated_logviewer()

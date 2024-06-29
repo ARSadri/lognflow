@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.11.3'
+__version__ = '0.12.0'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -32,7 +32,8 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11'
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12'
     ],
     description="Log and Flow tracking made easy with Python",
     install_requires=requirements,

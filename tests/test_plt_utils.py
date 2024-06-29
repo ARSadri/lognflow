@@ -5,7 +5,8 @@ import pytest
 
 import matplotlib.pyplot as plt
 import lognflow
-from lognflow.plt_utils import plt_imshow, complex2hsv_colorbar, plt_imhist
+from lognflow.plt_utils import (
+    plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv)
 import numpy as np
 
 def test_numbers_as_images():
@@ -79,12 +80,51 @@ def test_plt_imhist():
                kwargs_for_imshow = {'cmap' : 'jet'}, 
                kwargs_for_hist = {'bins': 40})
 
+def test_plt_imshow_complex():
+    
+    # Define the meshgrid for testing
+    comx, comy = np.meshgrid(np.arange(-7, 8, 1), np.arange(-7, 8, 1))
+    com = comx + 1j * comy
+    print(comx)
+    print(comy)
+    # Use the existing complex2hsv function to convert complex data to RGB
+    img, data_abs, data_angle = complex2hsv(com)
+    
+    # Calculate min and max angles
+    vmin = data_abs.min()
+    vmax = data_abs.max()
+    try:
+        min_angle = data_angle[data_abs > 0].min()
+    except:
+        min_angle = 0
+    try:
+        max_angle = data_angle[data_abs > 0].max()
+    except:
+        max_angle = 0
+    
+    # Plot the complex image
+    fig, ax = plt.subplots(figsize=(5, 5))
+    im = ax.imshow(img, extent=(-7, 8, -7, 8))
+    
+    # Annotate each pixel with its corresponding comx and comy values
+    for i in range(0, comx.shape[0], 1):
+        for j in range(0, comx.shape[1], 1):
+            ax.text(j - 7+0.5, -i + 7+0.5, f'({comx[i, j]}, {comy[i, j]})', ha='center', va='center', fontsize=8, color='white')
+    
+    # Create and plot the color disc as an inset
+    fig, ax_inset = complex2hsv_colorbar((fig, ax.inset_axes([0.78, 0.08, 0.18, 0.18], transform=ax.transAxes)),
+                                         vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
+    ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
+    
+    plt.show()
+
 if __name__ == '__main__':
-    test_plt_imhist(); exit()
-    test_complex2hsv_colorbar()
+    test_plot_gaussian_gradient()
+    test_plt_imshow_complex()
     test_plt_imshow()
+    test_plt_imhist()
+    test_complex2hsv_colorbar()
     test_imshow_series()
     test_imshow_by_subplots()
-    test_plot_gaussian_gradient()
     test_numbers_as_images()
     test_pltfig_to_numpy()

@@ -7,46 +7,88 @@ from matplotlib.colors import hsv_to_rgb
 from matplotlib.widgets import RangeSlider, Slider
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def complex2hsv(data_complex, vmin = None, vmax = None):
-    # Routine to visualise complex array as 2D image with colour conveying
-    # phase information
+def complex2hsv(data_complex, vmin=None, vmax=None):
+    """ complex2hsv
+        Routine to visualise complex array as 2D image with color conveying
+        phase information
+        data_complex must be a complex 2d image
+    """
+    sx, sy = data_complex.shape
 
-    sy, sx = data_complex.shape
-
-    sat = np.abs(data_complex)
+    data_abs = np.abs(data_complex)
     if vmin is None:
-        vmin = sat.min()
-    if vmax is None:        
-        vmax = sat.max()
-    sat = (sat-vmin)/(vmax-vmin)
-    
-    hue = (np.angle(data_complex)+np.pi)/(2*np.pi)
-    a, b = np.divmod(hue,1.0)
-    
+        vmin = data_abs.min()
+    if vmax is None:
+        vmax = data_abs.max()
+    sat = (data_abs - vmin) / (vmax - vmin)
+    data_angle = np.angle(data_complex) % (2 * np.pi)
+    hue = data_angle / (2 * np.pi)
+    a, b = np.divmod(hue, 1.0)
+
     H = np.zeros((sx, sy, 3))
-    H[:,:,0] = b
-    H[:,:,1] = np.ones([sx, sy])
-    H[:,:,2] = sat
+    H[:, :, 0] = b
+    H[:, :, 1] = np.ones([sx, sy])
+    H[:, :, 2] = sat
+
+    return hsv_to_rgb(H), data_abs, data_angle
+
+def complex2hsv_colorbar(
+        fig_and_ax=None, vmin=0, vmax=1, 
+        min_angle=0, max_angle=0, 
+        fontsize=8, angle_threshold=np.pi / 18):
     
-    return hsv_to_rgb(H)
-
-def complex2hsv_colorbar():
     xx, yy = np.meshgrid(
-        np.linspace(-1, 1, 1000), 
-        np.linspace(-1, 1, 1000))    
-    conv = complex2hsv(xx + 1j*yy, vmax = 1)
-
-    xx, yy = np.meshgrid(
-        np.linspace(-1, 1, 1000), 
+        np.linspace(-1, 1, 1000),
         np.linspace(-1, 1, 1000))
-    conv[(xx**2 + yy **2)>1] = 1
-    
-    fig, ax = plt.subplots()
-    im = ax.imshow(conv)
+    conv, sat, _ = complex2hsv(xx + 1j * yy, vmax=1)
+
+    # Set outside the circle to transparent
+    mask = (xx ** 2 + yy ** 2) > 1
+    conv_rgba = np.zeros((conv.shape[0], conv.shape[1], 4))
+    conv_rgba[..., :3] = conv
+    conv_rgba[..., 3] = 1.0  # Set alpha to 1 for everything
+    conv_rgba[mask, 3] = 0  # Set alpha to 0 outside the circle
+    conv_rgba[conv_rgba < 0] = 0
+    conv_rgba[conv_rgba > 1] = 1
+    conv_rgba = conv_rgba[::-1, :]
+    if fig_and_ax is None:
+        fig, ax = plt.subplots()
+    else:
+        try:
+            fig, ax = fig_and_ax
+        except Exception as e:
+            print('fig_and_ax should be a two-tuple of (fig, ax). You can type down '
+                  'the following to achieve it: fig, ax = plt.subplots()')
+            raise e
+
+    im = ax.imshow(conv_rgba, interpolation='nearest')  # Flip the image vertically
     ax.axis('off')
+
+    diff = np.abs(max_angle - min_angle)
+    # Draw lines at min and max angles if they are not too close
+    if np.minimum(diff, 2 * np.pi - diff) > angle_threshold:
+        for angle in [min_angle, max_angle]:
+            x_end = 500 + np.cos(angle) * 500
+            y_end = 500 - np.sin(angle) * 500
+            ax.plot([500, x_end], [500, y_end], '--', color='gray')
+
+    # Add text annotations for min and max values
+    ax.text(500, 500, f'{vmin:.2f}', ha='center', va='center', fontsize=fontsize, color='white')
+
+    # Calculate position for max value text and invert color for readability
+    angle = 45 * np.pi / 180  # 45 degrees in radians
+    x_max = int(np.cos(angle) * 500 + 300)
+    y_max = int(np.sin(angle) * 500 - 200)
+
+    bck_color = conv_rgba[y_max, x_max, :3]
+    text_color = 1 - bck_color  # Invert color
+
+    ax.text(x_max, y_max, f'{vmax:.2f}',
+            ha='center', va='center', fontsize=fontsize, color=text_color)
+
     return fig, ax
 
-def plt_colorbar(mappable):
+def plt_colorbar(mappable, **kwargs):
     """ Add colobar to the current axis 
         This is specially useful in plt.subplots
         stackoverflow.com/questions/23876588/
@@ -56,7 +98,7 @@ def plt_colorbar(mappable):
     fig = ax.figure
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(mappable, cax=cax)
+    cbar = fig.colorbar(mappable, cax=cax, **kwargs)
     return cbar
 
 def plt_violinplot(
@@ -156,6 +198,9 @@ def plt_imshow(img,
                remove_axis_ticks = False, 
                title = None, 
                cmap = None,
+               angle_cmap = 'twilight_shifted',
+               portrait = None,
+               complex_type = 'abs_angle',
                **kwargs):
     if(not np.iscomplexobj(img)):
         fig, ax = plt.subplots()
@@ -165,28 +210,64 @@ def plt_imshow(img,
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
     else:
-        if cmap == 'complex':
-            converted = complex2hsv(img)
+        if (cmap == 'complex') | (complex_type == 'complex'):
+                # Convert complex data to RGB
+            complex_image, data_abs, data_angle = complex2hsv(img)
+        
+            # Calculate min and max angles
+            vmin = data_abs.min()
+            vmax = data_abs.max()
+            try:
+                min_angle = data_angle[data_abs > 0].min()
+            except:
+                min_angle = 0
+            try:
+                max_angle = data_angle[data_abs > 0].max()
+            except:
+                max_angle = 0
+        
+            # Plot the complex image
             fig, ax = plt.subplots()
-            im = ax.imshow(converted, cmap = 'hsv', **kwargs)
-            if(colorbar):
-                plt_colorbar(im)
-                
+            im = ax.imshow(complex_image)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
-            
+
+            if(colorbar):
+                # Create and plot the color disc as an inset
+                fig, ax_inset = complex2hsv_colorbar(
+                    (fig, ax.inset_axes([0.78, 0.08, 0.18, 0.18], 
+                                        transform=ax.transAxes)),
+                    vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
+                ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
         else:
-            fig, ax = plt.subplots(1, 2)
-            im = ax[0].imshow(np.abs(img), 
-                              cmap = cmap, **kwargs)
-            if(colorbar):
-                plt_colorbar(im)
-            ax[0].set_title('Amplitude')    
-            im = ax[1].imshow(np.angle(img), 
-                              cmap = cmap, **kwargs)
-            if(colorbar):
-                plt_colorbar(im)
-            ax[1].set_title('Phase')
+            fig = plt.figure()
+            window = plt.get_current_fig_manager().window
+            if (window.height() > window.width()) & (portrait is None):
+                portrait = True
+            if portrait:
+                ax = [fig.add_subplot(2, 1, 1), fig.add_subplot(2, 1, 2)]
+            else:
+                ax = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
+            
+            if complex_type == 'abs_angle':
+                im = ax[0].imshow(np.abs(img), cmap = cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[0].set_title('abs')    
+                im = ax[1].imshow(np.angle(img), cmap = angle_cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[1].set_title('angle')
+            elif complex_type == 'real_imag':
+                im = ax[0].imshow(np.real(img), cmap = cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[0].set_title('real')    
+                im = ax[1].imshow(np.imag(img), cmap = angle_cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[1].set_title('imag')
+            
             if(remove_axis_ticks):
                 plt.setp(ax[0], xticks=[], yticks=[])
                 ax[0].xaxis.set_ticks_position('none')
@@ -195,15 +276,19 @@ def plt_imshow(img,
                 ax[1].xaxis.set_ticks_position('none')
                 ax[1].yaxis.set_ticks_position('none')
     if title is not None:
-        ax.set_title(title)
+        fig.suptitle(title)
     return fig, ax
 
-def plt_hist(vectors_list, 
+def plt_hist(vectors_list, fig_ax = None,
              n_bins = 10, alpha = 0.5, normalize = False, 
              labels_list = None, **kwargs):
     
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    if fig_ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    else:
+        fig, ax = fig_ax
+    
     if not (type(vectors_list) is list):
         vectors_list = [vectors_list]
     for vec_cnt, vec in enumerate(vectors_list):
@@ -220,16 +305,58 @@ def plt_hist(vectors_list,
                      label = f'{labels_list[vec_cnt]}', **kwargs)
     return fig, ax
 
-def plt_surface(stack, **kwargs):
+def plt_scatter3(
+        data3D, fig_ax = None, title = None, 
+        make_animation = False, **kwargs):
+    
+    if fig_ax is None:
+        from mpl_toolkits.mplot3d import Axes3D
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig, ax = fig_ax
+    ax.scatter(data3D[:, 0], 
+               data3D[:, 1], 
+               data3D[:, 2], **kwargs)
+    
+    if title is not None:
+            ax.set_title(title)
+
+    if make_animation:
+        stack = []
+        for ii in np.arange(0, 360, 10):
+            ax.view_init(elev=10., azim=ii)
+            img = pltfig_to_numpy_3ch(fig)
+            stack.append(img)
+        return fig, ax, stack
+    
+    else:
+        return fig, ax
+
+def plt_surface(stack, fig_ax = None, **kwargs):
     from mpl_toolkits.mplot3d import Axes3D
     n_r, n_c = stack.shape
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+
+    if fig_ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig, ax = fig_ax
+
     X, Y = np.meshgrid(np.arange(n_r, dtype='int'), 
                        np.arange(n_c, dtype='int'))
     ax.plot_surface(X, Y, stack, **kwargs)
     return fig, ax
-        
+
+def pltfig_to_numpy_3ch(fig):
+    """Convert a matplotlib figure to a numpy 2D array (RGB)."""
+    fig.canvas.draw()
+    w, h = fig.canvas.get_width_height()
+    buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+    buf.shape = (h, w, 4)  # Shape should be (height, width, 4) for RGBA
+    buf = np.copy(buf)  # Ensure we have a copy, not a view
+    return buf
+
 def pltfig_to_numpy(fig):
     """ from https://www.icare.univ-lille.fr/how-to-
                     convert-a-matplotlib-figure-to-a-numpy-array-or-a-pil-image/
@@ -351,8 +478,8 @@ class plot_gaussian_gradient:
     refer to the tests.py
     """
     def __init__(self, xlabel = None, ylabel = None, num_bars = 100, 
-                 title = None, xmin = None, xmax = None, 
-                 ymin = None, ymax = None, fontsize = 14):
+                       title = None, xmin = None, xmax = None, 
+                       ymin = None, ymax = None, fontsize = 14):
         self.xlabel = xlabel
         self.ylabel = ylabel
         self.title = title

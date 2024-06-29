@@ -3,6 +3,12 @@ import numpy as np
 from   matplotlib.pyplot import imread as mpl_imread
 from   .utils            import replace_all, dummy_function, name_from_file
 
+deprecated_msg = 'logviewer is deprecated and will be' + \
+                 ' removed in a few revisions.please use lognflow only.' + \
+                 ' for example you can write logger.get_single(name)' + \
+                 ' When using lognflow for reading only, if you dont' + \
+                 ' log anything, no new directory will be made.'
+
 class logviewer:
     """ log viewer
         Since lognflow makes lots of files and folders, maybe it is nice
@@ -16,19 +22,35 @@ class logviewer:
     """ 
     def __init__(self,
                  log_dir : pathlib.Path,
-                 logger = print):
+                 logger = print,
+                 not_exist_ok = False):
         self.log_dir = pathlib.Path(log_dir)
-        assert self.log_dir.is_dir(), \
-            f'lognflow.logviewer| No such directory: '+ str(self.log_dir)
+        self.not_exist_ok = not_exist_ok
+        if not not_exist_ok:
+            print(deprecated_msg)
+            self.assert_log_dir()
         self.logger = logger
         self.load = self.get_single
         self.log_dir_str = str(self.log_dir.absolute())
+
+    def assert_log_dir(self):
+        if not self.log_dir.is_dir():
+            print('~'*60)
+            print(f'lognflow.logviewer| No such directory: '+ str(self.log_dir))
+            if self.not_exist_ok:
+                print(f'You probably initialized logviewer from lognflow with '
+                      'not_exist_ok. You have not logged anything in this directory.'
+                      'You probably have entereed a wrong directory name '
+                      'for the logger.')
+            print('~'*60)
+            assert self.log_dir.is_dir()
     
     def name_from_file(self, fpath):
         """ 
             Given an fpath inside the logger log_dir, 
             what would be its equivalent parameter_name?
         """
+        self.assert_log_dir()
         return name_from_file(self.log_dir_str, fpath)
     
     def disable_logger(self):
@@ -47,6 +69,7 @@ class logviewer:
                 this input needs to be set. npy, npz, mat, and torch are
                 supported.
         """
+        self.assert_log_dir()
         var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
             .replace('\r', '\\r').replace('\b', '\\b')
 
@@ -101,6 +124,7 @@ class logviewer:
                 this input needs to be set. npy, npz, mat, and torch are
                 supported.
         """
+        self.assert_log_dir()
         nlist = self.get_flist(var_name, suffix)
         if nlist:
             nlist = [name_from_file(self.log_dir_str, fpath) for fpath in nlist]
@@ -121,6 +145,7 @@ class logviewer:
             :param var_name_B:
                 directory B name
         """
+        self.assert_log_dir()
         if not flist_A:
             flist_A = self.get_flist(var_name_A, suffix)
         if not flist_B:
@@ -145,10 +170,6 @@ class logviewer:
 
         return(flist_A_new, flist_B_new)
 
-    # def load(self, parameter_name, suffix = None, flist = None,
-    #              file_index : [int, list[int]] = -1, read_func = None):
-    #     ...
-    
     def get_text(self, log_name='main_log', flist = None, suffix = 'txt',
                        file_index = -1):
         """ get text log files
@@ -167,6 +188,7 @@ class logviewer:
                 to include, default: -1
 
         """
+        self.assert_log_dir()
         if isinstance(file_index, int):
             file_index = [file_index]
         if not flist:
@@ -203,6 +225,7 @@ class logviewer:
                 when reading a MATLAB file, the output is a dictionary.
                 Also when reading a npz except if it is made by log_var
         """
+        self.assert_log_dir()
         assert file_index == int(file_index), \
                     f'file_index {file_index} must be an integer'
         flist = self.get_flist(var_name, suffix)
@@ -298,6 +321,7 @@ class logviewer:
                 when reading a MATLAB file, the output is a dictionary.
                 Also when reading a npz except if it is made by log_var
         """
+        self.assert_log_dir()
         get_single_data, fpath = self._get_single(
             var_name = var_name, file_index = file_index, suffix = suffix, 
             read_func = read_func, verbose = verbose)   
@@ -339,7 +363,8 @@ class logviewer:
                 It returns a list of data in all files or a numpy array if 
                 concatenation of all is possible.
         """
-        if not flist:
+        self.assert_log_dir()
+        if len(flist) == 0:
             flist = self.get_flist(var_name, suffix)
         else:
             flist = list(flist)
@@ -373,6 +398,8 @@ class logviewer:
 
     def get_stack_from_names(self, 
              var_names = None, read_func = None, return_flist = False):
+        
+        self.assert_log_dir()
         try:
             var_names_str = str(var_names)
         except: pass
@@ -412,6 +439,8 @@ class logviewer:
             :param var_name:
                 variable name
         """
+        
+        self.assert_log_dir()
         var_dir = self.log_dir / var_name
         if(var_dir.is_dir()):
             var_fname = None
@@ -419,7 +448,11 @@ class logviewer:
         else:
             var_fname = var_dir.name
             var_dir = var_dir.parent
-            flist = list(var_dir.glob(f'{var_fname}*'))
+            flist = list(var_dir.glob(f'{var_fname}'))
+            if (len(flist) == 0) & (not ('*' in var_fname)):
+                self.logger(
+                    'lognflow, replace_time_with_index:' +\
+                    'the given pattern has no * and no files were found')
         if flist:
             flist.sort()
             fcnt_width = len(str(len(flist)))
