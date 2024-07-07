@@ -79,6 +79,7 @@ def test_plt_imhist():
     plt_imhist(img, 
                kwargs_for_imshow = {'cmap' : 'jet'}, 
                kwargs_for_hist = {'bins': 40})
+    plt.show()
 
 def test_plt_imshow_complex():
     
@@ -119,12 +120,12 @@ def test_plt_imshow_complex():
     plt.show()
 
 if __name__ == '__main__':
-    test_plot_gaussian_gradient()
-    test_plt_imshow_complex()
-    test_plt_imshow()
     test_plt_imhist()
+    test_plt_imshow_complex()
     test_complex2hsv_colorbar()
-    test_imshow_series()
     test_imshow_by_subplots()
+    test_plot_gaussian_gradient()
+    test_plt_imshow()
+    test_imshow_series()
     test_numbers_as_images()
     test_pltfig_to_numpy()

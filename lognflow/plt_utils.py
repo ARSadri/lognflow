@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from matplotlib.colors import hsv_to_rgb
-from matplotlib.widgets import RangeSlider, Slider
+from matplotlib.widgets import RangeSlider, TextBox
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def complex2hsv(data_complex, vmin=None, vmax=None):
@@ -57,8 +58,8 @@ def complex2hsv_colorbar(
         try:
             fig, ax = fig_and_ax
         except Exception as e:
-            print('fig_and_ax should be a two-tuple of (fig, ax). You can type down '
-                  'the following to achieve it: fig, ax = plt.subplots()')
+            print('fig_and_ax should be a two-tuple of (fig, ax). Use:')
+            print('>>> fig, ax = plt.subplots()')
             raise e
 
     im = ax.imshow(conv_rgba, interpolation='nearest')  # Flip the image vertically
@@ -73,7 +74,9 @@ def complex2hsv_colorbar(
             ax.plot([500, x_end], [500, y_end], '--', color='gray')
 
     # Add text annotations for min and max values
-    ax.text(500, 500, f'{vmin:.2f}', ha='center', va='center', fontsize=fontsize, color='white')
+    if int(vmin*100)/100 > 0:   #because we are going to show .2f
+        ax.text(500, 500, f'{vmin:.2f}', 
+                ha='center', va='center', fontsize=fontsize, color='white')
 
     # Calculate position for max value text and invert color for readability
     angle = 45 * np.pi / 180  # 45 degrees in radians
@@ -88,17 +91,26 @@ def complex2hsv_colorbar(
 
     return fig, ax
 
-def plt_colorbar(mappable, **kwargs):
-    """ Add colobar to the current axis 
-        This is specially useful in plt.subplots
-        stackoverflow.com/questions/23876588/
-            matplotlib-colorbar-in-each-subplot
+def plt_colorbar(mappable, colorbar_aspect=2, colorbar_pad_fraction=0.05):
+    """
+    Add a colorbar to the current axis with consistent width.
+
+    Parameters:
+        mappable (AxesImage): The image to which the colorbar applies.
+        colorbar_aspect (int): The aspect ratio of the colorbar width relative 
+            to the axis width. Default is 2.
+        colorbar_pad_fraction (float): The fraction of padding between the 
+            axis and the colorbar. Default is 0.05.
+
+    Returns:
+        Colorbar: The colorbar added to the axis.
     """
     ax = mappable.axes
     fig = ax.figure
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(mappable, cax=cax, **kwargs)
+    width = ax.get_position().width / colorbar_aspect
+    cax = divider.append_axes("right", size=width, pad=colorbar_pad_fraction)
+    cbar = fig.colorbar(mappable, cax=cax)
     return cbar
 
 def plt_violinplot(
@@ -127,20 +139,23 @@ def plt_violinplot(
     return fig, ax
 
 class plt_imhist:
-    def __init__(self, in_image, figsize=(12, 6), title = None,
-                 kwargs_for_imshow = {}, kwargs_for_hist = {}):
+    def __init__(self, in_image, figsize=(12, 6), title=None, bins=None,
+                 kwargs_for_imshow={}, kwargs_for_hist={}):
+        if bins is not None:
+            if not (bins in kwargs_for_hist):
+                kwargs_for_hist['bins'] = bins
+        
         # Adjust figsize to provide more space if needed
         self.fig, axs = plt.subplots(
-            1, 2, figsize = figsize,
+            1, 2, figsize=figsize,
             gridspec_kw={'width_ratios': [5, 1], 'wspace': 0.1})
-        self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)  
-        # Leave space on the right for the slider
+        self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)
         
         # Display the image
         self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
         if title is not None:
             axs[0].set_title(title)
-        axs[0].axis('off')  # Hide axes for the image
+        axs[0].axis('off')
         
         cm = self.im.get_cmap()
         
@@ -151,35 +166,54 @@ class plt_imhist:
             bin_centres, n, height=(bins[1]-bins[0]),
             color=cm((bin_centres - bin_centres.min()) /
                          (bin_centres.max() - bin_centres.min())))
-        axs[1].invert_xaxis()  # Invert x-axis to have the histogram vertical
+        axs[1].invert_xaxis()
         
-        axs[1].yaxis.set_visible(True)  # Make sure the y-axis is visible
-        axs[1].xaxis.set_visible(False)  # Hide the x-axis
+        axs[1].yaxis.set_visible(True)
+        axs[1].xaxis.set_visible(False)
+        
+        # Create textbox axes
+        upper_text_ax = self.fig.add_axes([0.88, 0.85, 0.05, 0.05])
+        lower_text_ax = self.fig.add_axes([0.88, 0.1, 0.05, 0.05])
+        
+        self.upper_text_box = TextBox(
+            upper_text_ax, 'Max', initial=f'{in_image.max():.6f}')
+        self.lower_text_box = TextBox(
+            lower_text_ax, 'Min', initial=f'{in_image.min():.6f}')
+        
+        # Calculate the position for the slider
+        slider_top = 0.85 - 0.02  # Bottom of the upper text box
+        slider_bottom = 0.1 + 0.07  # Top of the lower text box
+        slider_height = slider_top - slider_bottom  # Height between the two text boxes
         
         # Create slider axes on the right side of the histogram
         slider_ax = self.fig.add_axes(
-            [0.88, 0.1, 0.02, 0.8], facecolor='lightgoldenrodyellow')
+            [0.895, slider_bottom, 0.02, slider_height], 
+            facecolor='lightgoldenrodyellow')
         self.slider = RangeSlider(
             slider_ax, '', in_image.min(), in_image.max(),
             valinit=[in_image.min(), in_image.max()], orientation='vertical')
         self.slider.label.set_visible(False)
-        self.slider.valtext.set_visible(False)  
+        self.slider.valtext.set_visible(False)
         
         self.lower_limit_line = axs[1].axhline(
             self.slider.val[0], color='k', linestyle='--')
         self.upper_limit_line = axs[1].axhline(
             self.slider.val[1], color='k', linestyle='--')
-
-        # Initial text annotations for vmin and vmax
-        self.vmin_text = axs[1].text(0.5, self.slider.val[0], f'{self.slider.val[0]:.2f}',
-                                     transform=axs[1].get_yaxis_transform(),
-                                     ha='right', va='bottom', color='k')
-        self.vmax_text = axs[1].text(0.5, self.slider.val[1], f'{self.slider.val[1]:.2f}',
-                                     transform=axs[1].get_yaxis_transform(),
-                                     ha='right', va='top', color='k')
-
-        self.slider.on_changed(self.update)
         
+        # Initial text annotations for vmin and vmax
+        self.vmin_text = axs[1].text(
+            0.5, self.slider.val[0], f'{self.slider.val[0]:.6f}',
+            transform=axs[1].get_yaxis_transform(), 
+            ha='right', va='bottom', color='k')
+        self.vmax_text = axs[1].text(
+            0.5, self.slider.val[1], f'{self.slider.val[1]:.6f}',
+            transform=axs[1].get_yaxis_transform(),
+            ha='right', va='top', color='k')
+        
+        self.slider.on_changed(self.update)
+        self.lower_text_box.on_submit(self.update_from_text)
+        self.upper_text_box.on_submit(self.update_from_text)
+    
     def update(self, val):
         self.im.set_clim(val[0], val[1])
         self.lower_limit_line.set_ydata([val[0], val[0]])
@@ -187,11 +221,24 @@ class plt_imhist:
         
         # Update text annotations to reflect the new vmin and vmax
         self.vmin_text.set_position((0.5, val[0]))
-        self.vmin_text.set_text(f'{val[0]:.2f}')
+        self.vmin_text.set_text(f'{val[0]:.6f}')
         self.vmax_text.set_position((0.5, val[1]))
-        self.vmax_text.set_text(f'{val[1]:.2f}')
+        self.vmax_text.set_text(f'{val[1]:.6f}')
+        
+        # Update text boxes to reflect the new values
+        self.lower_text_box.set_val(f'{val[0]:.6f}')
+        self.upper_text_box.set_val(f'{val[1]:.6f}')
         
         self.fig.canvas.draw_idle()
+    
+    def update_from_text(self, text):
+        try:
+            lower_val = float(self.lower_text_box.text)
+            upper_val = float(self.upper_text_box.text)
+            if lower_val < upper_val:
+                self.slider.set_val([lower_val, upper_val])
+        except ValueError:
+            pass
         
 def plt_imshow(img, 
                colorbar = True, 
@@ -306,30 +353,36 @@ def plt_hist(vectors_list, fig_ax = None,
     return fig, ax
 
 def plt_scatter3(
-        data3D, fig_ax = None, title = None, 
+        data_N_by_3, fig_ax = None, title = None, 
+        elev_list = None, azim_list = None,
         make_animation = False, **kwargs):
-    
+    assert (len(data_N_by_3.shape)==2) & (data_N_by_3.shape[1] == 3), \
+        'The first argument must be N x 3'
     if fig_ax is None:
         from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig, ax = fig_ax
-    ax.scatter(data3D[:, 0], 
-               data3D[:, 1], 
-               data3D[:, 2], **kwargs)
+    ax.scatter(data_N_by_3[:, 0], 
+               data_N_by_3[:, 1], 
+               data_N_by_3[:, 2], **kwargs)
     
     if title is not None:
             ax.set_title(title)
 
     if make_animation:
         stack = []
-        for ii in np.arange(0, 360, 10):
-            ax.view_init(elev=10., azim=ii)
-            img = pltfig_to_numpy_3ch(fig)
-            stack.append(img)
+        if elev_list is None:
+            elev_list = np.arange(0, 360, 45)
+        if azim_list is None:
+            azim_list = np.arange(0, 360, 45)
+        for elev in elev_list:
+            for azim in azim_list:
+                ax.view_init(elev=elev, azim=azim)
+                img = pltfig_to_numpy_3ch(fig)
+                stack.append(img)
         return fig, ax, stack
-    
     else:
         return fig, ax
 
@@ -585,11 +638,12 @@ def imshow_series(list_of_stacks,
     for ind, stack in enumerate(list_of_stacks):
         assert stack.shape[0] == n_imgs, \
             'All members of the given list should have same number of images.' \
-            + f' while the stack indexed as {ind} has length {len(stack)}'
+            f' while the stack indexed as {ind} has length {len(stack)}.'
         assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
             f'The shape of the stack {ind} must have length 3 or 4, it has '\
-            f' shape of {stack.shape}. Perhaps you wanted to have only one set of'\
-            ' images. If thats the case, put that single image in a list.'
+            f'shape of {stack.shape}. Perhaps you wanted to have only '\
+             'one set of images. If thats the case, put that single '\
+             'image in a list.'
 
     if (list_of_titles_columns is not None):
         assert len(list_of_titles_columns) == n_stacks, \
@@ -675,108 +729,71 @@ def imshow_series(list_of_stacks,
                 cbar.ax.tick_params(labelsize=1)
     return fig, None
 
-def imshow_by_subplots( 
-    stack,
-    frame_shape = None,
-    grid_locations = None,
-    figsize = None,
-    im_size_factor = None,
-    im_sizes = None,
-    colorbar = False,
-    remove_axis_ticks = True,
-    title = None,
-    cmap = None,
-    **kwargs):    
+def imshow_by_subplots(
+        stack, grid_locations=None, frame_shape=None, 
+        titles=[], cmaps=[], colorbar=True, 
+        colorbar_aspect=2, colorbar_pad_fraction=0.05,
+        figsize=None, remove_axis_ticks=True, **kwargs):
+    """
+    Plots a list of 2D images at specified 2D grid_locations with titles 
+    and colormaps.
     
-    stack_shape = stack.shape
-    n_dims = len(stack_shape)
+    Parameters:
+    stack (list of 2D arrays): List of 2D images to plot.
+    grid_locations (list of tuples or None): List of subplot grid_locations 
+        in (rows, cols, index) format or None to generate a grid.
+    frame_shape (tuple of int or None): Shape of the grid (rows, cols) if 
+        grid_locations is None. Default is None.
+    titles (list of str): List of titles for each image.
+    cmaps (list of str): List of colormaps for each image.
+    colorbar (bool): Whether to add a colorbar beside each image. 
+        Default is True.
+    colorbar_aspect (int): Aspect ratio for the colorbars. Default is 2.
+    colorbar_pad_fraction (float): Padding fraction for the colorbars. 
+        Default is 0.05.
+    figsize (tuple): Size of the figure.
+    remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
+    """
+    if grid_locations is None:
+        N = len(stack)
+        if frame_shape is None:
+            cols = int(np.ceil(np.sqrt(N)))
+            rows = int(np.ceil(N / cols))
+            frame_shape = (rows, cols)
+        grid_locations = [(frame_shape[0], frame_shape[1], i+1) for i in range(N)]
+    else:
+        rows = max(loc[0] for loc in grid_locations)
+        cols = max(loc[1] for loc in grid_locations)
+        frame_shape = (rows, cols)
     
-    FLAG_img_ready = False
-    use_stack_to_frame = False
-    if(n_dims == 2):
-        FLAG_img_ready = True
-    elif(n_dims == 3):
-        if(stack_shape[2] != 3):
-            use_stack_to_frame = True
-        else:
-            #warning that 3 dimensions as the last axis is RGB
-            FLAG_img_ready = True
-    elif(n_dims == 4):
-            use_stack_to_frame = True
+    if figsize is None:
+        frame_shape = np.array(frame_shape)
+        figsize = 10 * frame_shape / frame_shape.max()
     
-    if(use_stack_to_frame):
-        FLAG_img_ready = True
-
-    if(FLAG_img_ready):
-        if(np.iscomplexobj(stack)):
-            print('complex not supported in log_imshow_by_subplots')
-            return
-        else:                
-            n_f = stack.shape[0]
-            if grid_locations is None:
-                if(frame_shape is None):
-                    n_f_sq = int(np.ceil(n_f ** 0.5))
-                    n_f_r, n_f_c = (n_f_sq, n_f_sq)
-                else:
-                    n_f_r, n_f_c = frame_shape
-                
-                fig, ax = plt.subplots(n_f_r,n_f_c)
-                if(remove_axis_ticks):
-                    plt.setp(ax, xticks=[], yticks=[])
-                for rcnt in range(n_f_r):
-                    for ccnt in range(n_f_c):
-                        imcnt = ccnt + rcnt * n_f_c
-                        if imcnt < n_f:
-                            im = ax[rcnt, ccnt].imshow(
-                                stack[imcnt], cmap = cmap, **kwargs)
-                            if(colorbar):
-                                plt_colorbar(im)
-                            if(remove_axis_ticks):
-                                plt.setp(ax, xticks=[], yticks=[])
-            else:
-                assert len(grid_locations) == n_f, \
-                    f'length of grid_locations: {grid_locations.shape} should '\
-                    f'be the same as number of images: {n_f}.'
-                assert len(grid_locations.shape) == 2, \
-                    'grid_locations should be n_f x 2, its shape is: '\
-                    f'{grid_locations.shape}.'
-                if background_image is not None:
-                    background_image = background_image.squeeze()
-                    assert len(background_image.shape) == 2, \
-                        'The background image should be a 2D image, its shape ' \
-                        f' is {background_image.shape}.'
-                        
-                if figsize is None:
-                    grid_locations_r_min = grid_locations[:, 0].min()
-                    grid_locations_r_max = grid_locations[:, 0].max()
-                    grid_locations_c_min = grid_locations[:, 1].min()
-                    grid_locations_c_max = grid_locations[:, 1].max()
-                    grid_size = (grid_locations_r_max - grid_locations_r_min,
-                                 grid_locations_c_max - grid_locations_c_min)
-                    figsize = (2, 2 * grid_size[1]/grid_size[0])
-                if im_sizes is None:
-                    if im_size_factor is None:
-                        im_size_factor = figsize[0] * figsize[1] / n_f
-                        im_sizes = (im_size_factor, 
-                                    im_size_factor * stack.shape[
-                                        2]/stack.shape[1]) 
-                
-                fig = plt.figure(figsize=figsize)
-                ax = fig.add_axes([0, 0, 1, 1])
-                if background_image is not None:
-                    ax.imshow(background_image)
-                if title is not None:
-                    ax.set_title(title)
-                for ccnt, coords in enumerate(grid_locations):
-                    pos = [coords[1], 1-coords[0], im_sizes[0], im_sizes[1]]
-                    ax_local = fig.add_axes(pos)
-                    im = ax_local.imshow(stack[ccnt], 
-                                   cmap = cmap, **kwargs)
-                    if(colorbar):
-                        plt_colorbar(im)
-                    if(remove_axis_ticks):
-                        plt.setp(ax_local, xticks=[], yticks=[])
-                        ax_local.xaxis.set_ticks_position('none')
-                        ax_local.yaxis.set_ticks_position('none')
+    fig = plt.figure(figsize=figsize)
+    
+    for i, (image, location) in enumerate(zip(stack, grid_locations)):
+        ax = fig.add_subplot(location[0], location[1], location[2])
         
-        return fig, ax
+        if 'cmap' in kwargs:
+            cax = ax.imshow(image, **kwargs)
+        else:
+            try:
+                _cmap = cmaps[i]
+            except:
+                _cmap = None
+            cax = ax.imshow(image, cmap=_cmap, **kwargs)
+        try:
+            ax.set_title(titles[i])
+        except:
+            pass
+        
+        if remove_axis_ticks:
+            ax.axis('off')
+        
+        if colorbar:
+            plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
+                         colorbar_pad_fraction=colorbar_pad_fraction)
+    
+    fig.tight_layout()
+    return fig, ax

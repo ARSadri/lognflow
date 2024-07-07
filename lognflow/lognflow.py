@@ -864,7 +864,7 @@ class lognflow:
     
     def log_plt(self, 
                 parameter_name: str, 
-                image_format='jpeg', dpi=1200,
+                image_format='jpg', dpi=1200,
                 time_tag: bool = None,
                 close_plt = True):
         """log a single plt
@@ -901,7 +901,7 @@ class lognflow:
     def log_plot(self, parameter_name: str, 
                        parameter_value_list,
                        x_values = None,
-                       image_format='jpeg', dpi=1200, title = None,
+                       image_format='jpg', dpi=1200, title = None,
                        time_tag: bool = None,
                        return_figure = False,
                        **kwargs):
@@ -974,7 +974,7 @@ class lognflow:
                        alpha = 0.5,
                        labels_list = None,
                        normalize = False,
-                       image_format='jpeg', dpi=1200, title = None,
+                       image_format='jpg', dpi=1200, title = None,
                        time_tag: bool = None, 
                        return_figure = False,
                        **kwargs):
@@ -1020,8 +1020,8 @@ class lognflow:
             return fig, ax
     
     def log_scatter3(self, parameter_name: str,
-                     parameter_value, 
-                     image_format='jpeg', 
+                     data_N_by_3, 
+                     image_format='jpg', 
                      dpi=1200,
                      title = None,
                      time_tag: bool = None, 
@@ -1035,7 +1035,7 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value: np.array
+            :param data_N_by_3: np.array
                     An np array of size 3 x n, to sctter n data points in 3D
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
@@ -1044,31 +1044,28 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        if make_animation:
-            fig, ax, stack = plt_scatter3(
-                parameter_value, title = title,
-                make_animation = True, **kwargs)
-        else:
-            fig, ax = plt_scatter3(
-                parameter_value, title = title, **kwargs)
+        if data_N_by_3.shape[0] == 3:
+            if data_N_by_3.shape[1] != 3:
+                data_N_by_3 = data_N_by_3.T
+                self.log_text(
+                    None, 'lognflow.log_scatter3> input dataset is transposed.')
+        fig_ax_optional_stack = plt_scatter3(data_N_by_3, title = title,
+                     make_animation = make_animation, **kwargs)
             
         if not return_figure:
             if make_animation:
-                self.log_animation(
-                    parameter_name, stack, dpi=dpi, time_tag = time_tag) 
+                self.log_animation(parameter_name, fig_ax_optional_stack[2], 
+                                   dpi=dpi, time_tag = time_tag) 
             else:
                 return self.log_plt(
                     parameter_name = parameter_name, 
                     image_format = image_format, dpi=dpi,
                     time_tag = time_tag)
         else:
-            if make_animation:
-                return fig, ax, stack
-            else:
-                return fig, ax
+            return fig_ax_optional_stack
     
     def log_surface(self, parameter_name: str,
-                       parameter_value, image_format='jpeg', 
+                       parameter_value, image_format='jpg', 
                        dpi=1200, title = None,
                        time_tag: bool = None, return_figure = False, **kwargs):
         """log a surface in 3D
@@ -1102,7 +1099,7 @@ class lognflow:
             return fig, ax
         
     def log_hexbin(self, parameter_name: str, parameter_value,
-                   gridsize = 20, image_format='jpeg', dpi=1200, title = None,
+                   gridsize = 20, image_format='jpg', dpi=1200, title = None,
                    time_tag: bool = None, return_figure = False):
         """log a 2D histogram 
             The 2D histogram is made out of hexagonals
@@ -1144,7 +1141,7 @@ class lognflow:
                    frame_shape : tuple = None,
                    colorbar = True,
                    remove_axis_ticks = True,
-                   image_format='jpeg', dpi=1200, cmap = 'viridis',
+                   image_format='jpg', dpi=1200, cmap = 'viridis',
                    title = None, time_tag: bool = None, borders = 0, 
                    return_figure = False, **kwargs):
         """log an image
@@ -1221,19 +1218,17 @@ class lognflow:
 
     def log_imshow_by_subplots(self, 
         parameter_name: str, 
-        parameter_value: np.ndarray,
+        stack: np.ndarray,
         frame_shape = None,
         grid_locations = None,
         figsize = None,
-        im_size_factor = None,
-        im_sizes = None,
-        image_format='jpeg', 
+        image_format='jpg', 
         dpi=1200, 
         time_tag: bool = None,
         colorbar = False,
         remove_axis_ticks = True,
-        title = None,
-        cmap = None,
+        titles = None,
+        cmaps = None,
         return_figure = False,
         **kwargs):
         """log multiple images in a tiled frame
@@ -1250,7 +1245,7 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param parameter_value: np.array
+            :param stack: np.array
                     An np array of size n_f x n_r x n_c, to be shown by imshow
                     as a square tile of side length of n_ch**0.5
             :param frame_shape:
@@ -1267,16 +1262,14 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        fig, ax = imshow_by_subplots(stack = parameter_value,
+        fig, ax = imshow_by_subplots(stack = stack,
                                      frame_shape = frame_shape, 
                                      grid_locations = grid_locations,
                                      figsize = figsize,
-                                     im_size_factor = im_size_factor,
-                                     im_sizes = im_sizes,
                                      colorbar = colorbar,
                                      remove_axis_ticks = remove_axis_ticks,
-                                     title = title,
-                                     cmap = cmap,
+                                     titles = titles,
+                                     cmaps = cmaps,
                                      **kwargs)
                 
         if not return_figure:
@@ -1301,7 +1294,7 @@ class lognflow:
                           list_of_titles_rows = None,
                           fontsize = None,
                           transpose = False,
-                          image_format='jpeg', 
+                          image_format='jpg', 
                           dpi=1200,
                           time_tag: bool = None,
                           return_figure = False):
@@ -1413,7 +1406,7 @@ class lognflow:
                              title='Confusion matrix',
                              cmap=None,
                              figsize = None,
-                             image_format = 'jpeg',
+                             image_format = 'jpg',
                              dpi = 1200,
                              time_tag = False):
         """log a confusion matrix

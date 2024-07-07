@@ -270,3 +270,8 @@ History
 * afterall, I am removing logviewer, all functions are in lognflow
 * inheriting logging is in my TODO list but 5 basic functions are added.
 
+0.12.1 (2024-07-08)
+-------------------
+* animation is added to scatte3
+* imshow_by_subplots is a lot better
+* many other bugs are fixed
