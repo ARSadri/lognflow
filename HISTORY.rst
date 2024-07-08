@@ -275,3 +275,7 @@ History
 * animation is added to scatte3
 * imshow_by_subplots is a lot better
 * many other bugs are fixed
+
+0.12.2 (2024-07-08)
+-------------------
+* critical bugs fixed!

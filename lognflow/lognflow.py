@@ -1588,14 +1588,7 @@ class lognflow:
         if not self.log_dir.is_dir():
             print('~'*60)
             print(f'lognflow.logdir: No such directory: '+ str(self.log_dir))
-            if self.not_exist_ok:
-                print(f'You probably initialized lognflow to read first.'\
-                      ' You have not logged anything in the log directory.'
-                      ' You probably have entereed a wrong directory name'
-                      ' for an existing logger or not provided log_dir in'
-                      ' the input and used the first argument which is'
-                      ' logs_root. Use log_dir as input to read from a '
-                      ' directory without logging anything.')
+            print(f'You probably wanted to read a file before logging.')
             print('~'*60)
             assert self.log_dir.is_dir()
 
@@ -1911,7 +1904,8 @@ class lognflow:
             return get_single_data
         
     def get_stack_from_files(self, 
-        var_name = None, flist = [], suffix = None, read_func = None):
+        var_name = None, flist = [], suffix = None, read_func = None,
+        return_flist = False):
        
         """ Get list or data of all files in a directory
        
@@ -1965,15 +1959,24 @@ class lognflow:
             try:
                 read_func(flist[0])
             except Exception as e:
-                self.log_text(None, f'The data file {flist[0]} could not be opened.'
-                            'Please provide a read_function in the input.')
+                if flist[0].is_file():
+                    self.log_text(None, 
+                        f'lognflow: The data file {flist[0]} could not be read.'
+                        'Please provide a read_function for this file.')
+                else:
+                    self.log_text(
+                        None, f'File {flist[0]} does not exist.')
                 raise e
             dataset = [read_func(fpath) for fpath in flist]
             try:
                 dataset_array = np.array(dataset, dtype=dataset[0].dtype)
             except:
                 dataset_array = dataset
-            return(dataset_array)
+            
+            if return_flist:
+                return(dataset_array, flist)
+            else:
+                return(dataset_array)
 
     def get_stack_from_names(self, 
              var_names = None, read_func = None, return_flist = False):
