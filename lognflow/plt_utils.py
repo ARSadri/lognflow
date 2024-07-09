@@ -1,12 +1,15 @@
 from .printprogress import printprogress
+
 import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from matplotlib.colors import hsv_to_rgb
-from matplotlib.widgets import RangeSlider, TextBox
-
+from matplotlib.widgets import RangeSlider, TextBox, Button
+from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from scipy.spatial.transform import Rotation as scipy_rotation
 
 def complex2hsv(data_complex, vmin=None, vmax=None):
     """ complex2hsv
@@ -245,7 +248,7 @@ def plt_imshow(img,
                remove_axis_ticks = False, 
                title = None, 
                cmap = None,
-               angle_cmap = 'twilight_shifted',
+               angle_cmap = None,
                portrait = None,
                complex_type = 'abs_angle',
                **kwargs):
@@ -301,6 +304,8 @@ def plt_imshow(img,
                 if(colorbar):
                     plt_colorbar(im)
                 ax[0].set_title('abs')    
+                if angle_cmap is None:
+                    angle_cmap = 'twilight_shifted'
                 im = ax[1].imshow(np.angle(img), cmap = angle_cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
@@ -309,7 +314,7 @@ def plt_imshow(img,
                 im = ax[0].imshow(np.real(img), cmap = cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
-                ax[0].set_title('real')    
+                ax[0].set_title('real')
                 im = ax[1].imshow(np.imag(img), cmap = angle_cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
@@ -359,7 +364,6 @@ def plt_scatter3(
     assert (len(data_N_by_3.shape)==2) & (data_N_by_3.shape[1] == 3), \
         'The first argument must be N x 3'
     if fig_ax is None:
-        from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
@@ -384,10 +388,19 @@ def plt_scatter3(
                 stack.append(img)
         return fig, ax, stack
     else:
+        if elev_list is None:
+            elev = None
+        else:
+            elev = elev_list[0]
+        if azim_list is None:
+            azim = None
+        else:
+            azim = azim_list[0]
+        if (len(elev_list) > 0) | (len(azim_list) > 0):
+            ax.view_init(elev=elev, azim=azim)
         return fig, ax
 
 def plt_surface(stack, fig_ax = None, **kwargs):
-    from mpl_toolkits.mplot3d import Axes3D
     n_r, n_c = stack.shape
 
     if fig_ax is None:
@@ -797,3 +810,218 @@ def imshow_by_subplots(
     
     fig.tight_layout()
     return fig, ax
+
+class transform3D_viewer:
+    """
+    A 3D viewer for point cloud transformations using matplotlib.
+
+    Attributes:
+        in_pointcloud (numpy.ndarray): The input point cloud.
+        moving_inds (numpy.ndarray): Indices of points that can be transformed.
+        T_stepsize (float): Step size for translation adjustments.
+        S_stepsize (float): Step size for scaling adjustments.
+        R_stepsize (float): Step size for rotation adjustments.
+    """
+    def __init__(self, in_pointcloud, moving_inds = None,
+                 T_stepsize = 1, S_stepsize = 0.1, R_stepsize = 5):
+        # Adjust figsize to provide more space if needed
+        self.T_stepsize, self.S_stepsize, self.R_stepsize = \
+            T_stepsize, S_stepsize, R_stepsize
+        all_inds = np.arange(len(in_pointcloud))
+        if moving_inds is None:
+            moving_inds = all_inds
+        mask = np.ones(len(in_pointcloud), dtype=bool)
+        mask[moving_inds] = False
+        self.PC = in_pointcloud
+        self.fixed_inds = all_inds[mask]
+        self.moving_inds = moving_inds
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111, projection='3d')
+        self.fig.subplots_adjust(left=0.05, right=0.6, bottom=0.1, top=0.9)
+        self.draw()
+
+        self.init_svd()
+        # Create transformation widgets
+        self.create_text_box("Tx", 0.75, 0.85, self.Tx, self.update_from_text)
+        self.create_text_box("Ty", 0.75, 0.78, self.Ty, self.update_from_text)
+        self.create_text_box("Tz", 0.75, 0.71, self.Tz, self.update_from_text)
+
+        self.create_buttons("Tx", 0.70, 0.85, self.decrease_Tx, self.increase_Tx)
+        self.create_buttons("Ty", 0.70, 0.78, self.decrease_Ty, self.increase_Ty)
+        self.create_buttons("Tz", 0.70, 0.71, self.decrease_Tz, self.increase_Tz)
+        
+        self.create_text_box("Sx", 0.75, 0.6, self.Sx, self.update_from_text)
+        self.create_text_box("Sy", 0.75, 0.53, self.Sy, self.update_from_text)
+        self.create_text_box("Sz", 0.75, 0.46, self.Sz, self.update_from_text)
+        
+        self.create_buttons("Sx", 0.70, 0.6, self.decrease_Sx, self.increase_Sx)
+        self.create_buttons("Sy", 0.70, 0.53, self.decrease_Sy, self.increase_Sy)
+        self.create_buttons("Sz", 0.70, 0.46, self.decrease_Sz, self.increase_Sz)
+        
+        self.create_text_box("Rx", 0.75, 0.35, self.Rx, self.update_from_text)
+        self.create_text_box("Ry", 0.75, 0.28, self.Ry, self.update_from_text)
+        self.create_text_box("Rz", 0.75, 0.21, self.Rz, self.update_from_text)
+        
+        self.create_buttons("Rx", 0.70, 0.35, self.decrease_Rx, self.increase_Rx)
+        self.create_buttons("Ry", 0.70, 0.28, self.decrease_Ry, self.increase_Ry)
+        self.create_buttons("Rz", 0.70, 0.21, self.decrease_Rz, self.increase_Rz)
+
+    def draw(self):
+        # Display the point cloud
+        self.ax.cla()
+        self.ax.scatter(self.PC[self.fixed_inds, 0],
+                        self.PC[self.fixed_inds, 1],
+                        self.PC[self.fixed_inds, 2], label='Fixed')
+        self.ax.scatter(self.PC[self.moving_inds, 0],
+                        self.PC[self.moving_inds, 1],
+                        self.PC[self.moving_inds, 2], label='Moving')
+    
+        # Calculate the bounding box for the moving_inds using SVD
+        points = self.PC[self.moving_inds]
+        mean = points.mean(axis=0)
+        centered_points = points - mean
+        U, S, Vt = np.linalg.svd(centered_points)
+    
+        # Project points onto principal axes
+        projections = centered_points @ Vt.T
+    
+        # Get the min and max along each principal axis
+        min_proj = projections.min(axis=0)
+        max_proj = projections.max(axis=0)
+    
+        # Define the bounding box corners in the projected space
+        bbox_proj = np.array([[min_proj[0], min_proj[1], min_proj[2]],
+                              [max_proj[0], min_proj[1], min_proj[2]],
+                              [max_proj[0], max_proj[1], min_proj[2]],
+                              [min_proj[0], max_proj[1], min_proj[2]],
+                              [min_proj[0], min_proj[1], max_proj[2]],
+                              [max_proj[0], min_proj[1], max_proj[2]],
+                              [max_proj[0], max_proj[1], max_proj[2]],
+                              [min_proj[0], max_proj[1], max_proj[2]]])
+    
+        # Rotate bounding box corners back to the original coordinate system
+        bbox = bbox_proj @ Vt + mean
+    
+        # Draw bounding box lines
+        edges = [(0, 1), (1, 2), (2, 3), (3, 0), # Bottom square
+                 (4, 5), (5, 6), (6, 7), (7, 4), # Top square
+                 (0, 4), (1, 5), (2, 6), (3, 7)] # Vertical lines
+    
+        for edge in edges:
+            self.ax.plot3D(*zip(bbox[edge[0]], bbox[edge[1]]), '--', color='r')
+    
+        self.ax.legend()
+        self.fig.canvas.draw()
+
+    def init_svd(self):
+        # Calculate the initial SVD of the centered movable part
+        mean_vec = self.PC[self.moving_inds].mean(0)
+        self.Tx, self.Ty, self.Tz = mean_vec
+        PC_moving_centered = self.PC[self.moving_inds] - mean_vec
+        U, S_vec, Vt = np.linalg.svd(PC_moving_centered.T)
+        self.Sx, self.Sy, self.Sz = S_vec
+        self.Vt = Vt[:3]
+        r = scipy_rotation.from_matrix(U)
+        self.Rx, self.Ry, self.Rz = r.as_euler('xyz', degrees=True)
+    
+    def create_text_box(self, label, x, y, initial_val, on_submit):
+        text_ax = self.fig.add_axes([x, y, 0.13, 0.05])
+        text_box = TextBox(text_ax, label + '         ', 
+                           initial=f'{initial_val:.6f}')
+        text_box.on_submit(on_submit)
+        setattr(self, f"{label}_text_box", text_box)
+    
+    def create_buttons(self, label, x, y, on_click_minus, on_click_plus):
+        minus_ax = self.fig.add_axes([x, y, 0.04, 0.05])
+        plus_ax = self.fig.add_axes([x + 0.19, y, 0.04, 0.05])
+        minus_button = Button(minus_ax, '-')
+        plus_button = Button(plus_ax, '+')
+        minus_button.on_clicked(on_click_minus)
+        plus_button.on_clicked(on_click_plus)
+        setattr(self, f"{label}_minus_button", minus_button)
+        setattr(self, f"{label}_plus_button", plus_button)
+    
+    def update_from_text(self, text):
+        try:
+            # Read new transformation values
+            translation = np.array([float(self.Tx_text_box.text),
+                                    float(self.Ty_text_box.text),
+                                    float(self.Tz_text_box.text)])
+            
+            new_S = np.diag([float(self.Sx_text_box.text),
+                             float(self.Sy_text_box.text),
+                             float(self.Sz_text_box.text)])
+            
+            r = scipy_rotation.from_euler('xyz',
+                np.array([float(self.Rx_text_box.text),
+                          float(self.Ry_text_box.text),
+                          float(self.Rz_text_box.text)]), degrees=True)
+            new_U = r.as_matrix()
+            
+            PC_transformed = (new_U @ new_S @ self.Vt).T + translation
+            
+            # Update the movable part of the point cloud
+            self.PC[self.moving_inds] = PC_transformed
+            
+            self.draw()
+        except ValueError:
+            pass
+
+    def decrease_Tx(self, event):
+        self.update_text_box("Tx", -self.T_stepsize)
+    
+    def increase_Tx(self, event):
+        self.update_text_box("Tx", self.T_stepsize)
+    
+    def decrease_Ty(self, event):
+        self.update_text_box("Ty", -self.T_stepsize)
+    
+    def increase_Ty(self, event):
+        self.update_text_box("Ty", self.T_stepsize)
+    
+    def decrease_Tz(self, event):
+        self.update_text_box("Tz", -self.T_stepsize)
+    
+    def increase_Tz(self, event):
+        self.update_text_box("Tz", self.T_stepsize)
+    
+    def decrease_Sx(self, event):
+        self.update_text_box("Sx", -self.S_stepsize)
+    
+    def increase_Sx(self, event):
+        self.update_text_box("Sx", self.S_stepsize)
+    
+    def decrease_Sy(self, event):
+        self.update_text_box("Sy", -self.S_stepsize)
+    
+    def increase_Sy(self, event):
+        self.update_text_box("Sy", self.S_stepsize)
+    
+    def decrease_Sz(self, event):
+        self.update_text_box("Sz", -self.S_stepsize)
+    
+    def increase_Sz(self, event):
+        self.update_text_box("Sz", self.S_stepsize)
+    
+    def decrease_Rx(self, event):
+        self.update_text_box("Rx", -self.R_stepsize)
+    
+    def increase_Rx(self, event):
+        self.update_text_box("Rx", self.R_stepsize)
+    
+    def decrease_Ry(self, event):
+        self.update_text_box("Ry", -self.R_stepsize)
+    
+    def increase_Ry(self, event):
+        self.update_text_box("Ry", self.R_stepsize)
+    
+    def decrease_Rz(self, event):
+        self.update_text_box("Rz", -self.R_stepsize)
+    
+    def increase_Rz(self, event):
+        self.update_text_box("Rz", self.R_stepsize)
+    
+    def update_text_box(self, label, delta):
+        current_val = float(getattr(self, f"{label}_text_box").text)
+        new_val = current_val + delta
+        getattr(self, f"{label}_text_box").set_val(f"{new_val:.6f}")

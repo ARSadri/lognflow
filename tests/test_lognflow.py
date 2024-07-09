@@ -495,6 +495,8 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     #tests about reading back
+    test_log_single()
+    exit()
     test_log_scatter3()
     test_log_animation()
     test_log_plt()
@@ -523,7 +525,6 @@ if __name__ == '__main__':
     test_log_imshow_complex()
     test_log_var()
     test_log_text()
-    test_log_single()
     test_log_single_text()
     test_log_surface()
     test_lognflow_conflict_in_names()

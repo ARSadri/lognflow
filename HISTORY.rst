@@ -279,3 +279,8 @@ History
 0.12.2 (2024-07-08)
 -------------------
 * critical bugs fixed!
+
+0.12.2 (2024-07-08)
+-------------------
+* plt_imshow complex real and image will have default cmap
+* transform3D_viewer is added for manipulating 3D point cloud

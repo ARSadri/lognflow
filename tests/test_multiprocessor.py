@@ -215,13 +215,20 @@ def test_multiprocessor_gen():
     data = (100+10*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
 
-    results_mp_gen = multiprocessor_gen(
-        compute_arg_scatterer, iterables = (data, mask), 
-        shareables = None, verbose = False)
-    for arrivals in results_mp_gen:
+    for arrivals in multiprocessor_gen(compute_arg_scatterer,
+                                       iterables = (data, mask), 
+                                       shareables = None,
+                                       verbose = True):
+        
         results_mp, IDs = arrivals
         print(IDs)
     results_mp = results_mp[0]
+
+    # results_mp = [arrivals[0] 
+    #               for arrivals in multiprocessor_gen(compute_arg_scatterer,
+    #                                    iterables = (data, mask), 
+    #                                    shareables = None,
+    #                                    verbose = True)]
 
     results = np.zeros(N)
     for cnt in printprogress(range(N)):

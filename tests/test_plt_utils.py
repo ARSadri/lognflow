@@ -6,8 +6,18 @@ import pytest
 import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
-    plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv)
+    plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
+    transform3D_viewer)
 import numpy as np
+
+def test_transform3D_viewer():
+    in_pointcloud = np.random.randn(100, 3)
+    moving_inds = np.where((in_pointcloud[:, 0] > 0) & 
+                           (in_pointcloud[:, 1] > 0) & 
+                           (in_pointcloud[:, 2] > 0))[0]
+    tp = transform3D_viewer(in_pointcloud, moving_inds)
+    plt.show()
+
 
 def test_numbers_as_images():
     dataset_shape = (10, 10, 64, 64)
@@ -120,6 +130,7 @@ def test_plt_imshow_complex():
     plt.show()
 
 if __name__ == '__main__':
+    test_transform3D_viewer()
     test_plt_imhist()
     test_plt_imshow_complex()
     test_complex2hsv_colorbar()

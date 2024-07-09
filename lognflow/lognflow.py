@@ -860,6 +860,7 @@ class lognflow:
                     fdata.write(str(parameter_value))
         except Exception as e:
             fpath = None
+            print(f"An error occurred: {e}")
         return fpath
     
     def log_plt(self, 
@@ -1020,7 +1021,9 @@ class lognflow:
             return fig, ax
     
     def log_scatter3(self, parameter_name: str,
-                     data_N_by_3, 
+                     data_N_by_3,
+                     elev_list = None,
+                     azim_list = None,
                      image_format='jpg', 
                      dpi=1200,
                      title = None,
@@ -1037,6 +1040,10 @@ class lognflow:
                     path like name such as myscript/myvar.
             :param data_N_by_3: np.array
                     An np array of size 3 x n, to sctter n data points in 3D
+            :param elev_list: list
+                    Must be an iterable even if has only one number for elev
+            :param azim_list: list
+                    Must be an iterable even if has only one number for azim
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
@@ -1049,12 +1056,13 @@ class lognflow:
                 data_N_by_3 = data_N_by_3.T
                 self.log_text(
                     None, 'lognflow.log_scatter3> input dataset is transposed.')
-        fig_ax_optional_stack = plt_scatter3(data_N_by_3, title = title,
+        fig_ax_opt_stack = plt_scatter3(data_N_by_3, title = title,
+                     elev_list = elev_list, azim_list = azim_list,
                      make_animation = make_animation, **kwargs)
             
         if not return_figure:
             if make_animation:
-                self.log_animation(parameter_name, fig_ax_optional_stack[2], 
+                self.log_animation(parameter_name, fig_ax_opt_stack[2], 
                                    dpi=dpi, time_tag = time_tag) 
             else:
                 return self.log_plt(
@@ -1062,7 +1070,7 @@ class lognflow:
                     image_format = image_format, dpi=dpi,
                     time_tag = time_tag)
         else:
-            return fig_ax_optional_stack
+            return fig_ax_opt_stack
     
     def log_surface(self, parameter_name: str,
                        parameter_value, image_format='jpg', 
@@ -1556,7 +1564,7 @@ class lognflow:
         try:
             self.flush_all()
         except:
-            pass
+            print('lognflow: cannot close')
 
     def __call__(self, *args, **kwargs):
         """calling the object
@@ -2051,7 +2059,7 @@ class lognflow:
         try:
             self.flush_all()
         except:
-            pass
+            print('lognflow: couldnt flush all logs')
         
     def __repr__(self):
         return f'{self.log_dir}'
