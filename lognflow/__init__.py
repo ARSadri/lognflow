@@ -2,14 +2,14 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.12.3'
+__version__ = '0.12.4'
 
 from .lognflow import lognflow
 from .logviewer import logviewer
 from .printprogress import printprogress
 from .plt_utils import (
     plt_colorbar, plot_gaussian_gradient, plt_imshow, plt_violinplot,
-    plt_imhist)
+    plt_imhist, transform3D_viewer)
 from .utils import (
     select_directory, select_file, repr_raw, replace_all, 
     is_builtin_collection, text_to_object, stack_to_frame, 

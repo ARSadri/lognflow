@@ -1,6 +1,7 @@
 from .printprogress import printprogress
 
 import numpy as np
+from functools import partial
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
@@ -818,15 +819,8 @@ class transform3D_viewer:
     Attributes:
         in_pointcloud (numpy.ndarray): The input point cloud.
         moving_inds (numpy.ndarray): Indices of points that can be transformed.
-        T_stepsize (float): Step size for translation adjustments.
-        S_stepsize (float): Step size for scaling adjustments.
-        R_stepsize (float): Step size for rotation adjustments.
     """
-    def __init__(self, in_pointcloud, moving_inds = None,
-                 T_stepsize = 1, S_stepsize = 0.1, R_stepsize = 5):
-        # Adjust figsize to provide more space if needed
-        self.T_stepsize, self.S_stepsize, self.R_stepsize = \
-            T_stepsize, S_stepsize, R_stepsize
+    def __init__(self, in_pointcloud, moving_inds=None):
         all_inds = np.arange(len(in_pointcloud))
         if moving_inds is None:
             moving_inds = all_inds
@@ -835,37 +829,47 @@ class transform3D_viewer:
         self.PC = in_pointcloud
         self.fixed_inds = all_inds[mask]
         self.moving_inds = moving_inds
+        self.transform_params = {}
+        self.figure()
+
+    def figure(self):
+        self.init_svd()
+        
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection='3d')
-        self.fig.subplots_adjust(left=0.05, right=0.6, bottom=0.1, top=0.9)
-        self.draw()
-
-        self.init_svd()
+        self.fig.subplots_adjust(left=0.05, right=0.5, bottom=0.1, top=0.9)
+        
+        # Create step size text boxes
+        self.create_text_box("T_step", 0.75, 0.88, 1.0, self.update_steps)
         # Create transformation widgets
-        self.create_text_box("Tx", 0.75, 0.85, self.Tx, self.update_from_text)
-        self.create_text_box("Ty", 0.75, 0.78, self.Ty, self.update_from_text)
-        self.create_text_box("Tz", 0.75, 0.71, self.Tz, self.update_from_text)
+        self.create_text_box("Tx", 0.75, 0.81, self.transform_params["Tx"], self.update_from_text)
+        self.create_text_box("Ty", 0.75, 0.74, self.transform_params["Ty"], self.update_from_text)
+        self.create_text_box("Tz", 0.75, 0.67, self.transform_params["Tz"], self.update_from_text)
 
-        self.create_buttons("Tx", 0.70, 0.85, self.decrease_Tx, self.increase_Tx)
-        self.create_buttons("Ty", 0.70, 0.78, self.decrease_Ty, self.increase_Ty)
-        self.create_buttons("Tz", 0.70, 0.71, self.decrease_Tz, self.increase_Tz)
+        self.create_buttons("Tx", 0.70, 0.81, partial(self.update_value, "Tx", "T_step", -1), partial(self.update_value, "Tx", "T_step", 1))
+        self.create_buttons("Ty", 0.70, 0.74, partial(self.update_value, "Ty", "T_step", -1), partial(self.update_value, "Ty", "T_step", 1))
+        self.create_buttons("Tz", 0.70, 0.67, partial(self.update_value, "Tz", "T_step", -1), partial(self.update_value, "Tz", "T_step", 1))
         
-        self.create_text_box("Sx", 0.75, 0.6, self.Sx, self.update_from_text)
-        self.create_text_box("Sy", 0.75, 0.53, self.Sy, self.update_from_text)
-        self.create_text_box("Sz", 0.75, 0.46, self.Sz, self.update_from_text)
+        self.create_text_box("S_step", 0.75, 0.59, 0.1, self.update_steps)
+        self.create_text_box("Sx", 0.75, 0.52, self.transform_params["Sx"], self.update_from_text)
+        self.create_text_box("Sy", 0.75, 0.45, self.transform_params["Sy"], self.update_from_text)
+        self.create_text_box("Sz", 0.75, 0.38, self.transform_params["Sz"], self.update_from_text)
         
-        self.create_buttons("Sx", 0.70, 0.6, self.decrease_Sx, self.increase_Sx)
-        self.create_buttons("Sy", 0.70, 0.53, self.decrease_Sy, self.increase_Sy)
-        self.create_buttons("Sz", 0.70, 0.46, self.decrease_Sz, self.increase_Sz)
+        self.create_buttons("Sx", 0.70, 0.52, partial(self.update_value, "Sx", "S_step", -1), partial(self.update_value, "Sx", "S_step", 1))
+        self.create_buttons("Sy", 0.70, 0.45, partial(self.update_value, "Sy", "S_step", -1), partial(self.update_value, "Sy", "S_step", 1))
+        self.create_buttons("Sz", 0.70, 0.38, partial(self.update_value, "Sz", "S_step", -1), partial(self.update_value, "Sz", "S_step", 1))
         
-        self.create_text_box("Rx", 0.75, 0.35, self.Rx, self.update_from_text)
-        self.create_text_box("Ry", 0.75, 0.28, self.Ry, self.update_from_text)
-        self.create_text_box("Rz", 0.75, 0.21, self.Rz, self.update_from_text)
+        self.create_text_box("R_step", 0.75, 0.3, 5.0, self.update_steps)
+        self.create_text_box("Rx", 0.75, 0.23, self.transform_params["Rx"], self.update_from_text)
+        self.create_text_box("Ry", 0.75, 0.18, self.transform_params["Ry"], self.update_from_text)
+        self.create_text_box("Rz", 0.75, 0.13, self.transform_params["Rz"], self.update_from_text)
         
-        self.create_buttons("Rx", 0.70, 0.35, self.decrease_Rx, self.increase_Rx)
-        self.create_buttons("Ry", 0.70, 0.28, self.decrease_Ry, self.increase_Ry)
-        self.create_buttons("Rz", 0.70, 0.21, self.decrease_Rz, self.increase_Rz)
+        self.create_buttons("Rx", 0.70, 0.23, partial(self.update_value, "Rx", "R_step", -1), partial(self.update_value, "Rx", "R_step", 1))
+        self.create_buttons("Ry", 0.70, 0.18, partial(self.update_value, "Ry", "R_step", -1), partial(self.update_value, "Ry", "R_step", 1))
+        self.create_buttons("Rz", 0.70, 0.13, partial(self.update_value, "Rz", "R_step", -1), partial(self.update_value, "Rz", "R_step", 1))
 
+        self.draw()
+        
     def draw(self):
         # Display the point cloud
         self.ax.cla()
@@ -916,20 +920,20 @@ class transform3D_viewer:
     def init_svd(self):
         # Calculate the initial SVD of the centered movable part
         mean_vec = self.PC[self.moving_inds].mean(0)
-        self.Tx, self.Ty, self.Tz = mean_vec
+        self.transform_params["Tx"], self.transform_params["Ty"], self.transform_params["Tz"] = mean_vec
         PC_moving_centered = self.PC[self.moving_inds] - mean_vec
         U, S_vec, Vt = np.linalg.svd(PC_moving_centered.T)
-        self.Sx, self.Sy, self.Sz = S_vec
+        self.transform_params["Sx"], self.transform_params["Sy"], self.transform_params["Sz"] = S_vec
         self.Vt = Vt[:3]
         r = scipy_rotation.from_matrix(U)
-        self.Rx, self.Ry, self.Rz = r.as_euler('xyz', degrees=True)
+        self.transform_params["Rx"], self.transform_params["Ry"], self.transform_params["Rz"] = r.as_euler('xyz', degrees=True)
     
     def create_text_box(self, label, x, y, initial_val, on_submit):
         text_ax = self.fig.add_axes([x, y, 0.13, 0.05])
         text_box = TextBox(text_ax, label + '         ', 
                            initial=f'{initial_val:.6f}')
         text_box.on_submit(on_submit)
-        setattr(self, f"{label}_text_box", text_box)
+        self.transform_params[f"{label}_text_box"] = text_box
     
     def create_buttons(self, label, x, y, on_click_minus, on_click_plus):
         minus_ax = self.fig.add_axes([x, y, 0.04, 0.05])
@@ -938,24 +942,32 @@ class transform3D_viewer:
         plus_button = Button(plus_ax, '+')
         minus_button.on_clicked(on_click_minus)
         plus_button.on_clicked(on_click_plus)
-        setattr(self, f"{label}_minus_button", minus_button)
-        setattr(self, f"{label}_plus_button", plus_button)
+        self.transform_params[f"{label}_minus_button"] = minus_button
+        self.transform_params[f"{label}_plus_button"] = plus_button
     
+    def update_steps(self, text):
+        try:
+            self.transform_params["T_step"] = float(self.transform_params["T_step_text_box"].text)
+            self.transform_params["S_step"] = float(self.transform_params["S_step_text_box"].text)
+            self.transform_params["R_step"] = float(self.transform_params["R_step_text_box"].text)
+        except ValueError:
+            pass
+
     def update_from_text(self, text):
         try:
             # Read new transformation values
-            translation = np.array([float(self.Tx_text_box.text),
-                                    float(self.Ty_text_box.text),
-                                    float(self.Tz_text_box.text)])
+            translation = np.array([float(self.transform_params["Tx_text_box"].text),
+                                    float(self.transform_params["Ty_text_box"].text),
+                                    float(self.transform_params["Tz_text_box"].text)])
             
-            new_S = np.diag([float(self.Sx_text_box.text),
-                             float(self.Sy_text_box.text),
-                             float(self.Sz_text_box.text)])
+            new_S = np.diag([float(self.transform_params["Sx_text_box"].text),
+                             float(self.transform_params["Sy_text_box"].text),
+                             float(self.transform_params["Sz_text_box"].text)])
             
             r = scipy_rotation.from_euler('xyz',
-                np.array([float(self.Rx_text_box.text),
-                          float(self.Ry_text_box.text),
-                          float(self.Rz_text_box.text)]), degrees=True)
+                np.array([float(self.transform_params["Rx_text_box"].text),
+                          float(self.transform_params["Ry_text_box"].text),
+                          float(self.transform_params["Rz_text_box"].text)]), degrees=True)
             new_U = r.as_matrix()
             
             PC_transformed = (new_U @ new_S @ self.Vt).T + translation
@@ -967,61 +979,8 @@ class transform3D_viewer:
         except ValueError:
             pass
 
-    def decrease_Tx(self, event):
-        self.update_text_box("Tx", -self.T_stepsize)
-    
-    def increase_Tx(self, event):
-        self.update_text_box("Tx", self.T_stepsize)
-    
-    def decrease_Ty(self, event):
-        self.update_text_box("Ty", -self.T_stepsize)
-    
-    def increase_Ty(self, event):
-        self.update_text_box("Ty", self.T_stepsize)
-    
-    def decrease_Tz(self, event):
-        self.update_text_box("Tz", -self.T_stepsize)
-    
-    def increase_Tz(self, event):
-        self.update_text_box("Tz", self.T_stepsize)
-    
-    def decrease_Sx(self, event):
-        self.update_text_box("Sx", -self.S_stepsize)
-    
-    def increase_Sx(self, event):
-        self.update_text_box("Sx", self.S_stepsize)
-    
-    def decrease_Sy(self, event):
-        self.update_text_box("Sy", -self.S_stepsize)
-    
-    def increase_Sy(self, event):
-        self.update_text_box("Sy", self.S_stepsize)
-    
-    def decrease_Sz(self, event):
-        self.update_text_box("Sz", -self.S_stepsize)
-    
-    def increase_Sz(self, event):
-        self.update_text_box("Sz", self.S_stepsize)
-    
-    def decrease_Rx(self, event):
-        self.update_text_box("Rx", -self.R_stepsize)
-    
-    def increase_Rx(self, event):
-        self.update_text_box("Rx", self.R_stepsize)
-    
-    def decrease_Ry(self, event):
-        self.update_text_box("Ry", -self.R_stepsize)
-    
-    def increase_Ry(self, event):
-        self.update_text_box("Ry", self.R_stepsize)
-    
-    def decrease_Rz(self, event):
-        self.update_text_box("Rz", -self.R_stepsize)
-    
-    def increase_Rz(self, event):
-        self.update_text_box("Rz", self.R_stepsize)
-    
-    def update_text_box(self, label, delta):
-        current_val = float(getattr(self, f"{label}_text_box").text)
-        new_val = current_val + delta
-        getattr(self, f"{label}_text_box").set_val(f"{new_val:.6f}")
+    def update_value(self, label, step_label, direction, event):
+        current_val = float(self.transform_params[f"{label}_text_box"].text)
+        step_size = float(self.transform_params[f"{step_label}_text_box"].text)
+        new_val = current_val + direction * step_size
+        self.transform_params[f"{label}_text_box"].set_val(f"{new_val:.6f}")

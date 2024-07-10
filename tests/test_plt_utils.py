@@ -2,7 +2,7 @@
 
 """Tests for `lognflow` package."""
 import pytest
-
+import time
 import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
@@ -17,8 +17,14 @@ def test_transform3D_viewer():
                            (in_pointcloud[:, 2] > 0))[0]
     tp = transform3D_viewer(in_pointcloud, moving_inds)
     plt.show()
-
-
+    print(tp.PC[moving_inds].mean(0))
+    
+    tp.figure()
+    plt.show()
+    print(tp.PC[moving_inds].mean(0))
+    
+    exit()
+    
 def test_numbers_as_images():
     dataset_shape = (10, 10, 64, 64)
     fontsize = 10
