@@ -829,11 +829,11 @@ class transform3D_viewer:
         self.PC = in_pointcloud
         self.fixed_inds = all_inds[mask]
         self.moving_inds = moving_inds
-        self.transform_params = {}
+        self.params = {}
         self.figure()
 
     def figure(self):
-        self.init_svd()
+        self.Theta_init, self.Vt_init = self.get_Theta(self.PC[self.moving_inds])
         
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection='3d')
@@ -842,27 +842,27 @@ class transform3D_viewer:
         # Create step size text boxes
         self.create_text_box("T_step", 0.75, 0.88, 1.0, self.update_steps)
         # Create transformation widgets
-        self.create_text_box("Tx", 0.75, 0.81, self.transform_params["Tx"], self.update_from_text)
-        self.create_text_box("Ty", 0.75, 0.74, self.transform_params["Ty"], self.update_from_text)
-        self.create_text_box("Tz", 0.75, 0.67, self.transform_params["Tz"], self.update_from_text)
+        self.create_text_box("Tx", 0.75, 0.81, self.Theta_init["Tx"], self.update_from_text)
+        self.create_text_box("Ty", 0.75, 0.74, self.Theta_init["Ty"], self.update_from_text)
+        self.create_text_box("Tz", 0.75, 0.67, self.Theta_init["Tz"], self.update_from_text)
 
         self.create_buttons("Tx", 0.70, 0.81, partial(self.update_value, "Tx", "T_step", -1), partial(self.update_value, "Tx", "T_step", 1))
         self.create_buttons("Ty", 0.70, 0.74, partial(self.update_value, "Ty", "T_step", -1), partial(self.update_value, "Ty", "T_step", 1))
         self.create_buttons("Tz", 0.70, 0.67, partial(self.update_value, "Tz", "T_step", -1), partial(self.update_value, "Tz", "T_step", 1))
         
         self.create_text_box("S_step", 0.75, 0.59, 0.1, self.update_steps)
-        self.create_text_box("Sx", 0.75, 0.52, self.transform_params["Sx"], self.update_from_text)
-        self.create_text_box("Sy", 0.75, 0.45, self.transform_params["Sy"], self.update_from_text)
-        self.create_text_box("Sz", 0.75, 0.38, self.transform_params["Sz"], self.update_from_text)
+        self.create_text_box("Sx", 0.75, 0.52, self.Theta_init["Sx"], self.update_from_text)
+        self.create_text_box("Sy", 0.75, 0.45, self.Theta_init["Sy"], self.update_from_text)
+        self.create_text_box("Sz", 0.75, 0.38, self.Theta_init["Sz"], self.update_from_text)
         
         self.create_buttons("Sx", 0.70, 0.52, partial(self.update_value, "Sx", "S_step", -1), partial(self.update_value, "Sx", "S_step", 1))
         self.create_buttons("Sy", 0.70, 0.45, partial(self.update_value, "Sy", "S_step", -1), partial(self.update_value, "Sy", "S_step", 1))
         self.create_buttons("Sz", 0.70, 0.38, partial(self.update_value, "Sz", "S_step", -1), partial(self.update_value, "Sz", "S_step", 1))
         
         self.create_text_box("R_step", 0.75, 0.3, 5.0, self.update_steps)
-        self.create_text_box("Rx", 0.75, 0.23, self.transform_params["Rx"], self.update_from_text)
-        self.create_text_box("Ry", 0.75, 0.18, self.transform_params["Ry"], self.update_from_text)
-        self.create_text_box("Rz", 0.75, 0.13, self.transform_params["Rz"], self.update_from_text)
+        self.create_text_box("Rx", 0.75, 0.23, self.Theta_init["Rx"], self.update_from_text)
+        self.create_text_box("Ry", 0.75, 0.18, self.Theta_init["Ry"], self.update_from_text)
+        self.create_text_box("Rz", 0.75, 0.13, self.Theta_init["Rz"], self.update_from_text)
         
         self.create_buttons("Rx", 0.70, 0.23, partial(self.update_value, "Rx", "R_step", -1), partial(self.update_value, "Rx", "R_step", 1))
         self.create_buttons("Ry", 0.70, 0.18, partial(self.update_value, "Ry", "R_step", -1), partial(self.update_value, "Ry", "R_step", 1))
@@ -917,23 +917,45 @@ class transform3D_viewer:
         self.ax.legend()
         self.fig.canvas.draw()
 
-    def init_svd(self):
+    def get_Theta(self, PC):
         # Calculate the initial SVD of the centered movable part
-        mean_vec = self.PC[self.moving_inds].mean(0)
-        self.transform_params["Tx"], self.transform_params["Ty"], self.transform_params["Tz"] = mean_vec
-        PC_moving_centered = self.PC[self.moving_inds] - mean_vec
+        Theta = {}
+        mean_vec = PC.mean(0)
+        Theta["Tx"], Theta["Ty"], Theta["Tz"] = mean_vec
+        PC_moving_centered = PC - mean_vec
         U, S_vec, Vt = np.linalg.svd(PC_moving_centered.T)
-        self.transform_params["Sx"], self.transform_params["Sy"], self.transform_params["Sz"] = S_vec
-        self.Vt = Vt[:3]
+        Theta["Sx"], Theta["Sy"], Theta["Sz"] = S_vec
         r = scipy_rotation.from_matrix(U)
-        self.transform_params["Rx"], self.transform_params["Ry"], self.transform_params["Rz"] = r.as_euler('xyz', degrees=True)
+        Theta["Rx"], Theta["Ry"], Theta["Rz"] = r.as_euler('xyz', degrees=True)
+        return Theta, Vt[:3]
     
+    def apply(self, PC):
+        Theta_in, Vt_in = self.get_Theta(PC)
+        Theta, _ = self.get_Theta(self.PC[self.moving_inds])
+        
+        translation = np.array(
+            [Theta_in['Tx'] + Theta["Tx"] - self.Theta_init['Tx'],
+             Theta_in['Ty'] + Theta["Ty"] - self.Theta_init['Ty'],
+             Theta_in['Tz'] + Theta["Tz"] - self.Theta_init['Tz']])
+        new_S = np.diag(
+            [Theta_in["Sx"] * Theta["Sx"] / self.Theta_init["Sx"],
+             Theta_in["Sy"] * Theta["Sy"] / self.Theta_init["Sy"],
+             Theta_in["Sz"] * Theta["Sz"] / self.Theta_init["Sz"]])
+        r = scipy_rotation.from_euler('xyz',
+            np.array([Theta_in["Rx"] + Theta["Rx"] - self.Theta_init["Rx"],
+                      Theta_in["Ry"] + Theta["Ry"] - self.Theta_init["Ry"],
+                      Theta_in["Rz"] + Theta["Rz"] - self.Theta_init["Rz"]]),
+            degrees=True)
+        new_U = r.as_matrix()
+        PC_transformed = (new_U @ new_S @ Vt_in).T + translation
+        return PC_transformed
+        
     def create_text_box(self, label, x, y, initial_val, on_submit):
         text_ax = self.fig.add_axes([x, y, 0.13, 0.05])
         text_box = TextBox(text_ax, label + '         ', 
                            initial=f'{initial_val:.6f}')
         text_box.on_submit(on_submit)
-        self.transform_params[f"{label}_text_box"] = text_box
+        self.params[f"{label}_text_box"] = text_box
     
     def create_buttons(self, label, x, y, on_click_minus, on_click_plus):
         minus_ax = self.fig.add_axes([x, y, 0.04, 0.05])
@@ -942,35 +964,35 @@ class transform3D_viewer:
         plus_button = Button(plus_ax, '+')
         minus_button.on_clicked(on_click_minus)
         plus_button.on_clicked(on_click_plus)
-        self.transform_params[f"{label}_minus_button"] = minus_button
-        self.transform_params[f"{label}_plus_button"] = plus_button
+        self.params[f"{label}_minus_button"] = minus_button
+        self.params[f"{label}_plus_button"] = plus_button
     
     def update_steps(self, text):
         try:
-            self.transform_params["T_step"] = float(self.transform_params["T_step_text_box"].text)
-            self.transform_params["S_step"] = float(self.transform_params["S_step_text_box"].text)
-            self.transform_params["R_step"] = float(self.transform_params["R_step_text_box"].text)
+            self.params["T_step"] = float(self.params["T_step_text_box"].text)
+            self.params["S_step"] = float(self.params["S_step_text_box"].text)
+            self.params["R_step"] = float(self.params["R_step_text_box"].text)
         except ValueError:
             pass
 
     def update_from_text(self, text):
         try:
             # Read new transformation values
-            translation = np.array([float(self.transform_params["Tx_text_box"].text),
-                                    float(self.transform_params["Ty_text_box"].text),
-                                    float(self.transform_params["Tz_text_box"].text)])
+            translation = np.array([float(self.params["Tx_text_box"].text),
+                                    float(self.params["Ty_text_box"].text),
+                                    float(self.params["Tz_text_box"].text)])
             
-            new_S = np.diag([float(self.transform_params["Sx_text_box"].text),
-                             float(self.transform_params["Sy_text_box"].text),
-                             float(self.transform_params["Sz_text_box"].text)])
+            new_S = np.diag([float(self.params["Sx_text_box"].text),
+                             float(self.params["Sy_text_box"].text),
+                             float(self.params["Sz_text_box"].text)])
             
             r = scipy_rotation.from_euler('xyz',
-                np.array([float(self.transform_params["Rx_text_box"].text),
-                          float(self.transform_params["Ry_text_box"].text),
-                          float(self.transform_params["Rz_text_box"].text)]), degrees=True)
+                np.array([float(self.params["Rx_text_box"].text),
+                          float(self.params["Ry_text_box"].text),
+                          float(self.params["Rz_text_box"].text)]), degrees=True)
             new_U = r.as_matrix()
             
-            PC_transformed = (new_U @ new_S @ self.Vt).T + translation
+            PC_transformed = (new_U @ new_S @ self.Vt_init).T + translation
             
             # Update the movable part of the point cloud
             self.PC[self.moving_inds] = PC_transformed
@@ -980,7 +1002,7 @@ class transform3D_viewer:
             pass
 
     def update_value(self, label, step_label, direction, event):
-        current_val = float(self.transform_params[f"{label}_text_box"].text)
-        step_size = float(self.transform_params[f"{step_label}_text_box"].text)
+        current_val = float(self.params[f"{label}_text_box"].text)
+        step_size = float(self.params[f"{step_label}_text_box"].text)
         new_val = current_val + direction * step_size
-        self.transform_params[f"{label}_text_box"].set_val(f"{new_val:.6f}")
+        self.params[f"{label}_text_box"].set_val(f"{new_val:.6f}")

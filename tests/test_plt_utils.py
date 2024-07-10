@@ -15,15 +15,33 @@ def test_transform3D_viewer():
     moving_inds = np.where((in_pointcloud[:, 0] > 0) & 
                            (in_pointcloud[:, 1] > 0) & 
                            (in_pointcloud[:, 2] > 0))[0]
+    in_pointcloud2 = in_pointcloud[moving_inds].copy()
     tp = transform3D_viewer(in_pointcloud, moving_inds)
     plt.show()
-    print(tp.PC[moving_inds].mean(0))
+        
+    in_pointcloud2_transformed = tp.apply(in_pointcloud2)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.scatter(tp.PC[moving_inds, 0], 
+               tp.PC[moving_inds, 1],
+               tp.PC[moving_inds, 2], color = 'green')
+    
+    ax.scatter(in_pointcloud2[:, 0], 
+               in_pointcloud2[:, 1], 
+               in_pointcloud2[:, 2], color = 'blue')
+    
+    ax.scatter(in_pointcloud2_transformed[:, 0]+0.05, 
+               in_pointcloud2_transformed[:, 1]+0.05, 
+               in_pointcloud2_transformed[:, 2]+0.05, marker = 's', color = 'red')
+
+    plt.show()    
     
     tp.figure()
     plt.show()
     print(tp.PC[moving_inds].mean(0))
-    
-    exit()
+
     
 def test_numbers_as_images():
     dataset_shape = (10, 10, 64, 64)
