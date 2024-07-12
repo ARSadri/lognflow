@@ -1,16 +1,13 @@
-from .printprogress import printprogress
-
 import numpy as np
 from functools import partial
-
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from matplotlib.colors import hsv_to_rgb
 from matplotlib.widgets import RangeSlider, TextBox, Button
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 from scipy.spatial.transform import Rotation as scipy_rotation
+from .printprogress import printprogress
 
 def complex2hsv(data_complex, vmin=None, vmax=None):
     """ complex2hsv
@@ -397,7 +394,7 @@ def plt_scatter3(
             azim = None
         else:
             azim = azim_list[0]
-        if (len(elev_list) > 0) | (len(azim_list) > 0):
+        if (elev is not None) | (azim is not None):
             ax.view_init(elev=elev, azim=azim)
         return fig, ax
 
@@ -820,15 +817,19 @@ class transform3D_viewer:
         in_pointcloud (numpy.ndarray): The input point cloud.
         moving_inds (numpy.ndarray): Indices of points that can be transformed.
     """
-    def __init__(self, in_pointcloud, moving_inds=None):
-        all_inds = np.arange(len(in_pointcloud))
-        if moving_inds is None:
-            moving_inds = all_inds
-        mask = np.ones(len(in_pointcloud), dtype=bool)
-        mask[moving_inds] = False
+    def __init__(self, in_pointcloud, pt_cls = None):
+        error_msg = 'input point cloud must be Nx3, where N >= 3'
+        assert len(in_pointcloud.shape) == 2, error_msg
+        assert in_pointcloud.shape[0] >= 3, error_msg
+        assert in_pointcloud.shape[1] == 3, error_msg
         self.PC = in_pointcloud
-        self.fixed_inds = all_inds[mask]
-        self.moving_inds = moving_inds
+    
+        if pt_cls is None:
+            pt_cls = np.zeros(len(in_pointcloud), dtype='int')
+        self.pt_cls = pt_cls
+        self.moving_inds = np.where(self.pt_cls == 0)[0]
+        assert len(self.moving_inds) > 0, \
+            'at least 3 data points must have class 0'
         self.params = {}
         self.figure()
 
@@ -873,12 +874,11 @@ class transform3D_viewer:
     def draw(self):
         # Display the point cloud
         self.ax.cla()
-        self.ax.scatter(self.PC[self.fixed_inds, 0],
-                        self.PC[self.fixed_inds, 1],
-                        self.PC[self.fixed_inds, 2], label='Fixed')
-        self.ax.scatter(self.PC[self.moving_inds, 0],
-                        self.PC[self.moving_inds, 1],
-                        self.PC[self.moving_inds, 2], label='Moving')
+        for cls_cnt in np.unique(self.pt_cls):
+            self.ax.scatter(self.PC[self.pt_cls == cls_cnt, 0],
+                            self.PC[self.pt_cls == cls_cnt, 1],
+                            self.PC[self.pt_cls == cls_cnt, 2], 
+                            label=f'cls_{cls_cnt}')
     
         # Calculate the bounding box for the moving_inds using SVD
         points = self.PC[self.moving_inds]
@@ -912,9 +912,8 @@ class transform3D_viewer:
                  (0, 4), (1, 5), (2, 6), (3, 7)] # Vertical lines
     
         for edge in edges:
-            self.ax.plot3D(*zip(bbox[edge[0]], bbox[edge[1]]), '--', color='r')
+            self.ax.plot3D(*zip(bbox[edge[0]], bbox[edge[1]]), '--', color='blue')
     
-        self.ax.legend()
         self.fig.canvas.draw()
 
     def get_Theta(self, PC):

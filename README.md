@@ -11,7 +11,7 @@ You can install it by:
 pip install lognflow
 ```
 ## How to use
-A simple program to use ```lognflow``` would be similar to the following:
+A simple program to use ```lognflow``` would be similar to the following , if the root for all logs is "c:\all_logs\\":
 
 ```python 
 	
@@ -21,12 +21,11 @@ A simple program to use ```lognflow``` would be similar to the following:
 	data = np.random.rand(100)
 	
 	logger = lognflow(r'c:\all_logs\\')
-	logger('This is a test for lognflow and log_single')
-	logger.log_single('data', data)
+	logger('This is a test for lognflow and save')
+	logger.save('data', data)
 	
 ```
-
-The ```logviewer``` is also very useful.
+You can also load a variable.
 
 ```python 
 
@@ -36,7 +35,7 @@ The ```logviewer``` is also very useful.
 
 ```
 
-The ```printprogress``` makes a pretty nice progress bar.
+Apart form lots of easy logging and loading functionalities, lognflow provides a very nice progress bar that does not make a mess in terminals that do not support \r::
 
 ```python 
 
@@ -121,8 +120,9 @@ Many tests are avialable in the tests directory.
 
 * lognflow puts all the logs into a directory on your pc
 * lognflow makes it easy to log text or simple plots.
-* logviewer makes it easy to load variables or directories
+* lognflow makes it easy to load variables or directories
 * printprogress is one of the best progress bars in Python.
+* multiprocessor makes it easy to use multiprocessing in Python.
 
 ## Author
 * Alireza Sadri `<Alireza[Dot]Sadri[At]Monash[Dot]edu>`

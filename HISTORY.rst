@@ -293,3 +293,7 @@ History
 0.12.5 (2024-07-10)
 -------------------
 * transform3D_viewer supports applying the transform to others
+
+0.12.6 (2024-07-11)
+-------------------
+* transform3D_viewer improved

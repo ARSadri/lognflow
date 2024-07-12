@@ -188,7 +188,9 @@ class lognflow:
                     new_log_dir_found = True
                 else:
                     self._init_time = time.time()
+            self.log_dir_provided = False
         else:
+            self.log_dir_provided = True
             self.log_dir = pathlib_Path(log_dir)
 
         self.logged = self
@@ -205,8 +207,26 @@ class lognflow:
         self.enabled = True
         self.counted_vars = {}
         
-        self.load = self.get_single
-        
+        self.log_text           = self.text
+        self.log_text_flush     = self.text_flush
+        self.log_var            = self.record
+        self.log_var_flush      = self.record_flush
+        self.log_plot           = self.plot
+        self.log_hist           = self.hist
+        self.log_scatter3       = self.scatter3
+        self.log_surface        = self.surface
+        self.log_hexbin         = self.hexbin
+        self.log_imshow         = self.imshow
+        self.imshow_by_subplots = self.imshow_subplots
+        self.log_imshow_series  = self.imshow_series
+        self.log_images_in_pdf  = self.images_in_pdf
+        self.log_plt            = self.savefig
+        self.log_torch_dict     = self.save_torch
+        self.log_single         = self.save
+        self.get_single         = self.load
+        self.get_var            = self.get_record
+        self.get_torch_dict     = self.load_torch
+
     def disable(self):
         self.enabled = False
         
@@ -233,6 +253,7 @@ class lognflow:
             given a parameter_name, it returns log_dir / parameter_name
         """
         return self.log_dir / parameter_name
+    
     
     def copy(self, parameter_name = None, source = None, suffix = None,
              time_tag = False):
@@ -498,7 +519,7 @@ class lognflow:
             last_log_flush_time=0,
             log_flush_period=log_flush_period)  
 
-    def log_text_flush(self, log_name = None, flush = False, suffix = None):
+    def text_flush(self, log_name = None, flush = False, suffix = None):
         """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
@@ -533,7 +554,7 @@ class lognflow:
             curr_textinlog.to_be_logged = []
             curr_textinlog.last_log_flush_time = self.time_stamp
 
-    def log_text(self, 
+    def text(self, 
                  log_name: str = None,
                  to_be_logged = '', 
                  log_time_stamp = True,
@@ -646,7 +667,7 @@ class lognflow:
         cnt_limit = int(log_size_limit/(param.size*param.itemsize))
         return cnt_limit
 
-    def log_var(self, parameter_name: str, parameter_value, 
+    def record(self, parameter_name: str, parameter_value, 
                 suffix = None, log_size_limit: int = int(1e+7)):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
@@ -656,7 +677,7 @@ class lognflow:
             array along with their time stamp and then when the size of the 
             array reaches a threhshold flushes it into HDD with a file that
             has an initial time stamp.
-            The benefit of using this function over log_single is that it
+            The benefit of using this function over save is that it
             does not use the connection to the directoy all time and if that is
             on a network, there will be less overhead.
             
@@ -731,7 +752,7 @@ class lognflow:
                                                       suffix,
                                                       log_counter_limit)
 
-    def log_var_flush(self, parameter_name: str, suffix: str = None):
+    def record_flush(self, parameter_name: str, suffix: str = None):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
@@ -766,7 +787,7 @@ class lognflow:
             np.savetxt(fpath, _var_data_array)
         return fpath
     
-    def get_var(self, parameter_name: str, suffix: str = None) -> tuple:
+    def get_record(self, parameter_name: str, suffix: str = None) -> tuple:
         """ Get the buffered numpy arrays
             If you need the buffered variable back.
             :param parameter_name: str
@@ -794,11 +815,11 @@ class lognflow:
         time_array = _var.time_array[_var.time_array>0].copy()
         return(time_array, data_array)
 
-    def log_single(self, parameter_name: str, 
-                         parameter_value,
-                         suffix = None,
-                         mat_field = None,
-                         time_tag: bool = None):
+    def save(self, parameter_name: str, 
+                   parameter_value,
+                   suffix = None,
+                   mat_field = None,
+                   time_tag: bool = None):
         """log a single variable
             The most frequently used function would probably be this one.
             
@@ -863,7 +884,7 @@ class lognflow:
             print(f"An error occurred: {e}")
         return fpath
     
-    def log_plt(self, 
+    def savefig(self, 
                 parameter_name: str, 
                 image_format='jpg', dpi=1200,
                 time_tag: bool = None,
@@ -899,7 +920,7 @@ class lognflow:
                 None, f'Cannot save the plt instance {parameter_name}.')
             return None
     
-    def log_plot(self, parameter_name: str, 
+    def plot(self, parameter_name: str, 
                        parameter_value_list,
                        x_values = None,
                        image_format='jpg', dpi=1200, title = None,
@@ -969,7 +990,7 @@ class lognflow:
         else:
             return fig, ax
     
-    def log_hist(self, parameter_name: str, 
+    def hist(self, parameter_name: str, 
                        parameter_value_list,
                        n_bins = 10,
                        alpha = 0.5,
@@ -1020,7 +1041,8 @@ class lognflow:
         else:
             return fig, ax
     
-    def log_scatter3(self, parameter_name: str,
+    
+    def scatter3(self, parameter_name: str,
                      data_N_by_3,
                      elev_list = None,
                      azim_list = None,
@@ -1072,7 +1094,7 @@ class lognflow:
         else:
             return fig_ax_opt_stack
     
-    def log_surface(self, parameter_name: str,
+    def surface(self, parameter_name: str,
                        parameter_value, image_format='jpg', 
                        dpi=1200, title = None,
                        time_tag: bool = None, return_figure = False, **kwargs):
@@ -1105,8 +1127,8 @@ class lognflow:
             return fpath
         else:
             return fig, ax
-        
-    def log_hexbin(self, parameter_name: str, parameter_value,
+    
+    def hexbin(self, parameter_name: str, parameter_value,
                    gridsize = 20, image_format='jpg', dpi=1200, title = None,
                    time_tag: bool = None, return_figure = False):
         """log a 2D histogram 
@@ -1142,8 +1164,8 @@ class lognflow:
             return fpath
         else:
             return fig, ax
-        
-    def log_imshow(self, 
+    
+    def imshow(self, 
                    parameter_name: str, 
                    parameter_value, 
                    frame_shape : tuple = None,
@@ -1224,7 +1246,7 @@ class lognflow:
                 f'{parameter_value.shape}')
             return
 
-    def log_imshow_by_subplots(self, 
+    def imshow_subplots(self, 
         parameter_name: str, 
         stack: np.ndarray,
         frame_shape = None,
@@ -1288,8 +1310,8 @@ class lognflow:
             return fpath
         else:
             return fig, ax
-
-    def log_imshow_series(self, 
+    
+    def imshow_series(self, 
                           parameter_name: str,
                           list_of_stacks: list,
                           list_of_masks = None,
@@ -1370,7 +1392,7 @@ class lognflow:
         else:
             return fig, ax
 
-    def log_images_in_pdf(self,
+    def images_in_pdf(self,
         parameter_name: str, 
         parameter_value: list,
         time_tag: bool = None,
@@ -1541,21 +1563,11 @@ class lognflow:
         for parameter_name in list(self._vars_dict):
             self.log_var_flush(parameter_name)
 
-    def save(self, parameter_name: str, 
-                   parameter_value,
-                   suffix = None,
-                   mat_field = None,
-                   time_tag: bool = None):
-        return self.log_single(parameter_name = parameter_name, 
-                               parameter_value = parameter_value,
-                               suffix = suffix,
-                               mat_field = mat_field,
-                               time_tag = time_tag)
-
+    
     def savez(self, parameter_name: str, 
                     parameter_value,
                     time_tag: bool = None):
-        return self.log_single(parameter_name = parameter_name, 
+        return self.save(parameter_name = parameter_name, 
                                parameter_value = parameter_value,
                                suffix = 'npz',
                                time_tag = time_tag)
@@ -1591,34 +1603,27 @@ class lognflow:
     def exception(self):
         self.log_text('exception', text_to_log, time_tag = False)
 
-
     def assert_log_dir(self):
         if not self.log_dir.is_dir():
             print('~'*60)
-            print(f'lognflow.logdir: No such directory: '+ str(self.log_dir))
-            print(f'You probably wanted to read a file before logging.')
+            if self.log_dir_provided:
+                print(f'lognflow.logdir: No such directory: ')
+                print(self.log_dir)
+            else:
+                print('You should provide log_dir when initializing lognflow '
+                      'if you wish to read the stored data first as follows:')
+                print(f'logger = lognflow(log_dir = {self.log_dir.parent}')
             print('~'*60)
             assert self.log_dir.is_dir()
 
-    def name_from_file(self, fpath):
-        """ 
-            Given an fpath inside the logger log_dir, 
-            what would be its equivalent parameter_name?
-        """
-        self.assert_log_dir()
-        return name_from_file(self.log_dir_str, fpath)
-    
-    # def disable_logger(self):
-    #     self.logger = dummy_function
-    
-    def log_torch_dict(self, name, x):
+    def save_torch(self, name, x):
         if isinstance(x, dict):
             for key in x.keys():
                 log_dict(name+'/'+key, x[key])
         else:
             self.log_single(name, x.detach().cpu().numpy())
 
-    def get_torch_dict(self, name):
+    def load_torch(self, name):
         self.assert_log_dir()
         flist = self.logged.get_flist(name)
         for fpath in flist:
@@ -1633,7 +1638,8 @@ class lognflow:
                 output = {}
                 for fpath_inner in flist_dir:
                     key = fpath_inner.stem
-                    output[key] = get_dict(vname + '/' + fpath_inner.name)
+                    output[key] = self.load_torch(
+                        vname + '/' + fpath_inner.name)
                 return output
         return None    
     
@@ -1879,7 +1885,7 @@ class lognflow:
                         f'{var_path} is not in: {self.log_dir}')
         return None, None
     
-    def get_single(self, var_name, file_index = -1, 
+    def load(self, var_name, file_index = -1, 
                    suffix = None, read_func = None, verbose = False,
                    return_fpath = False):
         """ get a single variable
