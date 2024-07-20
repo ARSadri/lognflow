@@ -121,6 +121,14 @@ def test_log_animation():
     logger('This is a test for log_animation')    
     logger.log_animation('var1',var1)
 
+def test_save_matlab():
+    logger = lognflow(temp_dir)
+    logger('This is a test for saving MATLAB files using a dictionary')    
+    data_to_save = dict(data1 = np.random.rand(3,3),
+                        data2 = 'test',
+                        data3 = [1, 2, 4])
+    logger.save('MATLAB_test.mat', data_to_save)
+
 def test_save():
     var1 = np.random.rand(100)
     
@@ -142,11 +150,9 @@ def test_plot():
     logger = lognflow(temp_dir)
     logger('This is a test for plot')    
     
-    logger.plot(parameter_name = 'var1', 
-                    parameter_value_list = var1)
+    logger.plot('var1', var1)
     
-    logger.plot(parameter_name = 'vars', 
-                    parameter_value_list = [var1, var2, var3])
+    logger.plot('vars', [var1, var2, var3], '-*')
     
 def test_hist():
     var1 = np.random.rand(10000)
@@ -360,7 +366,7 @@ def test_log_images_to_pdf():
     logger.imshow('im1', np.random.randn(20, 40))
     
     images = logger.get_stack_from_names('im1*.*')
-    logger.images_in_pdf(
+    logger.images_to_pdf(
         'im1_all', parameter_value = images, time_tag = False)
     
 def test_variables_to_pdf():
@@ -495,6 +501,8 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     #tests about reading back
+    test_plot(); exit()
+    test_save_matlab()
     test_save()
     test_scatter3()
     test_log_animation()
@@ -528,7 +536,6 @@ if __name__ == '__main__':
     test_surface()
     test_lognflow_conflict_in_names()
     test_rename()
-    test_plot()
     test_logger()
     test_log_flush_period()
     test_record_without_time_stamp()

@@ -188,6 +188,7 @@ class lognflow:
                     new_log_dir_found = True
                 else:
                     self._init_time = time.time()
+            self.logs_root = logs_root
             self.log_dir_provided = False
         else:
             self.log_dir_provided = True
@@ -207,25 +208,46 @@ class lognflow:
         self.enabled = True
         self.counted_vars = {}
         
-        self.log_text           = self.text
-        self.log_text_flush     = self.text_flush
-        self.log_var            = self.record
-        self.log_var_flush      = self.record_flush
-        self.log_plot           = self.plot
-        self.log_hist           = self.hist
-        self.log_scatter3       = self.scatter3
-        self.log_surface        = self.surface
-        self.log_hexbin         = self.hexbin
-        self.log_imshow         = self.imshow
-        self.imshow_by_subplots = self.imshow_subplots
-        self.log_imshow_series  = self.imshow_series
-        self.log_images_in_pdf  = self.images_in_pdf
-        self.log_plt            = self.savefig
-        self.log_torch_dict     = self.save_torch
-        self.log_single         = self.save
-        self.get_single         = self.load
-        self.get_var            = self.get_record
-        self.get_torch_dict     = self.load_torch
+        #all depricated
+        self.log_text               = self.text
+        self.log_text_flush         = self.text_flush
+        self.log_var                = self.record
+        self.log_var_flush          = self.record_flush
+        self.log_plot               = self.plot
+        self.log_hist               = self.hist
+        self.log_scatter3           = self.scatter3
+        self.log_surface            = self.surface
+        self.log_hexbin             = self.hexbin
+        self.log_imshow             = self.imshow
+        self.log_imshow_by_subplots = self.imshow_subplots
+        self.log_imshow_series      = self.imshow_series
+        self.log_images_in_pdf      = self.images_to_pdf
+        self.log_plt                = self.savefig
+        self.log_torch_dict         = self.save_torch
+        self.log_single             = self.save
+        self.get_single             = self.load
+        self.get_var                = self.get_record
+        self.get_torch_dict         = self.load_torch
+
+    def assert_log_dir(self):
+        if not self.log_dir.is_dir():
+            print('~'*60)
+            if self.log_dir_provided:
+                print(f'lognflow.logdir: No such directory: ')
+                print(self.log_dir)
+            elif self.logs_root.is_dir():
+                self.log_dir = self.logs_root
+                print('lognflow Warning: You read from the provided logs_root:')
+                print(self.logs_root)
+                print('to read from a log, use log_dir as the input argument:')
+                print(f'logger = lognflow(log_dir = {self.log_dir}')
+                print('I will assume that this logs_root is log_dir from now on')
+            else:
+                print('You should provide log_dir when initializing lognflow '
+                      'if you wish to read the stored data first as follows:')
+                print(f'logger = lognflow(log_dir = pathlib.Path(STORAGE_DIR)')
+            print('~'*60)
+            assert self.log_dir.is_dir()
 
     def disable(self):
         self.enabled = False
@@ -253,7 +275,6 @@ class lognflow:
             given a parameter_name, it returns log_dir / parameter_name
         """
         return self.log_dir / parameter_name
-    
     
     def copy(self, parameter_name = None, source = None, suffix = None,
              time_tag = False):
@@ -374,11 +395,11 @@ class lognflow:
                 curr_textinlog.log_fpath = \
                     self.log_dir /curr_textinlog.log_fpath.name
         except:
-            self.log_text(None, 'Could not rename the log_dir from:')
-            self.log_text(None, f'{self.log_dir.name}')
-            self.log_text(None, 'into:')
-            self.log_text(None, f'{new_name}')
-            self.log_text(None, 'Most probably a file was open.')
+            self.text(None, 'Could not rename the log_dir from:')
+            self.text(None, f'{self.log_dir.name}')
+            self.text(None, 'into:')
+            self.text(None, f'{new_name}')
+            self.text(None, 'Most probably a file was open.')
         return self.log_dir
     
     def _param_dir_name_suffix(self, parameter_name: str, suffix: str = None):
@@ -733,13 +754,13 @@ class lognflow:
         try:
             time_array[curr_index] = self.time_stamp
         except:
-            self.log_text(
+            self.text(
                 self.log_name,
                 f'current index {curr_index} cannot be used in the logger')
         if(parameter_value.shape == data_array[curr_index].shape):
             data_array[curr_index] = parameter_value
         else:
-            self.log_text(
+            self.text(
                 self.log_name,
                 f'Shape of variable {log_dirnamesuffix} cannot change shape '\
                 f'from {data_array[curr_index].shape} '\
@@ -871,11 +892,15 @@ class lognflow:
             elif(suffix == 'mat'):
                 from scipy.io import savemat
                 if(mat_field is None):
-                    mat_field = param_name
-                savemat(fpath, {f'{mat_field}':parameter_value})
+                    if isinstance(parameter_value, dict):
+                        savemat(fpath, parameter_value)
+                    else:
+                        mat_field = param_name
+                if(mat_field is not None):
+                    savemat(fpath, {f'{mat_field}':parameter_value})
             elif(suffix == 'torch'):
                 from torch import save as torch_save
-                torch_save(parameter_value.state_dict(), fpath)
+                torch_save(parameter_value, fpath)
             else:
                 with open(fpath,'a') as fdata: 
                     fdata.write(str(parameter_value))
@@ -916,17 +941,20 @@ class lognflow:
         except:
             if(close_plt):
                 plt.close()
-            self.log_text(
+            self.text(
                 None, f'Cannot save the plt instance {parameter_name}.')
             return None
     
     def plot(self, parameter_name: str, 
-                       parameter_value_list,
-                       x_values = None,
-                       image_format='jpg', dpi=1200, title = None,
-                       time_tag: bool = None,
-                       return_figure = False,
-                       **kwargs):
+                   parameter_value_list,
+                   *plt_plot_args,
+                   x_values = None,
+                   image_format='jpg',
+                   dpi=1200,
+                   title = None,
+                   time_tag: bool = None,
+                   return_figure = False,
+                   **kwargs):
         """log a single plot
             If you have a numpy array or a list of arrays (or indexable by
             first dimension, an array of 1D arrays), use this to log a plot 
@@ -961,22 +989,24 @@ class lognflow:
         
             if( not( (len(x_values) == len(parameter_value_list)) | \
                      (len(x_values) == 1) )):
-                self.log_text(
+                self.text(
                     self.log_name,
                     f'x_values for {parameter_name} should have'\
                     + ' length of 1 or the same as parameters list.')
                 raise ValueError
         
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
         for list_cnt, parameter_value in enumerate(parameter_value_list):
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
             if(x_values is None):
-                ax.plot(parameter_value, **kwargs)
+                ax.plot(parameter_value, *plt_plot_args, **kwargs)
             else:
                 if(len(x_values) == len(parameter_value)):
-                    ax.plot(x_values[list_cnt], parameter_value, **kwargs)
+                    ax.plot(x_values[list_cnt], parameter_value, 
+                            *plt_plot_args, **kwargs)
                 else:
-                    ax.plot(x_values[0], parameter_value, **kwargs)
+                    ax.plot(x_values[0], parameter_value, 
+                            *plt_plot_args, **kwargs)
         
         if title is not None:
             ax.set_title(title)
@@ -1076,7 +1106,7 @@ class lognflow:
         if data_N_by_3.shape[0] == 3:
             if data_N_by_3.shape[1] != 3:
                 data_N_by_3 = data_N_by_3.T
-                self.log_text(
+                self.text(
                     None, 'lognflow.log_scatter3> input dataset is transposed.')
         fig_ax_opt_stack = plt_scatter3(data_N_by_3, title = title,
                      elev_list = elev_list, azim_list = azim_list,
@@ -1240,7 +1270,7 @@ class lognflow:
             else:
                 return fig, ax
         else:
-            self.log_text(
+            self.text(
                 self.log_name,
                 f'Cannot imshow variable {parameter_name} with shape' + \
                 f'{parameter_value.shape}')
@@ -1392,7 +1422,7 @@ class lognflow:
         else:
             return fig, ax
 
-    def images_in_pdf(self,
+    def images_to_pdf(self,
         parameter_name: str, 
         parameter_value: list,
         time_tag: bool = None,
@@ -1426,7 +1456,7 @@ class lognflow:
                          dpi = 1200,
                          **kwargs):
         images = self.logged.get_stack_from_names(parameter_value)
-        self.log_images_in_pdf(
+        self.images_to_pdf(
             parameter_name, images, time_tag, dpi, **kwargs)
 
     def log_confusion_matrix(self,
@@ -1585,43 +1615,30 @@ class lognflow:
                 logger('Hello lognflow')
             The text (str(...)) will be passed to the main log text file.
         """
-        fpath = self.log_text(None, *args, **kwargs)
+        fpath = self.text(None, *args, **kwargs)
         self.flush_all()
         return fpath
 
     #towards supporting all that logging supports
     def debug(self, text_to_log):
-        self.log_text('debug', text_to_log, time_tag = False)
+        self.text('debug', text_to_log, time_tag = False)
     def info(self):
-        self.log_text('info', text_to_log, time_tag = False)
+        self.text('info', text_to_log, time_tag = False)
     def warning(self):
-        self.log_text('warning', text_to_log, time_tag = False)
+        self.text('warning', text_to_log, time_tag = False)
     def error(self):
-        self.log_text('error', text_to_log, time_tag = False)
+        self.text('error', text_to_log, time_tag = False)
     def critical(self):
-        self.log_text('critical', text_to_log, time_tag = False)
+        self.text('critical', text_to_log, time_tag = False)
     def exception(self):
-        self.log_text('exception', text_to_log, time_tag = False)
-
-    def assert_log_dir(self):
-        if not self.log_dir.is_dir():
-            print('~'*60)
-            if self.log_dir_provided:
-                print(f'lognflow.logdir: No such directory: ')
-                print(self.log_dir)
-            else:
-                print('You should provide log_dir when initializing lognflow '
-                      'if you wish to read the stored data first as follows:')
-                print(f'logger = lognflow(log_dir = {self.log_dir.parent}')
-            print('~'*60)
-            assert self.log_dir.is_dir()
+        self.text('exception', text_to_log, time_tag = False)
 
     def save_torch(self, name, x):
         if isinstance(x, dict):
             for key in x.keys():
                 log_dict(name+'/'+key, x[key])
         else:
-            self.log_single(name, x.detach().cpu().numpy())
+            self.save(name, x.detach().cpu().numpy())
 
     def load_torch(self, name):
         self.assert_log_dir()
@@ -1790,7 +1807,7 @@ class lognflow:
                 txt = txt[0]
             return txt
 
-    def _get_single(self, var_name, file_index = None, 
+    def _load(self, var_name, file_index = None, 
                    suffix = None, read_func = None, verbose = False):
         """ get a single variable
             return the value of a saved variable.
@@ -1823,22 +1840,22 @@ class lognflow:
             else:
                 if file_index is not None:
                     if verbose:
-                        self.log_text(None, 
+                        self.text(None, 
                             f'There are {len(flist)} files, logged with'
                             + f' name {var_name}.'
                             + f' The given index is {file_index}.')
                     var_path = flist[file_index]
                 else:
-                    self.log_text(None, '-'*60)
-                    self.log_text(None, 
+                    self.text(None, '-'*60)
+                    self.text(None, 
                         f'There are {len(flist)} files, logged with'
                         + f' name {var_name} but the index is not given.')
-                    self.log_text(None, '-'*60)
+                    self.text(None, '-'*60)
                     return None
     
             if(var_path.is_file()):
                 if verbose:
-                    self.log_text(None, f'Loading {var_path}')
+                    self.text(None, f'Loading {var_path}')
                 if read_func is not None:
                     return (read_func(var_path), var_path)
                 if(var_path.suffix == '.npz'):
@@ -1881,7 +1898,7 @@ class lognflow:
                 var_path = None
                 
         if (var_path is None) & verbose:
-            self.log_text(None, f'Looking for {var_name} failed. ' + \
+            self.text(None, f'Looking for {var_name} failed. ' + \
                         f'{var_path} is not in: {self.log_dir}')
         return None, None
     
@@ -1909,7 +1926,7 @@ class lognflow:
                 Also when reading a npz except if it is made by log_var
         """
         self.assert_log_dir()
-        get_single_data, fpath = self._get_single(
+        get_single_data, fpath = self._load(
             var_name = var_name, file_index = file_index, suffix = suffix, 
             read_func = read_func, verbose = verbose)   
         if return_fpath:
@@ -1974,11 +1991,11 @@ class lognflow:
                 read_func(flist[0])
             except Exception as e:
                 if flist[0].is_file():
-                    self.log_text(None, 
+                    self.text(None, 
                         f'lognflow: The data file {flist[0]} could not be read.'
                         'Please provide a read_function for this file.')
                 else:
-                    self.log_text(
+                    self.text(
                         None, f'File {flist[0]} does not exist.')
                 raise e
             dataset = [read_func(fpath) for fpath in flist]
@@ -2044,7 +2061,7 @@ class lognflow:
             var_dir = var_dir.parent
             flist = list(var_dir.glob(f'{var_fname}'))
             if (len(flist) == 0) & (not ('*' in var_fname)):
-                self.log_text(None, 
+                self.text(None, 
                     'lognflow, replace_time_with_index:' +\
                     'the given pattern has no * and no files were found')
         if flist:
@@ -2052,20 +2069,20 @@ class lognflow:
             fcnt_width = len(str(len(flist)))
             for fcnt, fpath in enumerate(flist):
                 if verbose:
-                    self.log_text(None, f'Changing {flist[fcnt].name}')
+                    self.text(None, f'Changing {flist[fcnt].name}')
                 fname_new = fpath.name.split(fpath.stem.split('_')[-1])
                 fname_new = \
                     fname_new[0] + f'{fcnt:0{fcnt_width}d}' + fname_new[1]
                 fpath_new = flist[fcnt].parent / fname_new
                 if verbose:
-                    self.log_text(None, f'To {fpath_new.name}')
+                    self.text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
 
     def __del__(self):
         try:
             self.flush_all()
         except:
-            print('lognflow: couldnt flush all logs')
+            pass
         
     def __repr__(self):
         return f'{self.log_dir}'

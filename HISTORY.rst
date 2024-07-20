@@ -297,3 +297,8 @@ History
 0.12.6 (2024-07-11)
 -------------------
 * transform3D_viewer improved
+
+0.12.7 (2024-07-11)
+-------------------
+* some of the names of the funcitons are mroe accurate now
+* plot now takes arguments that plt.plot takes and a bug has been fixed there!

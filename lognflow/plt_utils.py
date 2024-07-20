@@ -18,10 +18,8 @@ def complex2hsv(data_complex, vmin=None, vmax=None):
     sx, sy = data_complex.shape
 
     data_abs = np.abs(data_complex)
-    if vmin is None:
-        vmin = data_abs.min()
-    if vmax is None:
-        vmax = data_abs.max()
+    if vmin is None: vmin = data_abs.min()
+    if vmax is None: vmax = data_abs.max()
     sat = (data_abs - vmin) / (vmax - vmin)
     data_angle = np.angle(data_complex) % (2 * np.pi)
     hue = data_angle / (2 * np.pi)
@@ -92,7 +90,7 @@ def complex2hsv_colorbar(
 
     return fig, ax
 
-def plt_colorbar(mappable, colorbar_aspect=2, colorbar_pad_fraction=0.05):
+def plt_colorbar(mappable, colorbar_aspect=3, colorbar_pad_fraction=0.05):
     """
     Add a colorbar to the current axis with consistent width.
 
@@ -250,6 +248,8 @@ def plt_imshow(img,
                portrait = None,
                complex_type = 'abs_angle',
                **kwargs):
+    vmin = kwargs['vmin'] if 'vmin' in kwargs else None
+    vmax = kwargs['vmax'] if 'vmax' in kwargs else None
     if(not np.iscomplexobj(img)):
         fig, ax = plt.subplots()
         im = ax.imshow(img, cmap = cmap, **kwargs)
@@ -259,12 +259,15 @@ def plt_imshow(img,
             plt.setp(ax, xticks=[], yticks=[])
     else:
         if (cmap == 'complex') | (complex_type == 'complex'):
-                # Convert complex data to RGB
-            complex_image, data_abs, data_angle = complex2hsv(img)
+            # Convert complex data to RGB
+                
+            complex_image, data_abs, data_angle = complex2hsv(
+                img, vmin = vmin, vmax = vmax)
         
             # Calculate min and max angles
-            vmin = data_abs.min()
-            vmax = data_abs.max()
+            if vmin is None: vmin = data_abs.min()
+            if vmax is None: vmax = data_abs.max()
+            
             try:
                 min_angle = data_angle[data_abs > 0].min()
             except:
@@ -622,7 +625,7 @@ def imshow_series(list_of_stacks,
                   list_of_titles_columns = None,
                   list_of_titles_rows = None,
                   fontsize = None,
-                  transpose = False,
+                  transpose = True,
                   ):
     """ imshow a stack of images or sets of images in a shelf,
         input must be a list or array of images
@@ -765,6 +768,12 @@ def imshow_by_subplots(
     figsize (tuple): Size of the figure.
     remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
     """
+    try:
+        dims = stack.shape
+        if len(dims) == 2:
+            dims = [dims]
+    except: pass
+    
     if grid_locations is None:
         N = len(stack)
         if frame_shape is None:
@@ -782,10 +791,12 @@ def imshow_by_subplots(
         figsize = 10 * frame_shape / frame_shape.max()
     
     fig = plt.figure(figsize=figsize)
-    
+    # stack_shape_0 = [image.shape[0] for image in stack]
+    # image_blank_shape[0] = ...
     for i, (image, location) in enumerate(zip(stack, grid_locations)):
         ax = fig.add_subplot(location[0], location[1], location[2])
-        
+        if image is None:
+            continue
         if 'cmap' in kwargs:
             cax = ax.imshow(image, **kwargs)
         else:
