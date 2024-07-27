@@ -112,20 +112,7 @@ def select_file():
     fpath = Path(fpath[0])
     return(fpath)
 
-def str2type(_element):
-    if _element[0] == '\'':
-        return _element[1:-1]
-    else:
-        try:
-            return int(_element)
-        except ValueError:
-            try:
-                return float(_element)
-            except ValueError:
-                pass
-    return _element
-
-def text_to_object(txt):
+def text_to_collection(text):
     """ Read a list or dict that was sent to write to text e.g. via log_single:
     As you may have tried, it is possible to send a Pythonic list to a text file
     the list will be typed there with [ and ] and ' and ' for strings with ', '
@@ -137,23 +124,36 @@ def text_to_object(txt):
     will be returned as string with any other wierd things attached to it.
     
     """
-    if(txt[0] == '['):
-        txt = txt.strip('[').strip(']')
-        txt = txt.split(', ')
-        obj_out = txt
-        for cnt, _element in enumerate(txt):
-            obj_out[cnt] = str2type(_element)
-    elif(txt[0] == '{'):
-        txt = txt.strip('{').strip('}')
-        txt = txt.split(', ')
-        obj_out = dict()
-        for cnt, _element in enumerate(txt):
-            _element_key = str2type(_element.split(': ')[0])
-            _element_value = str2type(_element.split(': ')[1])
-            obj_out[_element_key] = _element_value
-    else:
-        obj_out = txt
-    return obj_out
+    import ast
+    def parse_node(node):
+        if isinstance(node, ast.List):
+            return [parse_node(elem) for elem in node.elts]
+        elif isinstance(node, ast.Dict):
+            return {parse_node(key): parse_node(value) for key, value in zip(node.keys, node.values)}
+        elif isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, ast.Num):  # For Python < 3.8
+            return node.n
+        elif isinstance(node, ast.Str):  # For Python < 3.8
+            return node.s
+        elif isinstance(node, ast.Name):
+            if node.id == 'array':
+                return np
+            elif node.id == 'tensor':
+                import torch
+                return torch
+        elif isinstance(node, ast.Call):
+            func_name = node.func.id
+            if func_name == 'array':
+                return np.array([parse_node(arg) for arg in node.args])
+            elif func_name == 'tensor':
+                import torch
+                return torch.tensor([parse_node(arg) for arg in node.args])
+        return None
+
+    tree = ast.parse(text, mode='eval')
+    return parse_node(tree.body)
+
 
 def stack_to_frame(stack, frame_shape : tuple = None, borders = 0):
     """ turn a stack of images into a 2D frame of images

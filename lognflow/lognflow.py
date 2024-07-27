@@ -54,6 +54,7 @@ from    .utils              import (repr_raw,
                                     stack_to_frame,
                                     name_from_file,
                                     is_builtin_collection,
+                                    text_to_collection,
                                     dummy_function)
 from    .plt_utils          import (plt_colorbar,
                                     plt_hist,
@@ -857,7 +858,7 @@ class lognflow:
                     dictionary, np.savez will be used. As you may know, np.save
                     can save all pickalables.
             :param suffix: str
-                    can be 'npz', 'npy', 'mat', 'torch' for pytorch models
+                    can be 'npz', 'npy', 'mat', 'pth' for pytorch models
                     or 'txt' or anything else which will save it as text.
                     This includes 'json', 'pdb', or ...
             :param mat_field: str
@@ -898,7 +899,7 @@ class lognflow:
                         mat_field = param_name
                 if(mat_field is not None):
                     savemat(fpath, {f'{mat_field}':parameter_value})
-            elif(suffix == 'torch'):
+            elif(suffix == 'pth'):
                 from torch import save as torch_save
                 torch_save(parameter_value, fpath)
             else:
@@ -1808,7 +1809,8 @@ class lognflow:
             return txt
 
     def _load(self, var_name, file_index = None, 
-                   suffix = None, read_func = None, verbose = False):
+                   suffix = None, read_func = None, verbose = False,
+                   return_collection = False):
         """ get a single variable
             return the value of a saved variable.
 
@@ -1825,6 +1827,9 @@ class lognflow:
                 supported.
             :param read_func:
                 a function that takes the Posix path and returns data
+            :param return_collection:
+                if True, then tries to read the text as if a list/dict/tuple had been
+                logged.
             .. note::
                 when reading a MATLAB file, the output is a dictionary.
                 Also when reading a npz except if it is made by log_var
@@ -1862,8 +1867,8 @@ class lognflow:
                     buf = np.load(var_path)
                     try: #check if it is made by log_var
                         assert len(buf.files) == 2
-                        time_array = buf['time_array']
-                        data_array = buf['data_array']
+                        time_array = buf['time']
+                        data_array = buf['data']
                         data_array = data_array[time_array > 0]
                         time_array = time_array[time_array > 0]
                         return((time_array, data_array), var_path)
@@ -1880,17 +1885,17 @@ class lognflow:
                 if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
                     from tifffile import imread as tifffile_imread
                     return(tifffile_imread(var_path), var_path)
-                if(var_path.suffix == '.torch'):      
+                if (var_path.suffix == '.pth'):
                     from torch import load as torch_load 
                     return(torch_load(var_path), var_path)
-                try:
+                try:    #png
                     img = mpl_imread(var_path)
                     return(img, var_path)
                 except: pass
-                # if( (var_path.suffix in ['.txt', '.pdb', '.json', '.fasta'])):
-                #     return(var_path.read_text(), var_path)
                 try:
                     txt = var_path.read_text(errors = 'ignore')
+                    if return_collection:
+                        txt = text_to_collection(txt)
                     return(txt, var_path)
                 except:
                     var_path = None
@@ -1904,7 +1909,7 @@ class lognflow:
     
     def load(self, var_name, file_index = -1, 
                    suffix = None, read_func = None, verbose = False,
-                   return_fpath = False):
+                   return_fpath = False, return_collection = False):
         """ get a single variable
             return the value of a saved variable.
 
@@ -1928,7 +1933,8 @@ class lognflow:
         self.assert_log_dir()
         get_single_data, fpath = self._load(
             var_name = var_name, file_index = file_index, suffix = suffix, 
-            read_func = read_func, verbose = verbose)   
+            read_func = read_func, verbose = verbose,
+            return_collection = return_collection)   
         if return_fpath:
             return get_single_data, fpath
         else:

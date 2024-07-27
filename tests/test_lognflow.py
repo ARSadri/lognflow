@@ -7,8 +7,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from lognflow import (
-    lognflow, printprogress, select_directory, text_to_object)
-from lognflow.utils import stacks_to_frames
+    lognflow, printprogress, select_directory)
+from lognflow.utils import stacks_to_frames, text_to_collection
 
 import tempfile
 temp_dir = tempfile.gettempdir()
@@ -25,7 +25,6 @@ def test_log_index():
     logger.save('testd', 'test7', time_tag = 'time_and_index')
     logger.save('testd', 'test8', time_tag = 'time_and_index')
     logger.save('testd', 'test9', time_tag = 'time_and_index')
-    
     
 def test_lognflow_conflict_in_names():
     logger = lognflow(temp_dir)
@@ -112,8 +111,7 @@ def test_record_without_time_stamp():
     logger('This is a test for lognflow and record')    
 
     for _ in range(10):
-        logger.save('vars/vec/v', np.random.rand(10000), 
-                       time_tag = False)
+        logger.save('vars/vec/v', np.random.rand(10000), time_tag = False)
         
 def test_log_animation():
     var1 = np.random.rand(32, 100, 100)
@@ -496,12 +494,28 @@ def test_depricated_logviewer():
     logger.save('test', 1)
     print(logger.logged.load('test*'))
 
+def test_log_list_dict_read_back():
+    logger = lognflow(temp_dir, time_tag = False)
+    logger('testing the save for list and dict')
+    try:
+        import torch
+        vec3 = torch.tensor([6,7,8])
+    except:
+        vec3 = np.array([6,7,8])
+    input_list = ['test', 2, np.array([[3],[4],[5]]), vec3, [9, 10, 11], {'a': 12, 'b': [13, 14, 15]}]
+    logger.save('var.txt', input_list)
+    var_readback = logger.load('var.txt', return_collection=True)
+    
+    for x, y in zip(input_list, var_readback): 
+        print(f'{x} --> {y}')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
     #tests about reading back
-    test_plot(); exit()
+    test_log_list_dict_read_back()
+    test_plot()
     test_save_matlab()
     test_save()
     test_scatter3()

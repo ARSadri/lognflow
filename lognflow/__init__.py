@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.12.7'
+__version__ = '0.12.8'
 
 from .lognflow import lognflow
 from .logviewer import logviewer
@@ -12,7 +12,7 @@ from .plt_utils import (
     plt_imhist, transform3D_viewer)
 from .utils import (
     select_directory, select_file, repr_raw, replace_all, 
-    is_builtin_collection, text_to_object, stack_to_frame, 
+    is_builtin_collection, text_to_collection, stack_to_frame, 
     stacks_to_frames, ssh_system)
 from .multiprocessor import multiprocessor
 from .loopprocessor import loopprocessor

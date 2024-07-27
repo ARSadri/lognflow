@@ -826,7 +826,8 @@ class transform3D_viewer:
 
     Attributes:
         in_pointcloud (numpy.ndarray): The input point cloud.
-        moving_inds (numpy.ndarray): Indices of points that can be transformed.
+        pt_cls (numpy.ndarray): there must be a class for each point.
+            class 0 is movable others will only have different colors
     """
     def __init__(self, in_pointcloud, pt_cls = None):
         error_msg = 'input point cloud must be Nx3, where N >= 3'
@@ -843,6 +844,16 @@ class transform3D_viewer:
             'at least 3 data points must have class 0'
         self.params = {}
         self.figure()
+        self.textboxevalues = np.array([
+            float(self.params["Tx_text_box"].text),
+            float(self.params["Ty_text_box"].text),
+            float(self.params["Tz_text_box"].text),
+            float(self.params["Sx_text_box"].text),
+            float(self.params["Sy_text_box"].text),
+            float(self.params["Sz_text_box"].text),
+            float(self.params["Rx_text_box"].text),
+            float(self.params["Ry_text_box"].text),
+            float(self.params["Rz_text_box"].text)])
 
     def figure(self):
         self.Theta_init, self.Vt_init = self.get_Theta(self.PC[self.moving_inds])
@@ -986,33 +997,72 @@ class transform3D_viewer:
             pass
 
     def update_from_text(self, text):
-        try:
-            # Read new transformation values
-            translation = np.array([float(self.params["Tx_text_box"].text),
-                                    float(self.params["Ty_text_box"].text),
-                                    float(self.params["Tz_text_box"].text)])
-            
-            new_S = np.diag([float(self.params["Sx_text_box"].text),
-                             float(self.params["Sy_text_box"].text),
-                             float(self.params["Sz_text_box"].text)])
-            
-            r = scipy_rotation.from_euler('xyz',
-                np.array([float(self.params["Rx_text_box"].text),
-                          float(self.params["Ry_text_box"].text),
-                          float(self.params["Rz_text_box"].text)]), degrees=True)
-            new_U = r.as_matrix()
-            
-            PC_transformed = (new_U @ new_S @ self.Vt_init).T + translation
-            
-            # Update the movable part of the point cloud
-            self.PC[self.moving_inds] = PC_transformed
-            
-            self.draw()
+        try: # Read new transformation values
+            self.textboxevalues = np.array([
+                float(self.params["Tx_text_box"].text),
+                float(self.params["Ty_text_box"].text),
+                float(self.params["Tz_text_box"].text),
+                float(self.params["Sx_text_box"].text),
+                float(self.params["Sy_text_box"].text),
+                float(self.params["Sz_text_box"].text),
+                float(self.params["Rx_text_box"].text),
+                float(self.params["Ry_text_box"].text),
+                float(self.params["Rz_text_box"].text)])
         except ValueError:
             pass
+            
+        translation = self.textboxevalues[:3].copy()
+        new_S = np.diag(self.textboxevalues[3:6].copy())
+        r = scipy_rotation.from_euler(
+            'xyz',self.textboxevalues[6:].copy(), degrees=True)
+        new_U = r.as_matrix()
+        PC_transformed = (new_U @ new_S @ self.Vt_init).T + translation
+        # Update the movable part of the point cloud
+        self.PC[self.moving_inds] = PC_transformed
+        
+        self.draw()
 
     def update_value(self, label, step_label, direction, event):
         current_val = float(self.params[f"{label}_text_box"].text)
         step_size = float(self.params[f"{step_label}_text_box"].text)
         new_val = current_val + direction * step_size
         self.params[f"{label}_text_box"].set_val(f"{new_val:.6f}")
+        
+class _questdiag:
+    def __init__(self,
+        question = '', 
+        figsize=(6, 2), 
+        buttons = {'Yes'    : True, 
+                   'No'     : False, 
+                   'Cancel' : None}):
+    
+        assert isinstance(buttons, dict), \
+            ('buttons arg must be a dictionary of texts appearing on '
+             'the buttons values to be returned.')
+        
+        self.buttons = buttons
+        
+        _, ax = plt.subplots(figsize=figsize)
+        plt.subplots_adjust(bottom=0.2) 
+    
+        ax.text(0.5, 0.75, question, ha='center', va='center', fontsize=12)
+        plt.axis('off')
+    
+        button_objects = []
+        for i, button_label in enumerate(buttons.keys()):
+            button_ax = plt.axes([0.1 + i * 0.3, 0.2, 0.2, 0.2]) 
+            button = Button(button_ax, button_label)
+            button.on_clicked(self.button_click)
+            button_objects.append(button)
+    
+        plt.show()
+    
+    def button_click(self, event):
+        ind = event.inaxes.texts[0].get_text()
+        self.result = self.buttons[ind]   # Return the corresponding output
+        plt.close()
+
+def question_dialog(
+    question = 'Yes/No/Cancel?', figsize=(6, 2), 
+    buttons = {'Yes' : True, 'No' : False, 'Cancel' : None}):
+    return _questdiag(question, figsize, buttons).result

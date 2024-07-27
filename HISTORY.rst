@@ -298,7 +298,16 @@ History
 -------------------
 * transform3D_viewer improved
 
-0.12.7 (2024-07-11)
+0.12.7 (2024-07-12)
 -------------------
 * some of the names of the funcitons are mroe accurate now
 * plot now takes arguments that plt.plot takes and a bug has been fixed there!
+
+0.12.8 (2024-07-27)
+-------------------
+* added question_dialog
+* bugs fixed in transform3D_viewer
+* suffix in load only sets the reader and does not disregard the current suffix
+* added support to load python collections including for text_collection
+* list, tuple or dict
+* np.array, torch.tensor
