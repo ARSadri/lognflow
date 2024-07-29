@@ -15,10 +15,9 @@ A simple program to use it would be similar to the following, if the root for al
 	logger = lognflow(r'c:\all_logs\\')
 	logger('This is a test for lognflow and save')
 	logger.save('data', data)
-
-You can also load a variable::
-	logger = lognflow(log_dir = r'c:\all_logs\\')
-	data = logger.load('data')
+	data = logger.load('data*.npy')
+	
+	logger.plot('data', data)
 
 Apart form lots of easy logging and loading functionalities, lognflow provides a very nice progress bar that does not make a mess in terminals that do not support \r::
 

@@ -23,18 +23,9 @@ A simple program to use ```lognflow``` would be similar to the following , if th
 	logger = lognflow(r'c:\all_logs\\')
 	logger('This is a test for lognflow and save')
 	logger.save('data', data)
+	data = logger.load('data*.npy')
+	logger.plot('data', data)
 	
-```
-You can also load a variable.
-
-```python 
-
-	from lognflow import logviewer
-	logged = logviewer(r'c:\all_logs\some_log\\')
-	data = logged.get_single('data')
-
-```
-
 Apart form lots of easy logging and loading functionalities, lognflow provides a very nice progress bar that does not make a mess in terminals that do not support \r::
 
 ```python 
