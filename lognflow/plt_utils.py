@@ -744,8 +744,8 @@ def imshow_series(list_of_stacks,
     return fig, None
 
 def imshow_by_subplots(
-        stack, grid_locations=None, frame_shape=None, 
-        titles=[], cmaps=[], colorbar=True, 
+        images, grid_locations=None, frame_shape = None, 
+        titles=[], cmaps=[], colorbar=True, margin = 0.025, inter_image_margin = 0.01,
         colorbar_aspect=2, colorbar_pad_fraction=0.05,
         figsize=None, remove_axis_ticks=True, **kwargs):
     """
@@ -753,11 +753,9 @@ def imshow_by_subplots(
     and colormaps.
     
     Parameters:
-    stack (list of 2D arrays): List of 2D images to plot.
+    images (list of 2D arrays): List of 2D images to plot.
     grid_locations (list of tuples or None): List of subplot grid_locations 
         in (rows, cols, index) format or None to generate a grid.
-    frame_shape (tuple of int or None): Shape of the grid (rows, cols) if 
-        grid_locations is None. Default is None.
     titles (list of str): List of titles for each image.
     cmaps (list of str): List of colormaps for each image.
     colorbar (bool): Whether to add a colorbar beside each image. 
@@ -769,55 +767,75 @@ def imshow_by_subplots(
     remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
     """
     try:
-        dims = stack.shape
+        dims = images.shape
         if len(dims) == 2:
             dims = [dims]
     except: pass
     
+    if colorbar:
+        margin = np.maximum(margin, 0.4)
+        inter_image_margin = np.maximum(margin, 0.4)
+    
+    N = len(images)
+    # Determine the maximum image size
+    max_width = max(img.shape[1] for img in images)
+    max_height = max(img.shape[0] for img in images)
+    
     if grid_locations is None:
-        N = len(stack)
         if frame_shape is None:
             cols = int(np.ceil(np.sqrt(N)))
             rows = int(np.ceil(N / cols))
-            frame_shape = (rows, cols)
-        grid_locations = [(frame_shape[0], frame_shape[1], i+1) for i in range(N)]
-    else:
-        rows = max(loc[0] for loc in grid_locations)
-        cols = max(loc[1] for loc in grid_locations)
-        frame_shape = (rows, cols)
-    
-    if figsize is None:
-        frame_shape = np.array(frame_shape)
-        figsize = 10 * frame_shape / frame_shape.max()
-    
-    fig = plt.figure(figsize=figsize)
-    # stack_shape_0 = [image.shape[0] for image in stack]
-    # image_blank_shape[0] = ...
-    for i, (image, location) in enumerate(zip(stack, grid_locations)):
-        ax = fig.add_subplot(location[0], location[1], location[2])
-        if image is None:
-            continue
-        if 'cmap' in kwargs:
-            cax = ax.imshow(image, **kwargs)
         else:
+            cols, rows = frame_shape
+            N = np.maximum(N, cols * rows)
+        
+        # Generate grid locations with dynamic spacing
+        spacing = max(max_width, max_height) * (1 + inter_image_margin)
+        grid_locations = np.array([[col * spacing, 1 - row * spacing] for row in range(rows) for col in range(cols)])
+        grid_locations = grid_locations[:N]  # Trim to number of images
+            
+    lefts = grid_locations[:, 0]
+    bottoms = grid_locations[:, 1]
+    rights = lefts + np.array([img.shape[1] for img in images])
+    tops = bottoms + np.array([img.shape[0] for img in images])
+    min_left = lefts.min() - margin * max_width
+    min_bottom = bottoms.min() - margin * max_height
+    max_right = rights.max() + margin * max_width
+    max_top = tops.max() + margin * max_height
+    lefts = (lefts - min_left) / (max_right - min_left)
+    bottoms = (bottoms - min_bottom) / (max_top - min_bottom)
+    rights = (rights - min_left) / (max_right - min_left)
+    tops = (tops - min_bottom) / (max_top - min_bottom)
+
+    fig = plt.figure()
+    for cnt in range(N):
+        gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
+                                          top=tops[cnt], bottom=bottoms[cnt])
+        ax = fig.add_subplot(gs[0])
+        image = images[cnt]
+        if image is not None:
+            if 'cmap' in kwargs:
+                cax = ax.imshow(image, **kwargs)
+            else:
+                try:
+                    _cmap = cmaps[i]
+                except:
+                    _cmap = None
+                cax = ax.imshow(image, cmap=_cmap, **kwargs)
+
             try:
-                _cmap = cmaps[i]
+                ax.set_title(titles[i])
             except:
-                _cmap = None
-            cax = ax.imshow(image, cmap=_cmap, **kwargs)
-        try:
-            ax.set_title(titles[i])
-        except:
-            pass
+                pass
+
+            if remove_axis_ticks:
+                ax.axis('off')    
+            if colorbar:
+                plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
+                             colorbar_pad_fraction=colorbar_pad_fraction)
         
-        if remove_axis_ticks:
-            ax.axis('off')
-        
-        if colorbar:
-            plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
-                         colorbar_pad_fraction=colorbar_pad_fraction)
-    
-    fig.tight_layout()
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    plt.margins(margin)
     return fig, ax
 
 class transform3D_viewer:
@@ -840,7 +858,7 @@ class transform3D_viewer:
             pt_cls = np.zeros(len(in_pointcloud), dtype='int')
         self.pt_cls = pt_cls
         self.moving_inds = np.where(self.pt_cls == 0)[0]
-        assert len(self.moving_inds) > 0, \
+        assert len(self.moving_inds) > 3, \
             'at least 3 data points must have class 0'
         self.params = {}
         self.figure()

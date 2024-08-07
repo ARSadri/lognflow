@@ -32,10 +32,10 @@ def test_multiprocessor():
     data = (10+100*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
     op_type = 'median'
-
+    shareables = (data, mask, op_type)
     stats = multiprocessor(multiprocessor_targetFunc, 
                            iterables = N,
-                           shareables = (data, mask, op_type),
+                           shareables = shareables,
                            verbose = True)
     results = []
     for cnt in range(N):
@@ -127,9 +127,13 @@ def test_error_handling_in_multiprocessor():
     print('             NOTE: IT SHOULD RAISE AN ERROR')
     print('             ------------------------------')
     
-    stats = multiprocessor(
-        error_multiprocessor_targetFunc, iterables, shareables,
-        verbose = True)
+    try:
+        stats = multiprocessor(
+            error_multiprocessor_targetFunc, iterables, shareables,
+            verbose = True)
+        raise
+    except:
+        print('Error has been raised')
     
 def noslice_multiprocessor_targetFunc(iterables_sliced, shareables):
     idx = iterables_sliced

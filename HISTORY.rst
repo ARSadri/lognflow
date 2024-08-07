@@ -311,3 +311,8 @@ History
 * added support to load python collections including for text_collection
 * list, tuple or dict
 * np.array, torch.tensor
+
+0.12.9 (2024-07-27)
+-------------------
+* more like logging
+* imshow_by_subplots is now fully functional

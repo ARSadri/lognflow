@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.12.8'
+__version__ = '0.12.9'
 
 from .lognflow import lognflow
 from .logviewer import logviewer
@@ -16,3 +16,7 @@ from .utils import (
     stacks_to_frames, ssh_system)
 from .multiprocessor import multiprocessor
 from .loopprocessor import loopprocessor
+
+getLogger = lognflow
+def basicConfig(*args, **kwargs):
+    ...

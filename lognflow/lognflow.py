@@ -36,6 +36,7 @@ before storing into the directory using log_var(name, var).
 
 """
 import  time
+import  inspect
 import  numpy                                   as np
 import  matplotlib.pyplot                       as plt
 from    matplotlib.pyplot   import imread       as mpl_imread
@@ -162,6 +163,13 @@ class lognflow:
         self.log_dir_prefix = log_dir_prefix
         self.log_dir_suffix = log_dir_suffix
         
+        frame = inspect.currentframe()
+        args, _, _, values = inspect.getargvalues(frame)
+        if 'time_tag' in values and values['time_tag'] is not None:
+            self._time_tag_provided = True
+        else:
+            self._time_tag_provided = False
+
         if(log_dir is None):
             if(logs_root is None):
                 logs_root = gettempdir()
@@ -230,6 +238,9 @@ class lognflow:
         self.get_var                = self.get_record
         self.get_torch_dict         = self.load_torch
 
+    def setLevel(self, level = 'info.txt'):
+        self.log_name = level
+        
     def assert_log_dir(self):
         if not self.log_dir.is_dir():
             print('~'*60)
@@ -1279,7 +1290,7 @@ class lognflow:
 
     def imshow_subplots(self, 
         parameter_name: str, 
-        stack: np.ndarray,
+        images: np.ndarray,
         frame_shape = None,
         grid_locations = None,
         figsize = None,
@@ -1306,7 +1317,7 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param stack: np.array
+            :param images: np.array
                     An np array of size n_f x n_r x n_c, to be shown by imshow
                     as a square tile of side length of n_ch**0.5
             :param frame_shape:
@@ -1323,7 +1334,7 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        fig, ax = imshow_by_subplots(stack = stack,
+        fig, ax = imshow_by_subplots(images = images,
                                      frame_shape = frame_shape, 
                                      grid_locations = grid_locations,
                                      figsize = figsize,

@@ -8,7 +8,7 @@ import numpy as np
 
 from lognflow import (lognflow, select_directory, 
                       logviewer, printprogress,
-                      text_to_object)
+                      text_to_collection)
 
 import tempfile
 temp_dir = tempfile.gettempdir()
@@ -103,7 +103,7 @@ def test_text_to_object():
         print('text read from the file:')
         print(txt)
         print('- '*30)
-        ext_obj = text_to_object(txt)
+        ext_obj = text_to_collection(txt)
         print(f'Extracted object is of type {type(ext_obj)}:')
         print(ext_obj)
 

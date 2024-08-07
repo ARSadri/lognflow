@@ -458,7 +458,7 @@ def test_text_to_object():
         print('text read from the file:')
         print(txt)
         print('- '*30)
-        ext_obj = text_to_object(txt)
+        ext_obj = text_to_collection(txt)
         print(f'Extracted object is of type {type(ext_obj)}:')
         print(ext_obj)
 
@@ -514,6 +514,8 @@ if __name__ == '__main__':
     temp_dir = select_directory()
     #---------------------------#
     #tests about reading back
+    test_imshow_subplots()
+
     test_log_list_dict_read_back()
     test_plot()
     test_save_matlab()
@@ -542,7 +544,6 @@ if __name__ == '__main__':
     test_imshow()
     test_copy_list_of_files()
     test_imshow_series()
-    test_imshow_subplots()
     test_imshow_complex()
     test_record()
     test_text()

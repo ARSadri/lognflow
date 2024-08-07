@@ -15,8 +15,10 @@ def test_transform3D_viewer():
     moving_inds = np.where((in_pointcloud[:, 0] > 0) & 
                            (in_pointcloud[:, 1] > 0) & 
                            (in_pointcloud[:, 2] > 0))[0]
+    points_classes = np.ones(len(in_pointcloud))
+    points_classes[moving_inds] = 0
     in_pointcloud2 = in_pointcloud[moving_inds].copy()
-    tp = transform3D_viewer(in_pointcloud, moving_inds)
+    tp = transform3D_viewer(in_pointcloud, points_classes)
     plt.show()
         
     in_pointcloud2_transformed = tp.apply(in_pointcloud2)
@@ -90,8 +92,16 @@ def test_imshow_series():
     plt.show()
 
 def test_imshow_by_subplots():
-    data = np.random.rand(16, 100, 100)
+    data = np.random.rand(15, 100, 100, 3)
+    lognflow.plt_utils.imshow_by_subplots(data, colorbar = False)
+
+    data = [np.random.rand(100, 100), np.random.rand(100, 150), np.random.rand(50, 100)]
     lognflow.plt_utils.imshow_by_subplots(data)
+
+    data = np.random.rand(15, 100, 100)
+    grid_locations = (np.random.rand(len(data), 2)*1000).astype('int')
+    lognflow.plt_utils.imshow_by_subplots(data, grid_locations = grid_locations)
+    
     plt.show()
 
 def test_plt_imshow():
@@ -154,11 +164,11 @@ def test_plt_imshow_complex():
     plt.show()
 
 if __name__ == '__main__':
-    test_transform3D_viewer()
+    test_transform3D_viewer(); exit()
+    test_imshow_by_subplots()
     test_plt_imhist()
     test_plt_imshow_complex()
     test_complex2hsv_colorbar()
-    test_imshow_by_subplots()
     test_plot_gaussian_gradient()
     test_plt_imshow()
     test_imshow_series()
