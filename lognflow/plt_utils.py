@@ -1,13 +1,14 @@
 import numpy as np
-from functools import partial
+from   functools import partial
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
-from matplotlib.colors import hsv_to_rgb
-from matplotlib.widgets import RangeSlider, TextBox, Button
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from scipy.spatial.transform import Rotation as scipy_rotation
-from .printprogress import printprogress
+from   matplotlib.colors import hsv_to_rgb
+from   matplotlib.widgets import RangeSlider, TextBox, Button
+from   mpl_toolkits.mplot3d import Axes3D
+from   mpl_toolkits.axes_grid1 import make_axes_locatable
+from   scipy.spatial.transform import Rotation as scipy_rotation
+from   .printprogress import printprogress
+from   itertools import cycle as itertools_cycle
 
 def complex2hsv(data_complex, vmin=None, vmax=None):
     """ complex2hsv
@@ -360,7 +361,7 @@ def plt_hist(vectors_list, fig_ax = None,
 
 def plt_scatter3(
         data_N_by_3, fig_ax = None, title = None, 
-        elev_list = None, azim_list = None,
+        elev_list = [20, 70], azim_list = np.arange(0, 360, 20),
         make_animation = False, **kwargs):
     assert (len(data_N_by_3.shape)==2) & (data_N_by_3.shape[1] == 3), \
         'The first argument must be N x 3'
@@ -376,27 +377,21 @@ def plt_scatter3(
     if title is not None:
             ax.set_title(title)
 
+    try: elev_list = [int(elev_list)]
+    except: pass
+    try: azim_list = [int(azim_list)]
+    except: pass
+
     if make_animation:
         stack = []
-        if elev_list is None:
-            elev_list = np.arange(0, 360, 45)
-        if azim_list is None:
-            azim_list = np.arange(0, 360, 45)
         for elev in elev_list:
             for azim in azim_list:
                 ax.view_init(elev=elev, azim=azim)
                 img = pltfig_to_numpy_3ch(fig)
                 stack.append(img)
         return fig, ax, stack
-    else:
-        if elev_list is None:
-            elev = None
-        else:
-            elev = elev_list[0]
-        if azim_list is None:
-            azim = None
-        else:
-            azim = azim_list[0]
+        elev = None if elev_list is None else elev_list[0]
+        azim = None if azim_list is None else azim_list[0]
         if (elev is not None) | (azim is not None):
             ax.view_init(elev=elev, azim=azim)
         return fig, ax
@@ -744,7 +739,7 @@ def imshow_series(list_of_stacks,
     return fig, None
 
 def imshow_by_subplots(
-        images, grid_locations=None, frame_shape = None, 
+        images, grid_locations=None, frame_shape = None, title = None,
         titles=[], cmaps=[], colorbar=True, margin = 0.025, inter_image_margin = 0.01,
         colorbar_aspect=2, colorbar_pad_fraction=0.05,
         figsize=None, remove_axis_ticks=True, **kwargs):
@@ -824,7 +819,7 @@ def imshow_by_subplots(
                 cax = ax.imshow(image, cmap=_cmap, **kwargs)
 
             try:
-                ax.set_title(titles[i])
+                ax.set_title(titles[cnt])
             except:
                 pass
 
@@ -833,7 +828,9 @@ def imshow_by_subplots(
             if colorbar:
                 plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
                              colorbar_pad_fraction=colorbar_pad_fraction)
-        
+    if title is not None:
+        fig.suptitle(title)
+    
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
     return fig, ax
@@ -919,6 +916,13 @@ class transform3D_viewer:
                             self.PC[self.pt_cls == cls_cnt, 1],
                             self.PC[self.pt_cls == cls_cnt, 2], 
                             label=f'cls_{cls_cnt}')
+        cls_values = np.unique(self.pt_cls)
+        if len(cls_values) > 1:
+            for cls_cnt in cls_values[:-1] :
+                self.ax.plot([self.PC[self.pt_cls == cls_cnt, 0][-1], self.PC[self.pt_cls == cls_cnt + 1, 0][0]],
+                             [self.PC[self.pt_cls == cls_cnt, 1][-1], self.PC[self.pt_cls == cls_cnt + 1, 1][0]],
+                             [self.PC[self.pt_cls == cls_cnt, 2][-1], self.PC[self.pt_cls == cls_cnt + 1, 2][0]], 
+                             color = 'black', linewidth = 2)
     
         # Calculate the bounding box for the moving_inds using SVD
         points = self.PC[self.moving_inds]
@@ -1045,7 +1049,7 @@ class transform3D_viewer:
         step_size = float(self.params[f"{step_label}_text_box"].text)
         new_val = current_val + direction * step_size
         self.params[f"{label}_text_box"].set_val(f"{new_val:.6f}")
-        
+                
 class _questdiag:
     def __init__(self,
         question = '', 
@@ -1084,3 +1088,46 @@ def question_dialog(
     question = 'Yes/No/Cancel?', figsize=(6, 2), 
     buttons = {'Yes' : True, 'No' : False, 'Cancel' : None}):
     return _questdiag(question, figsize, buttons).result
+
+matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
+    's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
+    '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
+
+def plot_marker(
+        coords, fig_ax=None, figsize=(2, 2),
+        marker=None, markersize = None, return_markersize = False):
+    """
+    Plots a grid of dots with a dynamic figure size to avoid overlap.
+    
+    Parameters:
+    - coords: numpy array of shape (N, 2), where each row is [x, y] coordinates
+    - fig_ax: 2-tuple of (fig, ax) or None; if None, a new figure and axis are created
+    - figsize: tuple of two floats, figure size in inches (width, height)
+    - marker: str, marker style (e.g., 'x', 'o', '.', etc.); if None, use the next marker in the cycle
+    - marker_sizer: float, the marker size
+    
+    Returns:
+    - 2-tuple of (fig, ax), and the markersize used for plotting
+    """
+    if fig_ax is None:
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        if figsize is None:
+            figsize = fig.get_size_inches()
+    else:
+        fig, ax = fig_ax
+    
+    if markersize is None:
+        markersize = 12 * min(figsize[0], figsize[1])/ len(coords)
+        markersize = np.maximum(markersize, 1)
+
+    if marker is None:
+        marker = next(matplotlib_lines_Line2D_markers_keys_cycle)
+    
+    ax.plot(coords[:, 0], coords[:, 1], 
+            marker=marker, markersize=markersize, linestyle='')
+
+    if return_markersize:
+        return fig, ax, markersize
+    else:
+        return fig, ax

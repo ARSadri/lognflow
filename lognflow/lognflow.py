@@ -1089,11 +1089,12 @@ class lognflow:
                      elev_list = None,
                      azim_list = None,
                      image_format='jpg', 
-                     dpi=1200,
+                     dpi=300,
                      title = None,
                      time_tag: bool = None, 
                      return_figure = False,
                      make_animation = False,
+                     log_animation_kwargs = {},
                      **kwargs):
         """log a single scatter in 3D
             Scatter plotting in 3D
@@ -1127,7 +1128,8 @@ class lognflow:
         if not return_figure:
             if make_animation:
                 self.log_animation(parameter_name, fig_ax_opt_stack[2], 
-                                   dpi=dpi, time_tag = time_tag) 
+                                   dpi=dpi, time_tag = time_tag,
+                                   **log_animation_kwargs) 
             else:
                 return self.log_plt(
                     parameter_name = parameter_name, 
@@ -1559,10 +1561,9 @@ class lognflow:
                 time_tag = time_tag)
         return fpath
 
-    def log_animation(self, parameter_name: str, stack, 
-                         interval=50, blit=False, 
-                         repeat_delay = None, dpi=100,
-                         time_tag: bool = None):
+    def log_animation(
+        self, parameter_name: str, stack, interval=50, blit=False, 
+        repeat_delay = None, dpi=100, time_tag: bool = None):
         
         """Make an animation from a stack of images
             
@@ -1590,14 +1591,16 @@ class lognflow:
             ax.axis('off')
             ims.append([im])
         ani = matplotlib_animation.ArtistAnimation(\
-            fig, ims, interval = interval, blit = blit,
-            repeat_delay = repeat_delay)
-
-        ani.save(fpath, dpi = dpi, 
-                 writer = matplotlib_animation.PillowWriter(
-                     fps=int(1000/interval)))
-        return fpath
-
+            fig, ims, interval = interval, blit = blit, repeat_delay = repeat_delay)
+        try:
+            ani.save(fpath, dpi = dpi, 
+                 writer = matplotlib_animation.PillowWriter(fps=int(1000/interval)))
+            return fpath
+        except Exception as e:
+            print('lognflow: cannot save the animation. Here is the unraised error:')
+            print(e)
+            print('-'*79)
+        
     def flush_all(self):
         if not self.enabled: return
         for log_name in list(self._loggers_dict):
@@ -1605,7 +1608,6 @@ class lognflow:
         for parameter_name in list(self._vars_dict):
             self.log_var_flush(parameter_name)
 
-    
     def savez(self, parameter_name: str, 
                     parameter_value,
                     time_tag: bool = None):

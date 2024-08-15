@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
-    transform3D_viewer)
+    transform3D_viewer, plot_marker)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -76,6 +76,18 @@ def test_plot_gaussian_gradient():
                   label = 'red',
                   mu_color = (0.75, 0, 0, 1),
                   mu_linewidth = 3)
+    
+    pgg = lognflow.plot_gaussian_gradient()
+    pgg.addPlot(x = x, mu = mu, std = std, 
+                  gradient_color = (1, 0, 0), 
+                  label = 'red',
+                  mu_color = (0.75, 0, 0, 1),
+                  mu_linewidth = 1)
+    pgg.addPlot(x = x, mu = 8 - mu, std = std, 
+                gradient_color = (0, 0, 1), 
+                label = 'red',
+                mu_color = (0, 0, 0.75, 1),
+                mu_linewidth = 1)    
     pgg.show()
 
 def test_pltfig_to_numpy():
@@ -163,13 +175,25 @@ def test_plt_imshow_complex():
     
     plt.show()
 
+def test_plot_marker():
+    coords = np.random.rand(1000, 2)*100
+    fig, ax, markersize = plot_marker(
+        coords, fig_ax=None, figsize=None,
+        markersize=None, return_markersize = True)
+    for cnt in range(23):
+        coords = np.array([np.arange(1 + 1*cnt,1+ 1*(cnt+1)), np.zeros(1)]).T
+        fig_ax = plot_marker(coords, fig_ax=(fig, ax), markersize=markersize)
+    
+    plt.show()
+
 if __name__ == '__main__':
-    test_transform3D_viewer(); exit()
+    test_plot_marker(); exit()
+    test_plot_gaussian_gradient()
+    test_transform3D_viewer()
     test_imshow_by_subplots()
     test_plt_imhist()
     test_plt_imshow_complex()
     test_complex2hsv_colorbar()
-    test_plot_gaussian_gradient()
     test_plt_imshow()
     test_imshow_series()
     test_numbers_as_images()

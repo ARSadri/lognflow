@@ -179,7 +179,10 @@ def test_scatter3():
     logger('This is a test for scatter3')    
     
     logger.scatter3('var3d', var3d.T)
-    logger.scatter3('var3d_animation', var3d.T, make_animation=True)
+    logger.scatter3('var3d_animation', var3d.T, make_animation=True,
+                    elev_list = [45],
+                    azim_list = np.arange(0, 360, 2),
+                    log_animation_kwargs = {'interval' : 100})
     
 def test_savefig():
     plt.imshow(np.random.rand(100, 100))
@@ -509,18 +512,20 @@ def test_log_list_dict_read_back():
     for x, y in zip(input_list, var_readback): 
         print(f'{x} --> {y}')
 
+def test_lognflow_here():
+    logger = lognflow(log_dir = './')
+    logger('test')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
-    #---------------------------#
-    #tests about reading back
-    test_imshow_subplots()
+    #===========================#
 
+    test_imshow_subplots()
     test_log_list_dict_read_back()
     test_plot()
     test_save_matlab()
     test_save()
-    test_scatter3()
     test_log_animation()
     test_savefig()
     test_hexbin()
@@ -554,3 +559,4 @@ if __name__ == '__main__':
     test_logger()
     test_log_flush_period()
     test_record_without_time_stamp()
+    test_scatter3()

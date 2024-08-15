@@ -316,3 +316,8 @@ History
 -------------------
 * more like logging
 * imshow_by_subplots is now fully functional
+
+0.12.10 (2024-08-10)
+-------------------
+* the 3D viewer transformer shows the connection between parts
+* the imshow_by_subplots had a bug that is fixed
