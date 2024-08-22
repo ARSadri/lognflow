@@ -505,7 +505,8 @@ def test_log_list_dict_read_back():
         vec3 = torch.tensor([6,7,8])
     except:
         vec3 = np.array([6,7,8])
-    input_list = ['test', 2, np.array([[3],[4],[5]]), vec3, [9, 10, 11], {'a': 12, 'b': [13, 14, 15]}]
+    input_list = ['test', 2, np.array([[3],[4],[5]]),
+                  vec3, [9, 10, 11], {'a': 12, 'b': [13, 14, 15]}]
     logger.save('var.txt', input_list)
     var_readback = logger.load('var.txt', return_collection=True)
     

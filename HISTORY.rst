@@ -321,3 +321,7 @@ History
 -------------------
 * the 3D viewer transformer shows the connection between parts
 * the imshow_by_subplots had a bug that is fixed
+
+0.12.11 (2024-08-10)
+-------------------
+* the bug in scatter3 without animation is fixed.

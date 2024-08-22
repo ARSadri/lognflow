@@ -20,12 +20,13 @@ A simple program to use ```lognflow``` would be similar to the following , if th
 	
 	data = np.random.rand(100)
 	
-	logger = lognflow(r'c:\all_logs\\')
-	logger('This is a test for lognflow and save')
+	logger = lognflow(r'c:\all_logs\\', time_tag = False)
+	logger('This is a test for lognflow save and load')
 	logger.save('data', data)
-	data = logger.load('data*.npy')
+	data = logger.load('data.npy')
 	logger.plot('data', data)
-	
+```
+
 Apart form lots of easy logging and loading functionalities, lognflow provides a very nice progress bar that does not make a mess in terminals that do not support \r::
 
 ```python 

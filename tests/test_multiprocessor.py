@@ -240,7 +240,27 @@ def test_multiprocessor_gen():
     
     print((results - results_mp).sum())
     print('-'*80)
-    
+
+"""
+def test_custom_parfor():
+    print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
+
+    N = 16
+    D = 1000000
+    data = (100+10*np.random.randn(N,D)).astype('int')
+    mask = (2*np.random.rand(N,D)).astype('int')
+
+    time_of_start = time.time()
+    results = np.zeros(N)
+    # for cnt in range(N):
+    @parfor(range(N))
+    def loop_func():
+        results[cnt] = np.median(data[cnt][mask[cnt]==1])
+    loop_func()
+    sp_period = time.time() - time_of_start
+    print(f'serial processing period: {sp_period}')
+"""
+ 
 if __name__ == '__main__':
     print('lets test', flush=True)
     test_simple_randgen()

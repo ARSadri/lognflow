@@ -1,17 +1,16 @@
 #from-import is necessary to speed up spawning in Windows as much as possible
-from numpy import __name__    as np___name__
-from numpy import array       as np_array
-from numpy import ndarray     as np_ndarray
-from numpy import ceil        as np_ceil
-from numpy import arange      as np_arange
-from numpy import zeros       as np_zeros
-from numpy import minimum     as np_minimum
-from numpy import concatenate as np_concatenate
-from numpy import argsort     as np_argsort
-from numpy import unique      as np_unique
+from numpy import __name__    as np___name__,\
+                  array       as np_array,\
+                  ndarray     as np_ndarray,\
+                  ceil        as np_ceil,\
+                  arange      as np_arange,\
+                  zeros       as np_zeros,\
+                  minimum     as np_minimum,\
+                  concatenate as np_concatenate,\
+                  argsort     as np_argsort,\
+                  unique      as np_unique
 
 from multiprocessing import Process, Queue, cpu_count, Event
-
 from .printprogress import printprogress
 from .utils import is_builtin_collection
 

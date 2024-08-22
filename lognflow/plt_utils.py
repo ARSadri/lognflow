@@ -390,6 +390,7 @@ def plt_scatter3(
                 img = pltfig_to_numpy_3ch(fig)
                 stack.append(img)
         return fig, ax, stack
+    else:
         elev = None if elev_list is None else elev_list[0]
         azim = None if azim_list is None else azim_list[0]
         if (elev is not None) | (azim is not None):

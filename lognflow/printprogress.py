@@ -16,6 +16,8 @@ class printprogress:
                  it, 
                  numTicks = 78,
                  title = None,
+                 desc = None,
+                 disable = False,
                  method = 'linear',
                  print_function = print,
                  **print_function_kwargs):
@@ -29,6 +31,8 @@ class printprogress:
             title : str 
                 The title of progress bar.
                 default: f'Progress bar for {n_steps} steps in {numTicks} ticks'
+            desc : str
+                it is the same as title used by tqdm
             print_function:
                 print_function must be callable with a string and should not add
                 \n to the its input.
@@ -44,7 +48,12 @@ class printprogress:
                 more options to come
         """
         assert method in ['linear', 'linear_robust']
-        
+        if desc is not None:
+            if title is not None:
+                assert desc == title, 'either give me title or desc' 
+            title = desc
+        if disable:
+            print_function = None
         try:
             n_steps = int(it)
             self.yielding_data = False
