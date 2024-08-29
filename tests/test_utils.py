@@ -31,13 +31,12 @@ def test_is_builtin_collection():
     test_tuple = (1, 2, 3)
     test_array = np.array([1, 2, 3])
     
-    print(lognflow.is_builtin_collection(test_list))  # Expected: True
-    print(lognflow.is_builtin_collection(test_string))  # Expected: False
-    print(lognflow.is_builtin_collection(test_dict))  # Expected: True
-    print(lognflow.is_builtin_collection(test_set))  # Expected: True
+    print(lognflow.is_builtin_collection(test_list))   # Expected: True
+    print(lognflow.is_builtin_collection(test_string)) # Expected: False
+    print(lognflow.is_builtin_collection(test_dict))   # Expected: True
+    print(lognflow.is_builtin_collection(test_set))    # Expected: True
     print(lognflow.is_builtin_collection(test_tuple))  # Expected: True
     print(lognflow.is_builtin_collection(test_array))  # Expected: False
-
 
 def test_ssh_system():
     try:
@@ -56,29 +55,23 @@ def test_printvar():
     lognflow.utils.printvar(test1)
     test2 = 123
     lognflow.utils.printvar(test2)
-    test3 = [1243, 'sadf', 21]
+    test3 = [1243, 'asdf', 21]
     lognflow.utils.printvar(test3)
 
 def test_save_or_load_kernel_state():
-    
-    # Example code that sets up some variables
     vec = np.random.rand(100)
     vec_orig = vec.copy()
-    another_variable = "Hello, World!"
+    another_variable = "Hello"
     
-    # Save the current state of the kernel (interpreter)
     current_kernel_state = lognflow.utils.save_or_load_kernel_state()
     
-    # Modify the variables
     vec = vec ** 2
-    another_variable = "Goodbye, World!"
+    another_variable = "Goodbye"
     
-    # Restore the previous state
     lognflow.utils.save_or_load_kernel_state(current_kernel_state)
     
-    # Check that the state has been restored
     assert (vec == vec_orig).all()
-    assert another_variable == "Hello, World!"
+    assert another_variable == "Hello"
     
     print("State restored successfully!")
 
@@ -87,7 +80,7 @@ def test_Pyrunner():
     Pyrunner(Path('./test_pyrunner_code.py'), logger = print)
 
 if __name__ == '__main__':
-    test_Pyrunner();exit()
+    test_Pyrunner()
     test_printvar()
     test_is_builtin_collection()
     test_stack_to_frame()

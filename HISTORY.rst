@@ -326,8 +326,12 @@ History
 -------------------
 * the bug in scatter3 without animation is fixed.
 
-0.12.12 (2024-09-01)
+0.12.12 (2024-09-08)
 -------------------
 * log_dir assertion only throws a warning
 * printvar try 1.
 * pyrunner try 1. is added
+
+0.12.12 (2024-09-08)
+-------------------
+* critical error removed

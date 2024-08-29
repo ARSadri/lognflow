@@ -385,7 +385,10 @@ class Pyrunner:
 
         show_and_ask_result = question_dialog(
             question='Choose a cell number', figsize=figsize, buttons=buttons)
-        if show_and_ask_result == str(show_and_ask_result):
+        if show_and_ask_result is None:
+            self.logger(f'pyrunner: closing reloads, press Exit to close.')
+            return
+        elif show_and_ask_result == str(show_and_ask_result):
             if show_and_ask_result == 'exit':
                 self.exit = True
                 return
@@ -407,7 +410,6 @@ class Pyrunner:
                 self.saved_state.pop(key)
                 self.logger(f'Deleted state: {key}')
                 return
-
         elif show_and_ask_result == int(show_and_ask_result):
             globals_['pyrunner_code'] = pyrunner_code
             globals_['pyrunner_cell_no'] = show_and_ask_result
