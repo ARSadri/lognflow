@@ -3,7 +3,6 @@ import time
 import inspect
 import pathlib
 import numpy as np
-import dill as pickle
 from pathlib import Path
 from .plt_utils import question_dialog
 
@@ -13,22 +12,29 @@ def is_builtin_collection(obj):
     """
     Determine if an object is a strictly built-in Python collection.
     
-    This function uses a heuristic based on the object type's module being either 'builtins',
-    'collections', or 'collections.abc', excluding strings and bytes explicitly, to identify
-    if the given object is a built-in collection type (list, tuple, dict, set). It checks if the
-    object belongs to one of Python's built-in collection modules and possesses both __len__ and
+    This function uses a heuristic based on the object 
+    type's module being either 'builtins',
+    'collections', or 'collections.abc', excluding 
+    strings and bytes explicitly, to identify
+    if the given object is a built-in collection 
+    type (list, tuple, dict, set). It checks if the
+    object belongs to one of Python's built-in 
+    collection modules and possesses both __len__ and
     __iter__ methods, which are typical characteristics of collections.
     
     Args:
         obj: The object to be checked.
     
     Returns:
-        bool: True if the object is a built-in Python collection (excluding strings and bytes),
+        bool: True if the object is a built-in Python 
+        collection (excluding strings and bytes),
               False otherwise.
     
     Note:
-        This function aims to exclude objects from external libraries (e.g., NumPy arrays) that,
-        while iterable and having a __len__ method, are not considered built-in Python collections.
+        This function aims to exclude objects from external 
+        libraries (e.g., NumPy arrays) that,
+        while iterable and having a __len__ method, 
+        are not considered built-in Python collections.
     """
     obj_type = type(obj)
     module = obj_type.__module__
@@ -134,7 +140,8 @@ def text_to_collection(text):
         if isinstance(node, ast.List):
             return [parse_node(elem) for elem in node.elts]
         elif isinstance(node, ast.Dict):
-            return {parse_node(key): parse_node(value) for key, value in zip(node.keys, node.values)}
+            return {parse_node(key): parse_node(value) 
+                    for key, value in zip(node.keys, node.values)}
         elif isinstance(node, ast.Constant):
             return node.value
         elif isinstance(node, ast.Num):  # For Python < 3.8
@@ -252,7 +259,8 @@ class ssh_system:
         import paramiko
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh_client.connect(hostname=hostname, username=username, password=password)
+        self.ssh_client.connect(
+            hostname=hostname, username=username, password=password)
         self.sftp_client = self.ssh_client.open_sftp()
 
     def ssh_ls(self, path: Path):
@@ -354,6 +362,7 @@ class Pyrunner:
             self.logger_(toprint)
 
     def save_or_load_kernel_state(self, globals_, saved_state = None):
+        import dill as pickle
         if saved_state is None:
             return pickle.dumps(
                 {k: v for k, v in globals_.items() 
