@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.12.11'
+__version__ = '0.12.12'
 
 from .lognflow import lognflow
 from .logviewer import logviewer
@@ -13,10 +13,10 @@ from .plt_utils import (
 from .utils import (
     select_directory, select_file, repr_raw, replace_all, 
     is_builtin_collection, text_to_collection, stack_to_frame, 
-    stacks_to_frames, ssh_system)
+    stacks_to_frames, ssh_system, printvar)
 from .multiprocessor import multiprocessor
 from .loopprocessor import loopprocessor
-
+from .pyrunner import Pyrunner
 getLogger = lognflow
 def basicConfig(*args, **kwargs):
     ...

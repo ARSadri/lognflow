@@ -1057,24 +1057,47 @@ class _questdiag:
         figsize=(6, 2), 
         buttons = {'Yes'    : True, 
                    'No'     : False, 
-                   'Cancel' : None}):
+                   'Cancel' : None},
+        row_spacing=0.05):
     
         assert isinstance(buttons, dict), \
             ('buttons arg must be a dictionary of texts appearing on '
              'the buttons values to be returned.')
         
         self.buttons = buttons
-        
+        self.result = None
         _, ax = plt.subplots(figsize=figsize)
         plt.subplots_adjust(bottom=0.2) 
     
-        ax.text(0.5, 0.75, question, ha='center', va='center', fontsize=12)
+        ax.text(0.5, 0.85, question, ha='center', va='center', fontsize=12)
         plt.axis('off')
+    
+        # Calculate grid size
+        N = len(buttons)
+        n_rows = int(np.ceil(N ** 0.5))
+        n_clms = int(np.ceil(N / n_rows))
+
+        # Button size and position
+        button_width = 0.8 / n_clms
+        button_height = 0.3 / n_rows
+        horizontal_spacing = (1 - button_width * n_clms) / (n_clms + 1)
+        vertical_spacing = (0.2 - button_height * n_rows) / (n_rows + 1)
+
+        # Adjust vertical_spacing to add more space between rows
+        vertical_spacing += row_spacing
     
         button_objects = []
         for i, button_label in enumerate(buttons.keys()):
-            button_ax = plt.axes([0.1 + i * 0.3, 0.2, 0.2, 0.2]) 
-            button = Button(button_ax, button_label)
+            row = i // n_clms
+            col = i % n_clms
+
+            button_ax = plt.axes([
+                horizontal_spacing + col * (button_width + horizontal_spacing),
+                0.2 + (n_rows - row - 1) * (button_height + vertical_spacing),  # Start from top
+                button_width,
+                button_height
+            ])
+            button = Button(button_ax, str(button_label))
             button.on_clicked(self.button_click)
             button_objects.append(button)
     
@@ -1132,3 +1155,51 @@ def plot_marker(
         return fig, ax, markersize
     else:
         return fig, ax
+    
+def plt_contours(Z_list, fig_ax=None, levels=10, colors_list=None, 
+                 linestyles_list=None, title=None):
+    """
+    Plot contours of multiple surfaces overlaid on the same plot.
+    
+    Parameters:
+    - Z_list: List of 2D arrays representing the surface heights at each 
+              grid point.
+    - fig_ax: Tuple (fig, ax) where fig is the figure and ax is the axes.
+              If None, creates a new figure and axes.
+    - levels: Number of contour levels for all surfaces.
+    - colors_list: List of colors for the contours of each surface. 
+                   If None, defaults to a colormap.
+    - linestyles_list: List of line styles for the contours of each surface. 
+                If None, defaults to a pattern.
+    - title: Optional title for the plot.
+    """
+    
+    # Create figure and axes if not provided
+    if fig_ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig, ax = fig_ax
+    
+    # Default colors and linestyles if not provided
+    if colors_list is None:
+        colors_list = plt.cm.hsv(np.linspace(0, 1, len(Z_list)))
+    if linestyles_list is None:
+        linestyles_list = ['dashed', 'solid'] * (len(Z_list) // 2 + 1)
+    
+    # Plot contours for each surface in Z_list
+    for i, Z in enumerate(Z_list):
+        Y, X = np.meshgrid(np.arange(Z.shape[0]), np.arange(Z.shape[1]))
+        
+        color = colors_list[i % len(colors_list)]
+        linestyle = linestyles_list[i % len(linestyles_list)]
+        
+        contour = ax.contour(X, Y, Z, levels=levels, colors=color, 
+                             linestyles=linestyle)
+        
+        # Add labels to contours
+        ax.clabel(contour, inline=True, fontsize=8, fmt='%.2f')
+        
+    if title is not None:
+        ax.set_title(title)
+    
+    return fig, ax

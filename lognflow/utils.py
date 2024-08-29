@@ -1,5 +1,11 @@
-from re import sub as re_sub
+import re
+import time
+import inspect
+import pathlib
 import numpy as np
+import dill as pickle
+from pathlib import Path
+from .plt_utils import question_dialog
 
 def dummy_function(*args, **kwargs): ...
 
@@ -106,7 +112,6 @@ def select_file():
         It works for windows and Linux using PyQt5.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication
-    from pathlib import Path
     _ = QApplication([])
     fpath = QFileDialog.getOpenFileName()
     fpath = Path(fpath[0])
@@ -243,20 +248,167 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
                            borders = borders) for stack in stack_list])
 	
 class ssh_system:
-	def __init__(self, hostname, username, password):
-		import paramiko
-		self.ssh_client = paramiko.SSHClient()
-		self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-		self.ssh_client.connect(hostname = hostname, 
-						   username = username,
-						   password = password)
-	
-	def ssh_ls(self, path):
-		stdin, stdout, stderr = self.ssh_client.exec_command(
-            'ls ' + str(path))
-		ls_result = stdout.readlines()
-		return ls_result
-		
-	def ssh_scp(self, source, destination):
-		...
-        
+    def __init__(self, hostname, username, password):
+        import paramiko
+        self.ssh_client = paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh_client.connect(hostname=hostname, username=username, password=password)
+        self.sftp_client = self.ssh_client.open_sftp()
+
+    def ssh_ls(self, path: Path):
+        stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
+        ls_result = stdout.readlines()
+        return [path / file.strip() for file in ls_result]
+
+    def ssh_scp(self, source: Path, destination: Path):
+        self.sftp_client.get(str(source), str(destination))
+
+    def ssh_rm(self, path: Path):
+        stdin, stdout, stderr = self.ssh_client.exec_command(f'rm {path}')
+        return stdout.read(), stderr.read()
+
+    def monitor_and_move(
+            self, remote_folder: Path, local_folder: Path, 
+            target_fname: str, interval=30):
+        # Wait until the interesting file appears in the remote folder
+        interesting_file_path = remote_folder / target_fname
+        cnt = 0
+        while not self.is_file(interesting_file_path):
+            if (cnt % 100) == 0:
+                print(f'Waiting for {interesting_file_path}', end = '')
+            else:
+                print('.')
+            time.sleep(interval)
+            cnt += 1
+        print('')
+        # Once the file appears, start processing the other files
+        print(f"{target_fname} found! Starting file transfer and deletion.")
+        files = self.ssh_ls(remote_folder)
+        for file in files:
+            local_file = local_folder / file.name
+            
+            # Copy file to local folder
+            print(f"Copying {file} to {local_file}")
+            self.ssh_scp(file, local_file)
+            
+            # Delete file from remote server
+            print(f"Deleting {file} from remote server")
+            self.ssh_rm(file)
+
+    def is_file(self, path: Path):
+        stdin, stdout, stderr = self.ssh_client.exec_command(
+            f'test -f {path} && echo "exists"')
+        return "exists" in stdout.read().decode()
+
+    def close_connection(self):
+        self.sftp_client.close()
+        self.ssh_client.close()
+
+def printvar(var):
+    # Get the name of the variable passed to the function
+    frame = inspect.currentframe().f_back
+    var_name = [name for name, value in frame.f_locals.items() if value is var]
+    
+    # Ensure that var_name is not empty
+    if var_name:
+        var_name = var_name[0]
+    else:
+        var_name = 'variable'
+
+    is_array = True
+    toprint = f'{type(var).__name__} {var_name}:'
+    try:
+        toprint += f'shape={var.shape} dtype={var.dtype}'
+    except: 
+        is_array = False
+    try:
+        toprint += f'device={var.device}'
+    except: pass
+    if not is_array:
+        toprint += str(var)
+    # Print the information
+    print(toprint)
+
+class Pyrunner:
+    def __init__(self, fpath, logger = None):
+        """ Jupyter like runner for Python
+        """ 
+        self.logger_ = logger
+        self.fpath = Path(fpath)
+        assert self.fpath.is_file()
+        self.log = ''
+        self.logger(f'file: {fpath}')
+        self.saved_state = {}
+        self.exit = False
+        while not self.exit:        
+            show_and_ask_result = self.show(globals())
+            if show_and_ask_result is None:
+                continue
+            globals().update(show_and_ask_result)
+            exec(pyrunner_code, globals())
+
+    def logger(self, toprint, end = '\n'):
+        toprint = str(toprint) + end
+        self.log += toprint
+        if self.logger_ is not None:
+            self.logger_(toprint)
+
+    def save_or_load_kernel_state(self, globals_, saved_state = None):
+        if saved_state is None:
+            return pickle.dumps(
+                {k: v for k, v in globals_.items() 
+                    if not k.startswith('__') and not callable(v)})
+        else:
+            globals_.update(pickle.loads(saved_state))
+
+    @property
+    def n_saves(self):
+        return len(self.saved_state.keys())
+
+    def show(self, globals_, figsize = (3, 2)) -> (str, int):
+        pyrunner_code = open(self.fpath).read()
+        pattern = r"if\s+pyrunner_cell_no\s*==\s*(\d+):"
+        matches = re.findall(pattern, pyrunner_code)
+        if len(matches) == 0:
+            print(f'Running the pyrunner_code in {self.fpath}')
+            print('No blocks found that checks pyrunner_cell_no')
+        pyrunner_cell_nos = sorted(set(int(num) for num in matches))
+        buttons = {}
+        for pyrunner_cell_no in pyrunner_cell_nos:
+            buttons[f'{pyrunner_cell_no}'] = pyrunner_cell_no
+        for key in self.saved_state:
+            buttons[f'load_{key}'] = f'load_{key}'
+        for key in self.saved_state:
+            buttons[f'del_{key}'] = f'del_{key}'
+        buttons[f'save_{self.n_saves + 1}'] = f'save_{self.n_saves + 1}'
+        buttons['exit'] = 'exit'
+
+        show_and_ask_result = question_dialog(
+            question='Choose a cell number', figsize=figsize, buttons=buttons)
+        if show_and_ask_result == str(show_and_ask_result):
+            if show_and_ask_result == 'exit':
+                self.exit = True
+                return
+
+            elif 'save' in show_and_ask_result:
+                key = show_and_ask_result.split('save_')[1]
+                self.saved_state[key] = self.save_or_load_kernel_state(globals_)
+                self.logger(f'saved state: {key}')
+                return
+
+            elif 'load' in show_and_ask_result:
+                key = show_and_ask_result.split('load_')[1]
+                self.save_or_load_kernel_state(globals_, self.saved_state[key])
+                self.logger(f'Loaded state: {key}')
+                return
+
+            elif 'del' in show_and_ask_result:
+                key = show_and_ask_result.split('del_')[1]
+                self.saved_state.pop(key)
+                self.logger(f'Deleted state: {key}')
+                return
+
+        elif show_and_ask_result == int(show_and_ask_result):
+            globals_['pyrunner_code'] = pyrunner_code
+            globals_['pyrunner_cell_no'] = show_and_ask_result
+            return globals_

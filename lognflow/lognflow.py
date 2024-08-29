@@ -243,10 +243,10 @@ class lognflow:
         
     def assert_log_dir(self):
         if not self.log_dir.is_dir():
-            print('~'*60)
+            print('~'*30, 'WARNING', '~'*30)
             if self.log_dir_provided:
                 print(f'lognflow.logdir: No such directory: ')
-                print(self.log_dir)
+                print({self.log_dir})
             elif self.logs_root.is_dir():
                 self.log_dir = self.logs_root
                 print('lognflow Warning: You read from the provided logs_root:')
@@ -257,9 +257,9 @@ class lognflow:
             else:
                 print('You should provide log_dir when initializing lognflow '
                       'if you wish to read the stored data first as follows:')
-                print(f'logger = lognflow(log_dir = pathlib.Path(STORAGE_DIR)')
-            print('~'*60)
-            assert self.log_dir.is_dir()
+                print(f'logger = lognflow(log_dir = LOG_DIR_PATH')
+            print('~'*67)
+            return False
 
     def disable(self):
         self.enabled = False
