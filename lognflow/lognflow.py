@@ -139,12 +139,13 @@ class lognflow:
         :param time_tag:
             File names can carry time_tags in time.time() format or indices. This 
             is pretty much the most fundamental contribution of lognflow beside
-            carrying the folders and files paths around. By default all file names
-            will stop having time tag if you set it here to False. Otherwise,
-            all file names will have time tag unless given argument at each logging 
-            function sets it to False. It can also be a string. options are 'index'
-            or 'time_and_index'. If you use indexer, instead of time
-            stamps, it will simple put an index that counts up after each logging.
+            carrying the folders and files paths around. By default it is True but
+            all file names will not have time tags if you set it to False or
+            if you don't mention it and create logs with same name, Otherwise,
+            you can give time_tag argument for all logger functions, all of which
+            set it to the default here by default. It can also be a string. options
+            are 'index' or 'time_and_index'. If you use index, instead of time
+            stamps, it will simply put an index that counts up after each logging.
         :type time_tag: bool
     """
     
@@ -159,10 +160,10 @@ class lognflow:
                  main_log_name    : str              = 'log',
                  log_flush_period : int              = 10):
         self._init_time = time.time()
-        self.time_tag = time_tag
         self.log_dir_prefix = log_dir_prefix
         self.log_dir_suffix = log_dir_suffix
         
+        self.time_tag = time_tag
         frame = inspect.currentframe()
         args, _, _, values = inspect.getargvalues(frame)
         if 'time_tag' in values and values['time_tag'] is not None:
@@ -216,8 +217,9 @@ class lognflow:
         self.log_dir_str = str(self.log_dir.absolute())
         self.enabled = True
         self.counted_vars = {}
+        self.param_name_set = set()
         
-        #all depricated
+        #all depricated and will be removed in a few revisions
         self.log_text               = self.text
         self.log_text_flush         = self.text_flush
         self.log_var                = self.record
@@ -233,10 +235,10 @@ class lognflow:
         self.log_images_in_pdf      = self.images_to_pdf
         self.log_plt                = self.savefig
         self.log_torch_dict         = self.save_torch
+        self.get_torch_dict         = self.load_torch
         self.log_single             = self.save
         self.get_single             = self.load
         self.get_var                = self.get_record
-        self.get_torch_dict         = self.load_torch
 
     def setLevel(self, level = 'info.txt'):
         self.log_name = level
@@ -439,7 +441,7 @@ class lognflow:
             else:
                 param_name = parameter_name_split[-1]
                 param_dir = '/'.join(parameter_name_split[:-1])
-        
+
         if(suffix == 'mat'):
             if(len(param_name) == 0):
                 param_dir_split = param_dir.split('/')
@@ -469,7 +471,12 @@ class lognflow:
     def _get_fpath(self, param_dir: pathlib_Path, param_name: str = None, 
                    suffix: str = None, time_tag: bool = None) -> pathlib_Path:
         
-        time_tag = self.time_tag if (time_tag is None) else time_tag
+        if time_tag is None:
+            if self._time_tag_provided:
+                time_tag = self.time_tag
+            elif param_name in self.param_name_set:
+                time_tag = True 
+
         assert isinstance(time_tag, (bool, str)), \
             'Argument time_tag must be a boolean or a string.'
 
@@ -494,9 +501,9 @@ class lognflow:
         
         if(not _param_dir.is_dir()):
             _param_dir.mkdir(parents = True, exist_ok = True)
-        if self.logged is None:
-            self.logged = logviewer(self.log_dir, self)
-            
+        
+        self.param_name_set.add(param_name)
+        
         if(param_name is not None):
             if(len(param_name) > 0):
                 if(index_tag):
@@ -527,7 +534,7 @@ class lognflow:
             log_dirnamesuffix = log_dirnamesuffix + '.' + suffix
         return log_dirnamesuffix
             
-    def _log_text_handler(self, log_name: str, 
+    def _text_handler(self, log_name: str, 
                          log_size_limit: int = int(1e+7),
                          time_tag: bool = None,
                          log_flush_period = None,
@@ -556,7 +563,7 @@ class lognflow:
         """ Flush the text logs
             Writing text to open(file, 'a') does not constantly happen on HDD.
             There is an OS buffer in between. This funciton should be called
-            regularly. lognflow calls it once in a while when log_text is
+            regularly. lognflow calls it once in a while when text is
             called multiple times. but use needs to also call it once in a
             while.
             In later versions, a timer will be used to call it automatically.
@@ -650,7 +657,7 @@ class lognflow:
             param_dir, param_name, suffix)
 
         if ( (not (log_dirnamesuffix in self._loggers_dict)) or new_file):
-            self._log_text_handler(log_dirnamesuffix, 
+            self._text_handler(log_dirnamesuffix, 
                                    log_size_limit = log_size_limit,
                                    time_tag = time_tag,
                                    suffix = suffix)
@@ -685,10 +692,10 @@ class lognflow:
             log_size += len(_logger_el)
         curr_textinlog.log_size += log_size
         
-        self.log_text_flush(log_dirnamesuffix, flush)        
+        self.text_flush(log_dirnamesuffix, flush)        
 
         if(log_size >= curr_textinlog.log_size_limit):
-            self._log_text_handler(
+            self._text_handler(
                 log_dirnamesuffix, 
                 log_size_limit = curr_textinlog.log_size_limit,
                 time_tag = curr_textinlog.time_tag,
@@ -754,7 +761,7 @@ class lognflow:
             curr_index = 0
 
         if(curr_index >= log_counter_limit):
-            self.log_var_flush(log_dirnamesuffix)
+            self.record_flush(log_dirnamesuffix)
             file_start_time = self.time_stamp
             curr_index = 0
 
@@ -1024,7 +1031,7 @@ class lognflow:
             ax.set_title(title)
             
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
@@ -1075,7 +1082,7 @@ class lognflow:
         if title is not None:
             ax.set_title(title)
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
@@ -1120,7 +1127,7 @@ class lognflow:
             if data_N_by_3.shape[1] != 3:
                 data_N_by_3 = data_N_by_3.T
                 self.text(
-                    None, 'lognflow.log_scatter3> input dataset is transposed.')
+                    None, 'lognflow.scatter3> input dataset is transposed.')
         fig_ax_opt_stack = plt_scatter3(data_N_by_3, title = title,
                      elev_list = elev_list, azim_list = azim_list,
                      make_animation = make_animation, **kwargs)
@@ -1131,7 +1138,7 @@ class lognflow:
                                    dpi=dpi, time_tag = time_tag,
                                    **log_animation_kwargs) 
             else:
-                return self.log_plt(
+                return self.savefig(
                     parameter_name = parameter_name, 
                     image_format = image_format, dpi=dpi,
                     time_tag = time_tag)
@@ -1164,7 +1171,7 @@ class lognflow:
             ax.set_title(title)
             
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
@@ -1201,7 +1208,7 @@ class lognflow:
             ax.set_title(title)
             
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
                     time_tag = time_tag)
@@ -1276,7 +1283,7 @@ class lognflow:
                        **kwargs)
                 
             if not return_figure:
-                fpath = self.log_plt(
+                fpath = self.savefig(
                         parameter_name = parameter_name, 
                         image_format=image_format, dpi=dpi,
                         time_tag = time_tag)
@@ -1347,7 +1354,7 @@ class lognflow:
                                      **kwargs)
                 
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
                     time_tag = time_tag)
@@ -1428,7 +1435,7 @@ class lognflow:
                                 transpose = transpose)
             
         if not return_figure:
-            fpath = self.log_plt(
+            fpath = self.savefig(
                     parameter_name = parameter_name, 
                     image_format=image_format, dpi=dpi,
                     time_tag = time_tag)
@@ -1555,7 +1562,7 @@ class lognflow:
         plt.title(title)
         plt.colorbar(im, fraction=0.046, pad=0.04)
         
-        fpath = self.log_plt(
+        fpath = self.savefig(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
                 time_tag = time_tag)
@@ -1595,8 +1602,10 @@ class lognflow:
         try:
             ani.save(fpath, dpi = dpi, 
                  writer = matplotlib_animation.PillowWriter(fps=int(1000/interval)))
+            plt.close()
             return fpath
         except Exception as e:
+            plt.close()
             print('lognflow: cannot save the animation. Here is the unraised error:')
             print(e)
             print('-'*79)
@@ -1604,9 +1613,9 @@ class lognflow:
     def flush_all(self):
         if not self.enabled: return
         for log_name in list(self._loggers_dict):
-            self.log_text_flush(log_name, flush = True)
+            self.text_flush(log_name, flush = True)
         for parameter_name in list(self._vars_dict):
-            self.log_var_flush(parameter_name)
+            self.record_flush(parameter_name)
 
     def savez(self, parameter_name: str, 
                     parameter_value,
@@ -1660,7 +1669,7 @@ class lognflow:
         for fpath in flist:
             if fpath.is_file():
                 vname = self.name_from_file(fpath)
-                out = self.logged.get_single(vname)
+                out = self.logged.load(vname)
                 return torch.from_numpy(out).cuda()
             if fpath.is_dir():
                 fpath_str = str(fpath.absolute())
@@ -1845,7 +1854,7 @@ class lognflow:
                 logged.
             .. note::
                 when reading a MATLAB file, the output is a dictionary.
-                Also when reading a npz except if it is made by log_var
+                Also when reading a npz except if it is made by record
         """
         self.assert_log_dir()
         assert file_index == int(file_index), \
@@ -1878,7 +1887,7 @@ class lognflow:
                     return (read_func(var_path), var_path)
                 if(var_path.suffix == '.npz'):
                     buf = np.load(var_path)
-                    try: #check if it is made by log_var
+                    try: #check if it is made by record
                         assert len(buf.files) == 2
                         time_array = buf['time']
                         data_array = buf['data']
@@ -1941,17 +1950,17 @@ class lognflow:
                 a function that takes the Posix path and returns data
             .. note::
                 when reading a MATLAB file, the output is a dictionary.
-                Also when reading a npz except if it is made by log_var
+                Also when reading a npz except if it is made by record
         """
         self.assert_log_dir()
-        get_single_data, fpath = self._load(
+        loaded_data, fpath = self._load(
             var_name = var_name, file_index = file_index, suffix = suffix, 
             read_func = read_func, verbose = verbose,
             return_collection = return_collection)   
         if return_fpath:
-            return get_single_data, fpath
+            return loaded_data, fpath
         else:
-            return get_single_data
+            return loaded_data
         
     def get_stack_from_files(self, 
         var_name = None, flist = [], suffix = None, read_func = None,
@@ -2044,7 +2053,7 @@ class lognflow:
             images_flist = self.get_flist(name)
             if images_flist:
                 for file_index in range(len(images_flist)):
-                    data, fpath = self.get_single(
+                    data, fpath = self.load(
                         name, file_index = file_index,
                         read_func = read_func, return_fpath = True)
                     if data is not None:
@@ -2108,3 +2117,5 @@ class lognflow:
 
     def __bool__(self):
         return self.log_dir.is_dir()
+
+getLogger = lognflow

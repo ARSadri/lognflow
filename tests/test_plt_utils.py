@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
-    transform3D_viewer, plot_marker)
+    transform3D_viewer, plot_marker, plt_contours)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -70,14 +70,14 @@ def test_plot_gaussian_gradient():
     mu = x**2
     std = mu**0.5
 
-    pgg = lognflow.plot_gaussian_gradient()
+    pgg = lognflow.plt_utils.plot_gaussian_gradient()
     pgg.addPlot(x = x, mu = mu, std = std, 
                   gradient_color = (1, 0, 0), 
                   label = 'red',
                   mu_color = (0.75, 0, 0, 1),
                   mu_linewidth = 3)
     
-    pgg = lognflow.plot_gaussian_gradient()
+    pgg = lognflow.plt_utils.plot_gaussian_gradient()
     pgg.addPlot(x = x, mu = mu, std = std, 
                   gradient_color = (1, 0, 0), 
                   label = 'red',
@@ -90,10 +90,10 @@ def test_plot_gaussian_gradient():
                 mu_linewidth = 1)    
     pgg.show()
 
-def test_pltfig_to_numpy():
+def test_plt_fig_to_numpy():
     fig, ax = plt.subplots(111)
     ax[0].imshow(np.random.rand(100, 100))
-    np_data = lognflow.plt_utils.pltfig_to_numpy(fig)
+    np_data = lognflow.plt_utils.plt_fig_to_numpy(fig)
     print(np_data.shape)
     plt.close()
 
@@ -169,7 +169,7 @@ def test_plt_imshow_complex():
             ax.text(j - 7+0.5, -i + 7+0.5, f'({comx[i, j]}, {comy[i, j]})', ha='center', va='center', fontsize=8, color='white')
     
     # Create and plot the color disc as an inset
-    fig, ax_inset = complex2hsv_colorbar((fig, ax.inset_axes([0.78, 0.08, 0.18, 0.18], transform=ax.transAxes)),
+    fig, ax_inset = complex2hsv_colorbar((fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], transform=ax.transAxes)),
                                          vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
     ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
     
@@ -186,15 +186,23 @@ def test_plot_marker():
     
     plt.show()
 
+def test_plt_contours():
+    yy, xx = np.meshgrid(np.arange(100), np.arange(50))
+    Z_list = [np.exp(- ((xx-15)**2 + (yy-30)**2)**0.5 / 18), 
+              np.exp(- ((xx-35)**2 + (yy-70)**2)**0.5 / 18) ]
+    plt_contours(Z_list)
+    plt.show()
+
 if __name__ == '__main__':
-    test_plot_marker(); exit()
+    test_plt_contours()
+    test_plt_imshow_complex()
+    test_complex2hsv_colorbar()
+    test_plot_marker()
     test_plot_gaussian_gradient()
     test_transform3D_viewer()
     test_imshow_by_subplots()
     test_plt_imhist()
-    test_plt_imshow_complex()
-    test_complex2hsv_colorbar()
     test_plt_imshow()
     test_imshow_series()
     test_numbers_as_images()
-    test_pltfig_to_numpy()
+    test_plt_fig_to_numpy()

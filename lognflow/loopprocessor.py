@@ -1,3 +1,4 @@
+#depricated file
 from multiprocessing import Process, Queue, cpu_count, Event
 from numpy import __name__    as np___name__
 from numpy import array       as np_array

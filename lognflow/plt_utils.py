@@ -10,6 +10,10 @@ from   scipy.spatial.transform import Rotation as scipy_rotation
 from   .printprogress import printprogress
 from   itertools import cycle as itertools_cycle
 
+matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
+    's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
+    '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
+
 def complex2hsv(data_complex, vmin=None, vmax=None):
     """ complex2hsv
         Routine to visualise complex array as 2D image with color conveying
@@ -32,6 +36,82 @@ def complex2hsv(data_complex, vmin=None, vmax=None):
     H[:, :, 2] = sat
 
     return hsv_to_rgb(H), data_abs, data_angle
+
+def plt_hist2(data, bins=30, cmap='viridis', 
+              xlabel=None, ylabel=None, zlabel=None, title=None, 
+              colorbar=True, fig_ax=None, colorbar_label=None):
+    """
+    Plot a 3D histogram with a cmap based on the height of the bars.
+
+    Parameters:
+    data (array-like): N x 2 array of (x, y) points.
+    bins (int): Number of bins in each dimension.
+    cmap (str): Name of the matplotlib colormap to use.
+    xlabel (str): Label for the x-axis.
+    ylabel (str): Label for the y-axis.
+    zlabel (str): Label for the z-axis.
+    title (str): Title of the plot.
+    colorbar (bool): Whether to show a colorbar.
+    fig_ax (tuple): Optional tuple (fig, ax) to plot on.
+    colorbar_label (str): Label for the colorbar.
+
+    Returns:
+    tuple: (fig, ax) - The figure and axis objects.
+    """
+    
+    assert data.shape[1] == 2, "Data must have shape (N, 2)"
+    
+    # Get the 2D histogram data (counts) and the bin edges
+    counts, x_edges, y_edges = np.histogram2d(data[:, 0], data[:, 1], bins=bins)
+
+    # Create meshgrid for the bin edges
+    x_pos, y_pos = np.meshgrid(x_edges[:-1] + 0.5 * (x_edges[1] - x_edges[0]),
+                               y_edges[:-1] + 0.5 * (y_edges[1] - y_edges[0]))
+    x_pos = x_pos.ravel()
+    y_pos = y_pos.ravel()
+    z_pos = np.zeros_like(x_pos)
+
+    # The size of the bars in X and Y directions
+    dx = dy = (x_edges[1] - x_edges[0])  # Same width for all bars
+    dz = counts.ravel()  # The height of each bar is the count
+
+    # Normalize dz (bar heights) to the range [0, 1] for the cmap
+    norm_dz = dz / dz.max() if dz.max() > 0 else dz  # Avoid division by zero
+
+    # Get a colormap based on the normalized dz values
+    colors = plt.cm.get_cmap(cmap)(norm_dz)
+
+    # Create the figure and 3D axis
+    if fig_ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig, ax = fig_ax
+    
+    if use_bars:
+        # Plot the bars with colors based on dz values
+        bars = ax.bar3d(x_pos, y_pos, z_pos, dx, dy, dz, 
+                        color=colors, edgecolor=colors, alpha=1)
+    else:
+        im = ax.imshow(...)
+    # Adjust viewing angle for better visibility
+    # ax.view_init(elev=20, azim=30)  # Adjust the elevation and azimuthal angles as needed
+
+    # Labels and title
+    if xlabel is not None: ax.set_xlabel(xlabel)
+    if ylabel is not None: ax.set_ylabel(ylabel)
+    if zlabel is not None: ax.set_zlabel(zlabel)
+    if title  is not None: ax.set_title(title)
+    
+    if colorbar:
+        # Add a color bar to show the mapping between dz values and the cmap
+        mappable = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=dz.min(), vmax=dz.max()))
+        mappable.set_array([])  # Only necessary for some versions of matplotlib
+        cbar = plt.colorbar(mappable, ax=ax)
+        if colorbar_label is not None:
+            cbar.set_label(colorbar_label)
+
+    return fig, ax
 
 def complex2hsv_colorbar(
         fig_and_ax=None, vmin=0, vmax=1, 
@@ -287,7 +367,7 @@ def plt_imshow(img,
             if(colorbar):
                 # Create and plot the color disc as an inset
                 fig, ax_inset = complex2hsv_colorbar(
-                    (fig, ax.inset_axes([0.78, 0.08, 0.18, 0.18], 
+                    (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], 
                                         transform=ax.transAxes)),
                     vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
                 ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
@@ -387,7 +467,7 @@ def plt_scatter3(
         for elev in elev_list:
             for azim in azim_list:
                 ax.view_init(elev=elev, azim=azim)
-                img = pltfig_to_numpy_3ch(fig)
+                img = plt_fig_to_numpy_3ch(fig)
                 stack.append(img)
         return fig, ax, stack
     else:
@@ -411,7 +491,7 @@ def plt_surface(stack, fig_ax = None, **kwargs):
     ax.plot_surface(X, Y, stack, **kwargs)
     return fig, ax
 
-def pltfig_to_numpy_3ch(fig):
+def plt_fig_to_numpy_3ch(fig):
     """Convert a matplotlib figure to a numpy 2D array (RGB)."""
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
@@ -420,7 +500,7 @@ def pltfig_to_numpy_3ch(fig):
     buf = np.copy(buf)  # Ensure we have a copy, not a view
     return buf
 
-def pltfig_to_numpy(fig):
+def plt_fig_to_numpy(fig):
     """ from https://www.icare.univ-lille.fr/how-to-
                     convert-a-matplotlib-figure-to-a-numpy-array-or-a-pil-image/
     """
@@ -470,7 +550,7 @@ def numbers_as_images_3D(data3D_shape: tuple,
         ax.text(text_loc[0], text_loc[1],
                 number_text, fontsize = fontsize)
         ax.axis('off')
-        buf = pltfig_to_numpy(fig)
+        buf = plt_fig_to_numpy(fig)
         plt.close()
         dataset[ind_x] = buf.copy()
         if(verbose):
@@ -525,7 +605,7 @@ def numbers_as_images_4D(data4D_shape: tuple,
             ax.imshow(mat, cmap = 'gray', vmin = 0, vmax = 1)
             ax.text(text_loc[0], text_loc[1], number_text, fontsize = fontsize)
             ax.axis('off')
-            buf = pltfig_to_numpy(fig)
+            buf = plt_fig_to_numpy(fig)
             plt.close()
             dataset[ind_x, ind_y] = buf.copy()
             if(verbose):
@@ -1113,10 +1193,6 @@ def question_dialog(
     buttons = {'Yes' : True, 'No' : False, 'Cancel' : None}):
     return _questdiag(question, figsize, buttons).result
 
-matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
-    's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
-    '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
-
 def plot_marker(
         coords, fig_ax=None, figsize=(2, 2),
         marker=None, markersize = None, return_markersize = False):
@@ -1156,7 +1232,7 @@ def plot_marker(
     else:
         return fig, ax
     
-def plt_contours(Z_list, fig_ax=None, levels=10, colors_list=None, 
+def plt_contours(Z_list, X_Y = None, fig_ax=None, levels=10, colors_list=None, 
                  linestyles_list=None, title=None):
     """
     Plot contours of multiple surfaces overlaid on the same plot.
@@ -1164,6 +1240,7 @@ def plt_contours(Z_list, fig_ax=None, levels=10, colors_list=None,
     Parameters:
     - Z_list: List of 2D arrays representing the surface heights at each 
               grid point.
+    - X_Y: tuple where the (X, Y) describe the meshgrid over which Z is defined
     - fig_ax: Tuple (fig, ax) where fig is the figure and ax is the axes.
               If None, creates a new figure and axes.
     - levels: Number of contour levels for all surfaces.
@@ -1182,19 +1259,20 @@ def plt_contours(Z_list, fig_ax=None, levels=10, colors_list=None,
     
     # Default colors and linestyles if not provided
     if colors_list is None:
-        colors_list = plt.cm.hsv(np.linspace(0, 1, len(Z_list)))
+        colors_list = plt.cm.jet(np.linspace(0, 1, len(Z_list)))
     if linestyles_list is None:
         linestyles_list = ['dashed', 'solid'] * (len(Z_list) // 2 + 1)
     
     # Plot contours for each surface in Z_list
     for i, Z in enumerate(Z_list):
-        Y, X = np.meshgrid(np.arange(Z.shape[0]), np.arange(Z.shape[1]))
-        
+        if X_Y is None:
+            Y, X = np.meshgrid(np.arange(Z.shape[1]), np.arange(Z.shape[0]))
+        else:
+            X, Y = X_Y
         color = colors_list[i % len(colors_list)]
         linestyle = linestyles_list[i % len(linestyles_list)]
         
-        contour = ax.contour(X, Y, Z, levels=levels, colors=color, 
-                             linestyles=linestyle)
+        contour = ax.contour(X, Y, Z, levels=levels, colors=[color],linestyles=linestyle)
         
         # Add labels to contours
         ax.clabel(contour, inline=True, fontsize=8, fmt='%.2f')

@@ -332,10 +332,17 @@ History
 * printvar try 1.
 * pyrunner try 1. is added
 
-0.12.12 (2024-08-29)
+0.12.13 (2024-08-29)
 -------------------
 * critical error removed
 
-0.12.12 (2024-08-30)
+0.12.14 (2024-08-30)
 -------------------
 * removed dependency on dill
+
+0.12.15 (2024-09-12)
+-------------------
+* added contour_overlayed
+* moved loopprocessor to multiprocessor
+* added printv
+* added plot_marker

@@ -44,6 +44,11 @@ def is_builtin_collection(obj):
         return False
     return hasattr(obj, '__len__') and hasattr(obj, '__iter__')
 
+def assure_is_collection(returned_obj):
+    if not is_builtin_collection(returned_obj):
+        return [returned_obj]
+    return returned_obj
+
 def name_from_file(log_dir, fpath):
     """ 
         Given an fpath inside the logger log_dir, 
@@ -312,7 +317,7 @@ class ssh_system:
         self.sftp_client.close()
         self.ssh_client.close()
 
-def printvar(var):
+def printv(var):
     # Get the name of the variable passed to the function
     frame = inspect.currentframe().f_back
     var_name = [name for name, value in frame.f_locals.items() if value is var]
