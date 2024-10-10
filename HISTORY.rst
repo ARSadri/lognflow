@@ -346,3 +346,11 @@ History
 * moved loopprocessor to multiprocessor
 * added printv
 * added plot_marker
+
+0.12.16 (2024-09-10)
+-------------------
+* added plt_confusion_matrix
+* changed the name of imshow_series and imshow_by_subplots and plot_marker
+* plot_marker is plt_mark
+* fixes for plt_utils
+* all tests passed!

@@ -7,20 +7,6 @@ import matplotlib.pyplot as plt
 import lognflow
 import numpy as np
 
-def test_stack_to_frame():
-   data4d = np.random.rand(25, 32, 32, 3)
-   img = lognflow.stack_to_frame(data4d, borders = np.nan)
-   plt.figure()
-   plt.imshow(img)
-   
-   data4d = np.random.rand(32, 32, 16, 16, 3)
-   stack = data4d.reshape(-1, *data4d.shape[2:])
-   frame = lognflow.stack_to_frame(stack, borders = np.nan)
-   plt.figure()
-   im = plt.imshow(frame)
-   lognflow.plt_colorbar(im)
-   plt.show()
-
 def test_is_builtin_collection():
 
     # Test the function with various types
@@ -45,7 +31,7 @@ def test_ssh_system():
         remote_dir = Path('/remote/folder/path')
         local_dir = Path('/local/folder/path')
         target_fname = 'intresting_file.log'
-        ssh.monitor_and_move(remote_dir, local_dir, target_fname)
+        ssh.monitor_and_remove(remote_dir, local_dir, target_fname)
         ssh.close_connection()
     except:
         print('SSH test not passed maybe because you did not set the credentials.')
@@ -76,12 +62,11 @@ def test_save_or_load_kernel_state():
     print("State restored successfully!")
 
 def test_Pyrunner():
-    from lognflow import Pyrunner
+    from lognflow.utils import Pyrunner
     Pyrunner(Path('./test_pyrunner_code.py'), logger = print)
 
 if __name__ == '__main__':
-    test_Pyrunner()
     test_printv()
+    test_Pyrunner()
     test_is_builtin_collection()
-    test_stack_to_frame()
     test_ssh_system()

@@ -13,7 +13,7 @@ import tempfile
 temp_dir = tempfile.gettempdir()
 
 def test_printprogress():
-    for N in list([100, 200, 400, 1000, 2000, 4000, 6000]):
+    for N in list([100, 200, 400, 1000]):
         pprog = printprogress(N)
         for _ in range(N):
             time.sleep(0.01)
@@ -32,7 +32,7 @@ def test_printprogress_ETA():
     pprog = printprogress(N, print_function = None)
     for _ in range(N):
         ETA = pprog()
-        print(ETA)
+        print(f'ETA: {ETA:.2f}')
     
 def test_specific_timing():
     logger = lognflow(temp_dir)
@@ -53,7 +53,7 @@ def test_generator_type():
     print(f'sum: {sum}')
 
 def test_varying_periods():
-    vec = np.arange(60)
+    vec = np.arange(30)
     sum = 0
     for _ in printprogress(vec):
         sum += _

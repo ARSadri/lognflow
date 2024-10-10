@@ -1,5 +1,5 @@
-from lognflow import multiprocessor, loopprocessor, printprogress
-from lognflow.multiprocessor import multiprocessor_gen
+from lognflow import multiprocessor, printprogress
+from lognflow.multiprocessor import multiprocessor_gen, loopprocessor
 import numpy as np
 import inspect
 import time
@@ -132,8 +132,9 @@ def test_error_handling_in_multiprocessor():
             error_multiprocessor_targetFunc, iterables, shareables,
             verbose = True)
         raise
-    except:
+    except Exception as e:
         print('Error has been raised')
+        print(e)
     
 def noslice_multiprocessor_targetFunc(iterables_sliced, shareables):
     idx = iterables_sliced
@@ -159,9 +160,6 @@ def test_noslice_multiprocessor():
     
     stats = multiprocessor(
         noslice_multiprocessor_targetFunc, iterables, shareables, verbose = True)
-
-
-############################################
 
 def compute(data, mask):
     for _ in range(400):
@@ -227,12 +225,6 @@ def test_multiprocessor_gen():
         results_mp, IDs = arrivals
         print(IDs)
     results_mp = results_mp[0]
-
-    # results_mp = [arrivals[0] 
-    #               for arrivals in multiprocessor_gen(compute_arg_scatterer,
-    #                                    iterables = (data, mask), 
-    #                                    shareables = None,
-    #                                    verbose = True)]
 
     results = np.zeros(N)
     for cnt in printprogress(range(N)):

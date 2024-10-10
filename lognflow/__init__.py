@@ -5,15 +5,15 @@ __email__ = 'arsadri@gmail.com'
 __version__ = '0.12.15'
 
 from .lognflow import lognflow, getLogger
-from .logviewer import logviewer
 from .printprogress import printprogress
-from .plt_utils import (
-    plt_colorbar, plt_imshow, plt_violinplot, plt_imhist, transform3D_viewer)
-from .utils import (
-    select_directory, select_file, repr_raw, replace_all, 
-    is_builtin_collection, text_to_collection, stack_to_frame, 
-    stacks_to_frames, ssh_system, printv, Pyrunner)
-from .multiprocessor import multiprocessor, loopprocessor
+from .plt_utils import plt_imshow, plt_imhist, plt_hist2
+from .utils import (select_directory, 
+                    select_file, 
+                    is_builtin_collection, 
+                    text_to_collection, 
+                    printv)
+
+from .multiprocessor import multiprocessor
 
 def basicConfig(*args, **kwargs):
     ...

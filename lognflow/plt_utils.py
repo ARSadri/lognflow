@@ -9,6 +9,7 @@ from   mpl_toolkits.axes_grid1 import make_axes_locatable
 from   scipy.spatial.transform import Rotation as scipy_rotation
 from   .printprogress import printprogress
 from   itertools import cycle as itertools_cycle
+from   itertools import product as itertools_product
 
 matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
     's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
@@ -36,6 +37,93 @@ def complex2hsv(data_complex, vmin=None, vmax=None):
     H[:, :, 2] = sat
 
     return hsv_to_rgb(H), data_abs, data_angle
+
+def stack_to_frame(stack, frame_shape : tuple = None, borders = 0):
+    """ turn a stack of images into a 2D frame of images
+        This is very useful when lots of images need to be tiled
+        against each other.
+    
+        Note: if the last dimension is 3, all images are RGB, if you don't wish that
+        you have to add another dimension at the end by np.expand_dim(arr, axis = -1)
+    
+        :param stack: np.ndarray
+                It must have the shape of either
+                n_im x n_r x n_c
+                n_im x n_r x  3  x  1
+                n_im x n_r x n_c x  3
+                
+            In all cases n_im will be turned into a frame
+            Remember if you have N images to put into a square, the input
+            shape should be 1 x n_r x n_c x N
+        :param frame_shape: tuple
+            The shape of the frame to put n_rows and n_colmnss of images
+            close to each other to form a rectangle of image.
+        :param borders: literal or np.inf or np.nan
+            When plotting images with matplotlib.pyplot.imshow, there
+            needs to be a border between them. This is the value for the 
+            border elements.
+            
+        output
+        ---------
+            Since we have N channels to be laid into a square, the side
+            length would be ceil(N**0.5) if frame_shape is not given.
+            it produces an np.array of shape n_f x n_r * f_r x n_c * f_c or
+            n_f x n_r * f_r x n_c * f_c x 3 in case of an RGB input.
+    """
+    is_rgb = stack.shape[-1] == 3
+    
+    if(len(stack.shape) == 4):
+        if((stack.shape[2] == 3) & (stack.shape[3] == 1)):
+            stack = stack[..., 0]
+    
+    n_im, n_R, n_C = stack.shape[:3]
+        
+    if(len(stack.shape) == 4):
+        assert is_rgb, 'For a stack of images with axis 3, it should be 1 or 3.'
+
+    assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
+        f'The stack you provided can have specific shapes. it is {stack.shape}'
+
+    if(frame_shape is None):
+        square_side = int(np.ceil(np.sqrt(n_im)))
+        frame_n_r, frame_n_c = (square_side, square_side)
+    else:
+        frame_n_r, frame_n_c = frame_shape
+    n_R += 2
+    n_C += 2
+    new_n_R = n_R * frame_n_r
+    new_n_C = n_C * frame_n_c
+
+    if is_rgb:
+        frame = np.zeros((new_n_R, new_n_C, 3), dtype = stack.dtype)
+    else:
+        frame = np.zeros((new_n_R, new_n_C), dtype = stack.dtype)
+    used_ch_cnt = 0
+    if(borders is not None):
+        frame += borders
+    for rcnt in range(frame_n_r):
+        for ccnt in range(frame_n_c):
+            ch_cnt = rcnt + frame_n_c*ccnt
+            if (ch_cnt<n_im):
+                frame[rcnt*n_R + 1: (rcnt + 1)*n_R - 1,
+                      ccnt*n_C + 1: (ccnt + 1)*n_C - 1] = \
+                    stack[used_ch_cnt]
+                used_ch_cnt += 1
+    return frame
+
+def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
+    """ turn a list of stack of images into a list of frame of images
+        This is simply a list of calling stack_to_frame
+        :param stack_list:
+            It must have the shape of either
+            n_f x n_im x n_r x n_c
+            n_f x n_im x n_r x  3  x 1
+            n_f x n_im x n_r x n_c x 3
+
+    """    
+    return np.array([stack_to_frame(stack, 
+                                    frame_shape = frame_shape, 
+                                    borders = borders) for stack in stack_list])
 
 def plt_hist2(data, bins=30, cmap='viridis', 
               xlabel=None, ylabel=None, zlabel=None, title=None, 
@@ -110,6 +198,51 @@ def plt_hist2(data, bins=30, cmap='viridis',
         cbar = plt.colorbar(mappable, ax=ax)
         if colorbar_label is not None:
             cbar.set_label(colorbar_label)
+
+    return fig, ax
+
+def plt_confusion_matrix(cm, 
+        target_names=None, title='Confusion Matrix', cmap=None, figsize=None):
+    """
+    This function plots a confusion matrix and returns the figure and axis.
+    Parameters:
+    - cm: Confusion matrix
+    - target_names: List of target names (default: None)
+    - title: Title of the plot (default: 'Confusion Matrix')
+    - cmap: Colormap (default: None)
+    - figsize: Size of the figure (default: None)
+    Returns:
+    - fig: Figure object
+    - ax: Axis object
+    """
+    accuracy = np.trace(cm) / np.sum(cm).astype('float')
+    misclass = 1 - accuracy
+
+    if figsize is None:
+        figsize = np.ceil(cm.shape[0]/3)
+
+    if target_names is None:
+        target_names = [chr(x + 65) for x in range(cm.shape[0])]
+
+    if cmap is None:
+        cmap = plt.get_cmap('Blues')
+
+    fig, ax = plt.subplots(figsize=(4*figsize, 4*figsize))
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+
+    tick_marks = np.arange(len(target_names))
+    ax.set_xticks(tick_marks)
+    ax.set_xticklabels(target_names, rotation=45)
+    ax.set_yticks(tick_marks)
+    ax.set_yticklabels(target_names)
+    for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
+        clr = np.array([1, 1, 1, 0]) * (cm[i, j] - cm.min()) / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
+        ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr)
+
+    ax.set_ylabel('True label')
+    ax.set_xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}')
+    ax.set_title(title)
+    fig.colorbar(im, fraction=0.046, pad=0.04)
 
     return fig, ax
 
@@ -321,25 +454,84 @@ class plt_imhist:
             pass
         
 def plt_imshow(img, 
+               fig_ax = None,
                colorbar = True, 
                remove_axis_ticks = False, 
                title = None, 
                cmap = None,
                angle_cmap = None,
                portrait = None,
-               complex_type = 'abs_angle',
                **kwargs):
+    """
+    Display an image or a complex-valued image using matplotlib's imshow.
+
+    This function can handle real images and complex-valued data, allowing for
+    visualization of magnitude and phase. The function provides options for 
+    displaying a colorbar, removing axis ticks, and setting titles. If the input 
+    image is complex, it will be represented in either RGB or separate real and 
+    imaginary components.
+
+    Parameters:
+    ----------
+    img : array_like
+        The image data to be displayed. This can be a 2D array for real images or 
+        a 2D complex array for complex-valued data.
+        
+    fig_ax : tuple, optional
+        A tuple containing a figure and an axis to plot on. If None, a new figure 
+        and axis will be created.
+        
+    colorbar : bool, optional
+        Whether to display a colorbar alongside the image. Default is True.
+        
+    remove_axis_ticks : bool, optional
+        Whether to remove ticks from the axes. Default is False.
+        
+    title : str, optional
+        A title to be displayed above the figure. Default is None.
+        
+    cmap : str, optional
+        The colormap to be used for displaying the image. Default is None.
+        to get real and imag part separately for a xomplex image, use 
+        cmap = 'complex_real_imag', if you don't provide the cmap, it will show
+        the abs and angle part of the image separately.
+        
+    angle_cmap : str, optional
+        The colormap to be used for displaying the angle of complex numbers. 
+        Default is twilight_shifted. 
+        
+    portrait : bool, optional
+        If True, the figure will be set up in portrait mode. If None, the function 
+        will automatically determine the orientation based on the window dimensions.
+        
+    **kwargs : keyword arguments
+        Additional keyword arguments passed to `imshow`, such as `vmin`, `vmax`, 
+        etc.
+
+    Returns: 2-tuple
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object containing the displayed image(s).
+        
+    ax : matplotlib.axes.Axes or list of Axes
+        The axes object(s) containing the displayed image(s). If the image is 
+        complex and displayed as two separate plots, a list of axes will be returned.
+    """
+    
     vmin = kwargs['vmin'] if 'vmin' in kwargs else None
     vmax = kwargs['vmax'] if 'vmax' in kwargs else None
     if(not np.iscomplexobj(img)):
-        fig, ax = plt.subplots()
+        if fig_ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig, ax = fig_ax
         im = ax.imshow(img, cmap = cmap, **kwargs)
         if(colorbar):
             plt_colorbar(im)
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
     else:
-        if (cmap == 'complex') | (complex_type == 'complex'):
+        if (cmap == 'complex'):
             # Convert complex data to RGB
                 
             complex_image, data_abs, data_angle = complex2hsv(
@@ -359,7 +551,10 @@ def plt_imshow(img,
                 max_angle = 0
         
             # Plot the complex image
-            fig, ax = plt.subplots()
+            if fig_ax is None:
+                fig, ax = plt.subplots()
+            else:
+                fig, ax = fig_ax
             im = ax.imshow(complex_image)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
@@ -372,7 +567,12 @@ def plt_imshow(img,
                     vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
                 ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
         else:
-            fig = plt.figure()
+            
+            if fig_ax is None:
+                fig = plt.figure()
+            else:
+                fig, _ = fig_ax
+            
             window = plt.get_current_fig_manager().window
             if (window.height() > window.width()) & (portrait is None):
                 portrait = True
@@ -381,7 +581,25 @@ def plt_imshow(img,
             else:
                 ax = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
             
-            if complex_type == 'abs_angle':
+            complex_real_imag = False
+            if cmap is not None:
+                if 'real_imag' in cmap:
+                    complex_real_imag = True
+            if complex_real_imag:
+                cmap = cmap.split('real_imag')[0]
+                if len(cmap) == 0: cmap = None
+                else: cmap = cmap[:-1]
+                if angle_cmap is None:
+                    angle_cmap = cmap
+                im = ax[0].imshow(np.real(img), cmap = cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[0].set_title('real')
+                im = ax[1].imshow(np.imag(img), cmap = angle_cmap, **kwargs)
+                if(colorbar):
+                    plt_colorbar(im)
+                ax[1].set_title('imag')
+            else:
                 im = ax[0].imshow(np.abs(img), cmap = cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
@@ -392,16 +610,7 @@ def plt_imshow(img,
                 if(colorbar):
                     plt_colorbar(im)
                 ax[1].set_title('angle')
-            elif complex_type == 'real_imag':
-                im = ax[0].imshow(np.real(img), cmap = cmap, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im)
-                ax[0].set_title('real')
-                im = ax[1].imshow(np.imag(img), cmap = angle_cmap, **kwargs)
-                if(colorbar):
-                    plt_colorbar(im)
-                ax[1].set_title('imag')
-            
+                            
             if(remove_axis_ticks):
                 plt.setp(ax[0], xticks=[], yticks=[])
                 ax[0].xaxis.set_ticks_position('none')
@@ -411,6 +620,8 @@ def plt_imshow(img,
                 ax[1].yaxis.set_ticks_position('none')
     if title is not None:
         fig.suptitle(title)
+        fig.canvas.manager.window.setWindowTitle(title)
+        
     return fig, ax
 
 def plt_hist(vectors_list, fig_ax = None,
@@ -455,7 +666,8 @@ def plt_scatter3(
                data_N_by_3[:, 2], **kwargs)
     
     if title is not None:
-            ax.set_title(title)
+        ax.set_title(title)
+        fig.canvas.manager.window.setWindowTitle(title)
 
     try: elev_list = [int(elev_list)]
     except: pass
@@ -691,18 +903,18 @@ class plot_gaussian_gradient:
     def __call__(self, *args, **kwargs):
         self.addPlot(*args, **kwargs)
 
-def imshow_series(list_of_stacks, 
-                  list_of_masks = None,
-                  figsize = None,
-                  figsize_ratio = 1,
-                  text_as_colorbar = False,
-                  colorbar = False,
-                  cmap = 'viridis',
-                  list_of_titles_columns = None,
-                  list_of_titles_rows = None,
-                  fontsize = None,
-                  transpose = True,
-                  ):
+def plt_imshow_series(list_of_stacks, 
+                      list_of_masks = None,
+                      figsize = None,
+                      figsize_ratio = 1,
+                      text_as_colorbar = False,
+                      colorbar = False,
+                      cmap = 'viridis',
+                      list_of_titles_columns = None,
+                      list_of_titles_rows = None,
+                      fontsize = None,
+                      transpose = True,
+                      ):
     """ imshow a stack of images or sets of images in a shelf,
         input must be a list or array of images
         
@@ -819,7 +1031,7 @@ def imshow_series(list_of_stacks,
                 cbar.ax.tick_params(labelsize=1)
     return fig, None
 
-def imshow_by_subplots(
+def plt_imshow_subplots(
         images, grid_locations=None, frame_shape = None, title = None,
         titles=[], cmaps=[], colorbar=True, margin = 0.025, inter_image_margin = 0.01,
         colorbar_aspect=2, colorbar_pad_fraction=0.05,
@@ -911,6 +1123,7 @@ def imshow_by_subplots(
                              colorbar_pad_fraction=colorbar_pad_fraction)
     if title is not None:
         fig.suptitle(title)
+        fig.canvas.manager.window.setWindowTitle(title)
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
@@ -1130,70 +1343,116 @@ class transform3D_viewer:
         step_size = float(self.params[f"{step_label}_text_box"].text)
         new_val = current_val + direction * step_size
         self.params[f"{label}_text_box"].set_val(f"{new_val:.6f}")
-                
+  
 class _questdiag:
-    def __init__(self,
-        question = '', 
-        figsize=(6, 2), 
-        buttons = {'Yes'    : True, 
-                   'No'     : False, 
-                   'Cancel' : None},
-        row_spacing=0.05):
-    
+    def __init__(self, question, buttons, figsize, question_hratio):
+        
         assert isinstance(buttons, dict), \
             ('buttons arg must be a dictionary of texts appearing on '
              'the buttons values to be returned.')
         
         self.buttons = buttons
         self.result = None
-        _, ax = plt.subplots(figsize=figsize)
-        plt.subplots_adjust(bottom=0.2) 
-    
-        ax.text(0.5, 0.85, question, ha='center', va='center', fontsize=12)
-        plt.axis('off')
-    
-        # Calculate grid size
-        N = len(buttons)
-        n_rows = int(np.ceil(N ** 0.5))
-        n_clms = int(np.ceil(N / n_rows))
 
-        # Button size and position
-        button_width = 0.8 / n_clms
-        button_height = 0.3 / n_rows
-        horizontal_spacing = (1 - button_width * n_clms) / (n_clms + 1)
-        vertical_spacing = (0.2 - button_height * n_rows) / (n_rows + 1)
+        # Calculate the number of rows and columns for the buttons
+        N = len(self.buttons)
+        n_rows = int(np.ceil(N ** 0.5))  # Number of rows for buttons
+        n_cols = int(np.ceil(N / n_rows))  # Number of columns for buttons
+        
+        if N == 1: n_rows, n_cols = 1, 1
+        if N == 2: n_rows, n_cols = 1, 2
+        if N == 3: n_rows, n_cols = 1, 3
+        if N == 6: n_rows, n_cols = 2, 3
+        
+        if question_hratio is None:
+            if isinstance(question, np.ndarray):
+                question_hratio = 10
+            else:
+                question_hratio = 1
+        
+        if figsize is None:
+            if isinstance(question, np.ndarray):
+                figsize = (5, 5)
+            else:
+                figsize = (5, 1)
 
-        # Adjust vertical_spacing to add more space between rows
-        vertical_spacing += row_spacing
-    
+        # Create the figure and GridSpec layout
+        fig = plt.figure(figsize=figsize)
+        gs = matplotlib.gridspec.GridSpec(n_rows + 2, n_cols, 
+                      figure=fig, height_ratios=[question_hratio] + [1] * (n_rows + 1))  
+        # First row (3x height) for the question, remaining rows for buttons
+        
+        # Top section for the question (span the entire width)
+        ax_question = fig.add_subplot(gs[0, :])
+        
+        # Handle different types of questions
+        if isinstance(question, np.ndarray):
+            if len(question.shape) == 1:
+                ax_question.plot(question)
+            elif len(question.shape) == 2:
+                plt_imshow(question, fig_ax = (fig, ax_question),)
+            plt.axis('on')  # Keep axis on for plots and images
+        else:
+            ax_question.text(0.5, 0.5, str(question), ha='center', va='center', fontsize=12)
+            ax_question.set_axis_off()  # No axis for text questions
+
+        # Create buttons and place them on the grid
         button_objects = []
-        for i, button_label in enumerate(buttons.keys()):
-            row = i // n_clms
-            col = i % n_clms
-
-            button_ax = plt.axes([
-                horizontal_spacing + col * (button_width + horizontal_spacing),
-                0.2 + (n_rows - row - 1) * (button_height + vertical_spacing),  # Start from top
-                button_width,
-                button_height
-            ])
-            button = Button(button_ax, str(button_label))
+        for i, (label, val) in enumerate(self.buttons.items()):
+            row = 2 + i // n_cols
+            col = i % n_cols
+            button_ax = fig.add_subplot(gs[row, col])
+            button = Button(button_ax, str(label))
             button.on_clicked(self.button_click)
             button_objects.append(button)
     
         plt.show()
     
     def button_click(self, event):
-        ind = event.inaxes.texts[0].get_text()
-        self.result = self.buttons[ind]   # Return the corresponding output
-        plt.close()
+        ind = event.inaxes.texts[0].get_text()  # Get text of the clicked button
+        self.result = self.buttons[ind]  # Return the corresponding output
+        plt.close()  # Close the plot after a button is clicked
 
 def question_dialog(
-    question = 'Yes/No/Cancel?', figsize=(6, 2), 
-    buttons = {'Yes' : True, 'No' : False, 'Cancel' : None}):
-    return _questdiag(question, figsize, buttons).result
+    question = 'Yes/No/Cancel?',
+    buttons={'Yes': True, 'No': False, 'Cancel': None},
+    figsize = None, 
+    question_hratio = None):
+    """ Question dialog
+    Creates a dialog with a question displayed at the top and a grid of buttons below it.
+    
+    The function supports displaying questions as text, 1D numpy arrays (as line plots),
+    or 2D numpy arrays (as images). It displays buttons beneath the question, allowing the
+    user to select one of the provided options. The buttons are organized into a grid
+    layout based on the number of buttons provided. When a button is clicked, the function 
+    returns the corresponding value associated with the button in the `buttons` dictionary.
 
-def plot_marker(
+    Parameters
+    ----------
+    question : str, np.ndarray, optional
+        The question to be presented. It can be a string, a 1D numpy array (plotted as a 
+        line), or a 2D numpy array (displayed as an image). Default is 'Yes/No/Cancel?'.
+    
+    buttons : dict, optional
+        A dictionary where the keys are the text labels that will appear on the buttons, 
+        and the values are the corresponding values to return when the button is clicked.
+        Default is {'Yes': True, 'No': False, 'Cancel': None}.
+        
+    figsize : tuple, optional
+        A tuple specifying the size of the figure (width, height) in inches. Default is (6, 2).
+
+    question_hratio: int, optional
+        If you are sending an image as a question, you can set the height ratio to
+        buttons here, we suggest 4
+    Returns
+    -------
+    result : any
+        The value associated with the button clicked by the user. If 'Yes' is clicked, 
+        returns `True`; if 'No', returns `False`; and if 'Cancel', returns `None`.
+    """
+    return _questdiag(question, buttons, figsize, question_hratio).result
+
+def plt_mark(
         coords, fig_ax=None, figsize=(2, 2),
         marker=None, markersize = None, return_markersize = False):
     """
@@ -1232,8 +1491,9 @@ def plot_marker(
     else:
         return fig, ax
     
-def plt_contours(Z_list, X_Y = None, fig_ax=None, levels=10, colors_list=None, 
-                 linestyles_list=None, title=None):
+def plt_contours(
+        Z_list, X_Y = None, fig_ax = None, levels = 10, colors_list = None, 
+        linestyles_list = None, linewidth = 0.5, fontsize = 3, title = None):
     """
     Plot contours of multiple surfaces overlaid on the same plot.
     
@@ -1247,7 +1507,7 @@ def plt_contours(Z_list, X_Y = None, fig_ax=None, levels=10, colors_list=None,
     - colors_list: List of colors for the contours of each surface. 
                    If None, defaults to a colormap.
     - linestyles_list: List of line styles for the contours of each surface. 
-                If None, defaults to a pattern.
+                       If None, defaults to a pattern.
     - title: Optional title for the plot.
     """
     
@@ -1271,13 +1531,16 @@ def plt_contours(Z_list, X_Y = None, fig_ax=None, levels=10, colors_list=None,
             X, Y = X_Y
         color = colors_list[i % len(colors_list)]
         linestyle = linestyles_list[i % len(linestyles_list)]
-        
-        contour = ax.contour(X, Y, Z, levels=levels, colors=[color],linestyles=linestyle)
+        contour = ax.contour(X, Y, Z, levels=levels, colors=[color],
+                             linestyles=linestyle, linewidths = linewidth)
         
         # Add labels to contours
-        ax.clabel(contour, inline=True, fontsize=8, fmt='%.2f')
+        ax.clabel(contour, inline=True, fontsize=fontsize, fmt='%.2f')
         
+    ax.set_aspect('equal')
+
     if title is not None:
         ax.set_title(title)
+        fig.canvas.manager.window.setWindowTitle(title)
     
     return fig, ax

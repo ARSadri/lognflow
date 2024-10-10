@@ -171,130 +171,108 @@ def text_to_collection(text):
     tree = ast.parse(text, mode='eval')
     return parse_node(tree.body)
 
-
-def stack_to_frame(stack, frame_shape : tuple = None, borders = 0):
-    """ turn a stack of images into a 2D frame of images
-        This is very useful when lots of images need to be tiled
-        against each other.
-    
-        Note: if the last dimension is 3, all images are RGB, if you don't wish that
-        you have to add another dimension at the end by np.expand_dim(arr, axis = -1)
-    
-        :param stack: np.ndarray
-                It must have the shape of either
-                n_im x n_r x n_c
-                n_im x n_r x  3  x  1
-                n_im x n_r x n_c x  3
-                
-            In all cases n_im will be turned into a frame
-            Remember if you have N images to put into a square, the input
-            shape should be 1 x n_r x n_c x N
-        :param frame_shape: tuple
-            The shape of the frame to put n_rows and n_colmnss of images
-            close to each other to form a rectangle of image.
-        :param borders: literal or np.inf or np.nan
-            When plotting images with matplotlib.pyplot.imshow, there
-            needs to be a border between them. This is the value for the 
-            border elements.
-            
-        output
-        ---------
-            Since we have N channels to be laid into a square, the side
-            length would be ceil(N**0.5) if frame_shape is not given.
-            it produces an np.array of shape n_f x n_r * f_r x n_c * f_c or
-            n_f x n_r * f_r x n_c * f_c x 3 in case of an RGB input.
+class SSHSystem:
     """
-    is_rgb = stack.shape[-1] == 3
-    
-    if(len(stack.shape) == 4):
-        if((stack.shape[2] == 3) & (stack.shape[3] == 1)):
-            stack = stack[..., 0]
-    
-    n_im, n_R, n_C = stack.shape[:3]
-        
-    if(len(stack.shape) == 4):
-        assert is_rgb, 'For a stack of images with axis 3, it should be 1 or 3.'
+    A class to handle basic SSH and SFTP operations on a remote system.
 
-    assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
-        f'The stack you provided can have specific shapes. it is {stack.shape}'
+    Attributes:
+        ssh_client (paramiko.SSHClient): The SSH client for executing commands on the remote system.
+        sftp_client (paramiko.SFTPClient): The SFTP client for file transfer operations.
+    """
 
-    if(frame_shape is None):
-        square_side = int(np.ceil(np.sqrt(n_im)))
-        frame_n_r, frame_n_c = (square_side, square_side)
-    else:
-        frame_n_r, frame_n_c = frame_shape
-    n_R += 2
-    n_C += 2
-    new_n_R = n_R * frame_n_r
-    new_n_C = n_C * frame_n_c
+    def __init__(self, hostname: str, username: str, password: str):
+        """
+        Initialize the SSHSystem by setting up the SSH and SFTP clients.
 
-    if is_rgb:
-        frame = np.zeros((new_n_R, new_n_C, 3), dtype = stack.dtype)
-    else:
-        frame = np.zeros((new_n_R, new_n_C), dtype = stack.dtype)
-    used_ch_cnt = 0
-    if(borders is not None):
-        frame += borders
-    for rcnt in range(frame_n_r):
-        for ccnt in range(frame_n_c):
-            ch_cnt = rcnt + frame_n_c*ccnt
-            if (ch_cnt<n_im):
-                frame[rcnt*n_R + 1: (rcnt + 1)*n_R - 1,
-                      ccnt*n_C + 1: (ccnt + 1)*n_C - 1] = \
-                    stack[used_ch_cnt]
-                used_ch_cnt += 1
-    return frame
-
-def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
-    """ turn a list of stack of images into a list of frame of images
-        This is simply a list of calling stack_to_frame
-        :param stack_list:
-            It must have the shape of either
-            n_f x n_im x n_r x n_c
-            n_f x n_im x n_r x  3  x 1
-            n_f x n_im x n_r x n_c x 3
-
-    """    
-    return np.array([stack_to_frame(stack, 
-                           frame_shape = frame_shape, 
-                           borders = borders) for stack in stack_list])
-	
-class ssh_system:
-    def __init__(self, hostname, username, password):
+        Args:
+            hostname (str): The hostname or IP address of the remote system.
+            username (str): The username for SSH authentication.
+            password (str): The password for SSH authentication.
+        """
         import paramiko
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh_client.connect(
-            hostname=hostname, username=username, password=password)
-        self.sftp_client = self.ssh_client.open_sftp()
+        try:
+            self.ssh_client.connect(hostname=hostname, username=username, password=password)
+            self.sftp_client = self.ssh_client.open_sftp()
+        except Exception as e:
+            print(f"Failed to connect to {hostname}: {e}")
+            self.ssh_client = None
+            self.sftp_client = None
 
     def ssh_ls(self, path: Path):
-        stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
-        ls_result = stdout.readlines()
-        return [path / file.strip() for file in ls_result]
+        """
+        List the contents of a directory on the remote system.
+
+        Args:
+            path (Path): The path to the directory on the remote system.
+
+        Returns:
+            list: A list of Path objects representing the files in the directory.
+        """
+        try:
+            stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
+            ls_result = stdout.readlines()
+            return [path / file.strip() for file in ls_result]
+        except Exception as e:
+            print(f"Error listing directory {path}: {e}")
+            return []
 
     def ssh_scp(self, source: Path, destination: Path):
-        self.sftp_client.get(str(source), str(destination))
+        """
+        Copy a file from the remote system to the local system using SFTP.
+
+        Args:
+            source (Path): The path of the file on the remote system.
+            destination (Path): The path where the file will be saved locally.
+        """
+        try:
+            self.sftp_client.get(str(source), str(destination))
+        except Exception as e:
+            print(f"Error copying {source} to {destination}: {e}")
 
     def ssh_rm(self, path: Path):
-        stdin, stdout, stderr = self.ssh_client.exec_command(f'rm {path}')
-        return stdout.read(), stderr.read()
+        """
+        Remove a file from the remote system.
 
-    def monitor_and_move(
-            self, remote_folder: Path, local_folder: Path, 
-            target_fname: str, interval=30):
-        # Wait until the interesting file appears in the remote folder
+        Args:
+            path (Path): The path to the file to be removed.
+
+        Returns:
+            tuple: A tuple containing the stdout and stderr outputs from the command.
+        """
+        try:
+            stdin, stdout, stderr = self.ssh_client.exec_command(f'rm {path}')
+            return stdout.read().decode(), stderr.read().decode()
+        except Exception as e:
+            print(f"Error removing file {path}: {e}")
+            return "", str(e)
+
+    def monitor_and_remove(
+        self, remote_folder: Path, local_folder: Path, 
+        target_fname: str, interval=30
+    ):
+        """
+        Monitor a remote folder for a specific file. Once the file appears, transfer and delete
+        other files from the folder.
+
+        Args:
+            remote_folder (Path): The folder on the remote system to monitor.
+            local_folder (Path): The local folder where files will be copied.
+            target_fname (str): The name of the file to wait for.
+            interval (int, optional): The time interval (in seconds) between each check. Default is 30 seconds.
+        """
         interesting_file_path = remote_folder / target_fname
         cnt = 0
         while not self.is_file(interesting_file_path):
             if (cnt % 100) == 0:
-                print(f'Waiting for {interesting_file_path}', end = '')
+                print(f'Waiting for {interesting_file_path}', end='')
             else:
-                print('.')
+                print('.', end='', flush=True)
             time.sleep(interval)
             cnt += 1
         print('')
-        # Once the file appears, start processing the other files
+
         print(f"{target_fname} found! Starting file transfer and deletion.")
         files = self.ssh_ls(remote_folder)
         for file in files:
@@ -308,16 +286,33 @@ class ssh_system:
             print(f"Deleting {file} from remote server")
             self.ssh_rm(file)
 
-    def is_file(self, path: Path):
-        stdin, stdout, stderr = self.ssh_client.exec_command(
-            f'test -f {path} && echo "exists"')
-        return "exists" in stdout.read().decode()
+    def is_file(self, path: Path) -> bool:
+        """
+        Check if a file exists on the remote system.
+
+        Args:
+            path (Path): The path to the file on the remote system.
+
+        Returns:
+            bool: True if the file exists, False otherwise.
+        """
+        try:
+            stdin, stdout, stderr = self.ssh_client.exec_command(f'test -f {path} && echo "exists"')
+            return "exists" in stdout.read().decode()
+        except Exception as e:
+            print(f"Error checking file {path}: {e}")
+            return False
 
     def close_connection(self):
-        self.sftp_client.close()
-        self.ssh_client.close()
+        """
+        Close the SSH and SFTP connections to the remote system.
+        """
+        if self.sftp_client:
+            self.sftp_client.close()
+        if self.ssh_client:
+            self.ssh_client.close()
 
-def printv(var):
+def printv(var, **kwargs):
     # Get the name of the variable passed to the function
     frame = inspect.currentframe().f_back
     var_name = [name for name, value in frame.f_locals.items() if value is var]
@@ -328,81 +323,175 @@ def printv(var):
     else:
         var_name = 'variable'
 
-    is_array = True
-    toprint = f'{type(var).__name__} {var_name}:'
+    is_np_torch = True
+    var_class = type(var).__name__
+    toprint = f'{var_class} {var_name}: '
     try:
-        toprint += f'shape={var.shape} dtype={var.dtype}'
+        array_shape = var.shape
+        toprint += f'shape={array_shape}'
     except: 
-        is_array = False
+        is_np_torch = False
     try:
-        toprint += f'device={var.device}'
+        array_dtype = var.dtype
+        toprint += f', dtype={array_dtype}'
     except: pass
-    if not is_array:
+    try:
+        toprint += f', device={var.device}'
+    except: pass
+    
+    if is_np_torch:
+        arr_size = np.prod(array_shape)
+        if 'array_size_threshold' in kwargs:
+            array_size_threshold = kwargs['array_size_threshold']
+        else:
+            array_size_threshold = 1e+6
+        if arr_size < array_size_threshold:
+            try:
+                toprint += f', min={var.min():.6f}'
+            except: pass
+            try:
+                toprint += f', max={var.max():.6f}'
+            except: pass
+            try:
+                toprint += f', mean={var.mean():.6f}'
+            except: pass
+            try:
+                toprint += f', std={var.std():.6f}'
+            except: pass
+            
+    if not is_np_torch:
         toprint += str(var)
     # Print the information
     print(toprint)
 
 class Pyrunner:
-    def __init__(self, fpath, logger = None):
-        """ Jupyter like runner for Python
-        """ 
+    """
+    A Jupyter-like Python code runner that executes code in blocks based on cell numbers,
+    supports saving and loading kernel states, and allows interactive execution.
+
+    Attributes:
+        fpath (Path): The path to the Python file to execute.
+        logger_ (callable): An optional logger function to log messages.
+        log (str): A string containing the accumulated log messages.
+        saved_state (dict): A dictionary to hold saved kernel states.
+        exit (bool): A flag to indicate when to stop execution.
+    """
+
+    def __init__(self, fpath: str, logger=None):
+        """
+        Initializes the Pyrunner class, runs the Python file in an interactive loop,
+        and allows execution of specific code blocks identified by cell numbers.
+
+        Args:
+            fpath (str): The file path to the Python script to be executed.
+            logger (callable, optional): A logger function to log output (default is None).
+        """
         self.logger_ = logger
         self.fpath = Path(fpath)
-        assert self.fpath.is_file()
+        assert self.fpath.is_file(), f"File {fpath} does not exist."
         self.log = ''
-        self.logger(f'file: {fpath}')
         self.saved_state = {}
         self.exit = False
+
+        self.logger(f'file: {fpath}')
         while not self.exit:        
             show_and_ask_result = self.show(globals())
             if show_and_ask_result is None:
                 continue
             globals().update(show_and_ask_result)
-            exec(pyrunner_code, globals())
+            exec(globals().get('pyrunner_code', ''), globals())
 
-    def logger(self, toprint, end = '\n'):
+    def logger(self, toprint: str, end: str = '\n'):
+        """
+        Logs the provided message. If a logger is provided, it logs the message using that function.
+        Otherwise, it appends the message to the internal log.
+
+        Args:
+            toprint (str): The message to log.
+            end (str, optional): The string appended after each message (default is '\n').
+        """
         toprint = str(toprint) + end
         self.log += toprint
         if self.logger_ is not None:
             self.logger_(toprint)
 
-    def save_or_load_kernel_state(self, globals_, saved_state = None):
+    def save_or_load_kernel_state(self, globals_: dict, saved_state=None):
+        """
+        Saves or loads the kernel state using the `dill` library. If `saved_state` is provided, it loads
+        the state into `globals_`. If `saved_state` is None, it returns a serialized form of the current
+        global variables.
+
+        Args:
+            globals_ (dict): The global variables to save or update.
+            saved_state (bytes, optional): The serialized kernel state to load (default is None).
+
+        Returns:
+            bytes: A serialized version of the global variables if saving the state.
+        """
         import dill as pickle
         if saved_state is None:
             return pickle.dumps(
                 {k: v for k, v in globals_.items() 
-                    if not k.startswith('__') and not callable(v)})
+                 if not k.startswith('__') and not callable(v)}
+            )
         else:
             globals_.update(pickle.loads(saved_state))
 
     @property
-    def n_saves(self):
+    def n_saves(self) -> int:
+        """
+        Returns the number of saved states.
+
+        Returns:
+            int: The number of saved states.
+        """
         return len(self.saved_state.keys())
 
-    def show(self, globals_, figsize = (3, 2)) -> (str, int):
+    def show(self, globals_: dict, figsize: tuple = (3, 2)) -> dict:
+        """
+        Displays available cell blocks for execution and handles user interaction to
+        run specific blocks or manage kernel states (save/load/delete).
+
+        Args:
+            globals_ (dict): The global variables of the current session.
+            figsize (tuple, optional): The size of the dialog box (default is (3, 2)).
+
+        Returns:
+            dict: A dictionary containing the updated global variables if a cell block is selected.
+        """
         pyrunner_code = open(self.fpath).read()
         pattern = r"if\s+pyrunner_cell_no\s*==\s*(\d+):"
         matches = re.findall(pattern, pyrunner_code)
+
         if len(matches) == 0:
-            print(f'Running the pyrunner_code in {self.fpath}')
-            print('No blocks found that checks pyrunner_cell_no')
+            self.logger(f'Running the pyrunner_code in {self.fpath}')
+            self.logger('No blocks found that check pyrunner_cell_no')
+            return
+
         pyrunner_cell_nos = sorted(set(int(num) for num in matches))
         buttons = {}
+
         for pyrunner_cell_no in pyrunner_cell_nos:
             buttons[f'{pyrunner_cell_no}'] = pyrunner_cell_no
+        
+        # Add options for saved states
         for key in self.saved_state:
             buttons[f'load_{key}'] = f'load_{key}'
-        for key in self.saved_state:
             buttons[f'del_{key}'] = f'del_{key}'
+
         buttons[f'save_{self.n_saves + 1}'] = f'save_{self.n_saves + 1}'
         buttons['exit'] = 'exit'
 
+        # Display dialog for user interaction
         show_and_ask_result = question_dialog(
-            question='Choose a cell number', figsize=figsize, buttons=buttons)
+            question='Choose a cell number', figsize=figsize, buttons=buttons
+        )
         if show_and_ask_result is None:
             self.logger(f'pyrunner: closing reloads, press Exit to close.')
             return
-        elif show_and_ask_result == str(show_and_ask_result):
+
+        # Handle user selection
+        if isinstance(show_and_ask_result, str):
             if show_and_ask_result == 'exit':
                 self.exit = True
                 return
@@ -410,7 +499,7 @@ class Pyrunner:
             elif 'save' in show_and_ask_result:
                 key = show_and_ask_result.split('save_')[1]
                 self.saved_state[key] = self.save_or_load_kernel_state(globals_)
-                self.logger(f'saved state: {key}')
+                self.logger(f'Saved state: {key}')
                 return
 
             elif 'load' in show_and_ask_result:
@@ -424,7 +513,10 @@ class Pyrunner:
                 self.saved_state.pop(key)
                 self.logger(f'Deleted state: {key}')
                 return
-        elif show_and_ask_result == int(show_and_ask_result):
+
+        elif isinstance(show_and_ask_result, int):
             globals_['pyrunner_code'] = pyrunner_code
             globals_['pyrunner_cell_no'] = show_and_ask_result
             return globals_
+
+

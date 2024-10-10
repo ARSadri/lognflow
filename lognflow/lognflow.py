@@ -52,18 +52,19 @@ from    .logviewer          import logviewer
 from    .utils              import (repr_raw,
                                     replace_all,
                                     select_directory,
-                                    stack_to_frame,
                                     name_from_file,
                                     is_builtin_collection,
                                     text_to_collection,
                                     dummy_function)
 from    .plt_utils          import (plt_colorbar,
+                                    stack_to_frame,
                                     plt_hist,
                                     plt_surface, 
-                                    imshow_series,
-                                    imshow_by_subplots,
+                                    plt_imshow_series,
+                                    plt_imshow_subplots,
                                     plt_imshow,
-                                    plt_scatter3)
+                                    plt_scatter3,
+                                    plt_confusion_matrix)
 from    typing              import  Union
 
 @dataclass
@@ -1343,7 +1344,7 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
-        fig, ax = imshow_by_subplots(images = images,
+        fig, ax = plt_imshow_subplots(images = images,
                                      frame_shape = frame_shape, 
                                      grid_locations = grid_locations,
                                      figsize = figsize,
@@ -1422,17 +1423,17 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        fig, ax = imshow_series(list_of_stacks, 
-                                list_of_masks = list_of_masks,
-                                figsize = figsize,
-                                figsize_ratio = figsize_ratio,
-                                text_as_colorbar = text_as_colorbar,
-                                colorbar = colorbar,
-                                cmap = cmap,
-                                list_of_titles_columns = list_of_titles_columns,
-                                list_of_titles_rows = list_of_titles_rows,
-                                fontsize = fontsize,
-                                transpose = transpose)
+        fig, ax = plt_imshow_series(list_of_stacks, 
+                                    list_of_masks = list_of_masks,
+                                    figsize = figsize,
+                                    figsize_ratio = figsize_ratio,
+                                    text_as_colorbar = text_as_colorbar,
+                                    colorbar = colorbar,
+                                    cmap = cmap,
+                                    list_of_titles_columns = list_of_titles_columns,
+                                    list_of_titles_rows = list_of_titles_rows,
+                                    fontsize = fontsize,
+                                    transpose = transpose)
             
         if not return_figure:
             fpath = self.savefig(
@@ -1489,7 +1490,8 @@ class lognflow:
                              figsize = None,
                              image_format = 'jpg',
                              dpi = 1200,
-                             time_tag = False):
+                             time_tag = False,
+                             close_plt = True):
         """log a confusion matrix
             given a sklearn confusion matrix (cm), make a nice plot
         
@@ -1529,43 +1531,16 @@ class lognflow:
     
         """
         if not self.enabled: return
-        accuracy = np.trace(cm) / np.sum(cm).astype('float')
-        misclass = 1 - accuracy
-    
-        if figsize is None:
-            figsize = np.ceil(cm.shape[0]/3)
-    
-        if target_names is None:
-            target_names = [chr(x + 65) for x in range(cm.shape[0])]
-    
-        if cmap is None:
-            cmap = plt.get_cmap('Blues')
-    
-        plt.figure(figsize=(4*figsize, 4*figsize))
-        im = plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    
-        if target_names is not None:
-            tick_marks = np.arange(len(target_names))
-            plt.xticks(tick_marks, target_names, rotation=45)
-            plt.yticks(tick_marks, target_names)
-    
-        for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
-            clr = np.array([1, 1, 1, 0]) \
-                  * (cm[i, j] - cm.min()) \
-                      / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
-            plt.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center",
-                     color=clr)
         
-        plt.ylabel('True label')
-        plt.xlabel('Predicted label\naccuracy={:0.4f}; ' \
-                   + 'misclass={:0.4f}'.format(accuracy, misclass))
-        plt.title(title)
-        plt.colorbar(im, fraction=0.046, pad=0.04)
+        plt_confusion_matrix(
+            cm, target_names=target_names, title=title, 
+            cmap=cmap, figsize=figsize)
         
         fpath = self.savefig(
                 parameter_name = parameter_name, 
                 image_format=image_format, dpi=dpi,
-                time_tag = time_tag)
+                time_tag = time_tag,
+                close_plt = close_plt)
         return fpath
 
     def log_animation(

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
-    transform3D_viewer, plot_marker, plt_contours)
+    transform3D_viewer, plt_mark, plt_contours, question_dialog)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -51,7 +51,6 @@ def test_numbers_as_images():
     dataset = lognflow.plt_utils.numbers_as_images_4D(
         dataset_shape, fontsize)
 
-    ##########################################################################
     n_x, n_y, n_r, n_c = dataset_shape
     txt_width = int(np.log(np.maximum(n_x, n_y))
                     /np.log(np.maximum(n_x, n_y))) + 1
@@ -97,22 +96,22 @@ def test_plt_fig_to_numpy():
     print(np_data.shape)
     plt.close()
 
-def test_imshow_series():
+def test_plt_imshow_series():
     data = [np.random.rand(10, 100, 100),
             np.random.rand(10, 10, 10)]
-    lognflow.plt_utils.imshow_series(data)
+    lognflow.plt_utils.plt_imshow_series(data)
     plt.show()
 
-def test_imshow_by_subplots():
+def test_plt_imshow_subplots():
     data = np.random.rand(15, 100, 100, 3)
-    lognflow.plt_utils.imshow_by_subplots(data, colorbar = False)
+    lognflow.plt_utils.plt_imshow_subplots(data, colorbar = False)
 
     data = [np.random.rand(100, 100), np.random.rand(100, 150), np.random.rand(50, 100)]
-    lognflow.plt_utils.imshow_by_subplots(data)
+    lognflow.plt_utils.plt_imshow_subplots(data)
 
     data = np.random.rand(15, 100, 100)
     grid_locations = (np.random.rand(len(data), 2)*1000).astype('int')
-    lognflow.plt_utils.imshow_by_subplots(data, grid_locations = grid_locations)
+    lognflow.plt_utils.plt_imshow_subplots(data, grid_locations = grid_locations)
     
     plt.show()
 
@@ -139,15 +138,12 @@ def test_plt_imhist():
 
 def test_plt_imshow_complex():
     
-    # Define the meshgrid for testing
     comx, comy = np.meshgrid(np.arange(-7, 8, 1), np.arange(-7, 8, 1))
     com = comx + 1j * comy
     print(comx)
     print(comy)
-    # Use the existing complex2hsv function to convert complex data to RGB
     img, data_abs, data_angle = complex2hsv(com)
     
-    # Calculate min and max angles
     vmin = data_abs.min()
     vmax = data_abs.max()
     try:
@@ -159,30 +155,37 @@ def test_plt_imshow_complex():
     except:
         max_angle = 0
     
-    # Plot the complex image
-    fig, ax = plt.subplots(figsize=(5, 5))
-    im = ax.imshow(img, extent=(-7, 8, -7, 8))
+    fig, ax = plt_imshow(img, extent=(-7, 8, -7, 8), title = 'complex2hsv',
+                         colorbar = False)
     
-    # Annotate each pixel with its corresponding comx and comy values
     for i in range(0, comx.shape[0], 1):
         for j in range(0, comx.shape[1], 1):
-            ax.text(j - 7+0.5, -i + 7+0.5, f'({comx[i, j]}, {comy[i, j]})', ha='center', va='center', fontsize=8, color='white')
+            ax.text(j - 7+0.5, -i + 7+0.5, f'({comx[i, j]}, {comy[i, j]})', 
+                    ha='center', va='center', fontsize=8, color='white')
     
-    # Create and plot the color disc as an inset
-    fig, ax_inset = complex2hsv_colorbar((fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], transform=ax.transAxes)),
-                                         vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
-    ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
+    fig, ax_inset = complex2hsv_colorbar(
+        (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], transform=ax.transAxes)),
+            vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
+    ax_inset.patch.set_alpha(0)
+    
+    plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100),
+               cmap = 'gray_real_imag')
+    
+    plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100),
+               cmap = 'jet_real_imag')
+
+    plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100))
     
     plt.show()
 
-def test_plot_marker():
+def test_plt_mark():
     coords = np.random.rand(1000, 2)*100
-    fig, ax, markersize = plot_marker(
+    fig, ax, markersize = plt_mark(
         coords, fig_ax=None, figsize=None,
         markersize=None, return_markersize = True)
     for cnt in range(23):
         coords = np.array([np.arange(1 + 1*cnt,1+ 1*(cnt+1)), np.zeros(1)]).T
-        fig_ax = plot_marker(coords, fig_ax=(fig, ax), markersize=markersize)
+        fig_ax = plt_mark(coords, fig_ax=(fig, ax), markersize=markersize)
     
     plt.show()
 
@@ -193,16 +196,44 @@ def test_plt_contours():
     plt_contours(Z_list)
     plt.show()
 
+def test_question_dialog():
+    vec = np.random.rand(100)
+    img = np.random.rand(100, 100)
+    question = 'how good is it?'
+    
+    result = question_dialog(vec)
+    print(result)
+    result = question_dialog(img)
+    print(result)
+    result = question_dialog(question)
+    print(result)
+
+def test_stack_to_frame():
+   data4d = np.random.rand(25, 32, 32, 3)
+   img = lognflow.plt_utils.stack_to_frame(data4d, borders = np.nan)
+   plt.figure()
+   plt.imshow(img)
+   
+   data4d = np.random.rand(32, 32, 16, 16, 3)
+   stack = data4d.reshape(-1, *data4d.shape[2:])
+   frame = lognflow.plt_utils.stack_to_frame(stack, borders = np.nan)
+   plt.figure()
+   im = plt.imshow(frame)
+   lognflow.plt_utils.plt_colorbar(im)
+   plt.show()
+
 if __name__ == '__main__':
-    test_plt_contours()
     test_plt_imshow_complex()
+    test_question_dialog()
+    test_plt_contours()
     test_complex2hsv_colorbar()
-    test_plot_marker()
+    test_plt_mark()
     test_plot_gaussian_gradient()
     test_transform3D_viewer()
-    test_imshow_by_subplots()
+    test_plt_imshow_subplots()
     test_plt_imhist()
     test_plt_imshow()
-    test_imshow_series()
+    test_plt_imshow_series()
     test_numbers_as_images()
     test_plt_fig_to_numpy()
+    test_stack_to_frame()
