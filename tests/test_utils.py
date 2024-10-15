@@ -66,7 +66,7 @@ def test_Pyrunner():
     Pyrunner(Path('./test_pyrunner_code.py'), logger = print)
 
 if __name__ == '__main__':
-    test_printv()
     test_Pyrunner()
+    test_printv()
     test_is_builtin_collection()
     test_ssh_system()

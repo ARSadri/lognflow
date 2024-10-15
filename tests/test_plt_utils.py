@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
-    transform3D_viewer, plt_mark, plt_contours, question_dialog)
+    transform3D_viewer, plt_mark, plt_contours, question_dialog,
+    plt_plot)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -36,7 +37,8 @@ def test_transform3D_viewer():
     
     ax.scatter(in_pointcloud2_transformed[:, 0]+0.05, 
                in_pointcloud2_transformed[:, 1]+0.05, 
-               in_pointcloud2_transformed[:, 2]+0.05, marker = 's', color = 'red')
+               in_pointcloud2_transformed[:, 2]+0.05,
+               marker = 's', color = 'red')
 
     plt.show()    
     
@@ -106,12 +108,15 @@ def test_plt_imshow_subplots():
     data = np.random.rand(15, 100, 100, 3)
     lognflow.plt_utils.plt_imshow_subplots(data, colorbar = False)
 
-    data = [np.random.rand(100, 100), np.random.rand(100, 150), np.random.rand(50, 100)]
+    data = [np.random.rand(100, 100), 
+            np.random.rand(100, 150), 
+            np.random.rand(50, 100)]
     lognflow.plt_utils.plt_imshow_subplots(data)
 
     data = np.random.rand(15, 100, 100)
     grid_locations = (np.random.rand(len(data), 2)*1000).astype('int')
-    lognflow.plt_utils.plt_imshow_subplots(data, grid_locations = grid_locations)
+    lognflow.plt_utils.plt_imshow_subplots(
+        data, grid_locations = grid_locations)
     
     plt.show()
 
@@ -222,7 +227,15 @@ def test_stack_to_frame():
    lognflow.plt_utils.plt_colorbar(im)
    plt.show()
 
+def test_plt_plot():
+    y_values_list = [[1, 2, 3], [4, 5, 6]]
+    x_values_list = [[1, 2, 3]]
+    plt_plot(y_values_list, '-*', x_values_list = x_values_list)
+    plt_plot(y_values_list, '-*')
+    plt.show()
+
 if __name__ == '__main__':
+    test_plt_plot()
     test_plt_imshow_complex()
     test_question_dialog()
     test_plt_contours()

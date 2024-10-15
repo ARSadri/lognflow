@@ -1,30 +1,26 @@
 from lognflow.plt_utils import plt, np, plt_imhist
-import numpy as np
+from lognflow import printv
 
-try:
-
-    if pyrunner_cell_no == 1:
-        vec = [1, 2, 3]
+if __name__ == '__main__':
+    if code_block_id == 1:
+        img = np.random.randn(100, 100)
+        img[30:50, 30:50] += 10
+        plt_imhist(img); plt.show()
     
-    if pyrunner_cell_no == 2:    
-        vec = [i ** 2 for i in vec]
-        print("Squared vec:", vec)
+    if code_block_id == 2:    
+        img[img > 50] *= img[img > 50]
+        plt_imhist(img); plt.show()
     
-    if pyrunner_cell_no == 3:    
-        vec = [np.exp(-i ** 2) for i in vec]
-        print("Squared vec:", vec)
-        plt_imhist(np.random.randn(100, 100))
-        plt.show()
+    if code_block_id == 3:    
+        img[img < 50] = np.exp(-img[img < 50])
+        plt_imhist(img); plt.show() 
     
-    if pyrunner_cell_no == 4:    
-        vec = [np.exp(i) for i in vec]
-        print("Squared vec:", vec)
-    
-    if pyrunner_cell_no == 5:    
-        vec = [np.log(i) for i in vec]
-        print("Squared vec:", vec)
+    if code_block_id == 4:    
+        img += np.random.randn(100, 100)
+        plt_imhist(img); plt.show() 
         
-    print(f"Current state of vec: {vec}")
-    
-except Exception as e:
-    print(e)
+    if code_block_id == 5:    
+        img = np.exp(-img)
+        plt_imhist(img); plt.show() 
+        
+    printv(img)

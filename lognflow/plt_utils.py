@@ -125,7 +125,7 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
                                     frame_shape = frame_shape, 
                                     borders = borders) for stack in stack_list])
 
-def plt_hist2(data, bins=30, cmap='viridis', 
+def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
               colorbar=True, fig_ax=None, colorbar_label=None):
     """
@@ -358,6 +358,11 @@ class plt_imhist:
             if not (bins in kwargs_for_hist):
                 kwargs_for_hist['bins'] = bins
         
+        try:
+            in_image = in_image.detach().cpu().numpy()
+            print('plt_imhist warning: image converted from torch to numpy for plt!')
+        except: pass
+
         # Adjust figsize to provide more space if needed
         self.fig, axs = plt.subplots(
             1, 2, figsize=figsize,
@@ -453,6 +458,99 @@ class plt_imhist:
         except ValueError:
             pass
         
+def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, 
+             fig_ax = None, title = None, **kwargs):
+    """
+        Plots multiple sets of y-values against x-values using Matplotlib, 
+        with options to customize the plot.
+    
+        Parameters
+        ----------
+        y_values_list : list or iterable
+            A list or iterable of y-values to plot. If a single 
+            iterable is provided, it will be treated as 
+            one dataset. If a list of iterables is provided, 
+            each will be plotted as a separate line.
+        
+        x_values_list : list or iterable
+            The x-values for the plot. This can either be a list 
+            of the same length as `y_values_list`, 
+            or a single iterable that will be reused for all y-values. 
+            If `None`, y-values will be plotted 
+            against their index.
+        
+        *plt_plot_args : tuple
+            Additional positional arguments passed to the Matplotlib 
+            `plot` function (e.g., line style, 
+            marker type).
+        
+        fig_ax : tuple (figure, axes), optional
+            A tuple containing a Matplotlib `figure` and `axes` object. 
+            If `None`, a new figure and axes 
+            will be created.
+        
+        title : str, optional
+            The title of the plot. If `None`, no title will be set.
+        
+        **kwargs : dict
+            Additional keyword arguments passed to the Matplotlib 
+            `plot` function (e.g., `color`, `linewidth`).
+        
+        Returns
+        -------
+        tuple
+            A tuple containing the Matplotlib `figure` and `axes`
+             objects used for the plot.
+        
+        Raises
+        ------
+        ValueError
+            If the length of `x_values_list` does not match the length of 
+            `y_values_list` or if it is not 1.
+        
+        Notes
+        -----
+        - If `fig_ax` is provided, the plot will be added to the 
+        given axes. Otherwise, a new figure and axes 
+          will be created.
+        - If `x_values_list` is `None`, y-values will be plotted against their index.
+        - The function can handle multiple y-value datasets, plotting 
+        each as a separate line.
+        
+        Example
+        -------
+        >>> y_values_list = [[1, 2, 3], [4, 5, 6]]
+        >>> x_values_list = [1, 2, 3]
+        >>> fig, ax = plt_plot(y_values_list, x_values_list)
+        >>> plt.show()
+    """
+    if x_values_list is not None:
+        assert ( (len(x_values_list) == len(y_values_list)) | \
+                 (len(x_values_list) == 1) ), \
+                f'lognflow/plt_utils/plt_plot: x_values_list should have'\
+                + ' length of 1 or the same as parameters list.'
+    
+    if fig_ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    else:
+        fig, ax = fig_ax
+    
+    for list_cnt, y_values in enumerate(y_values_list):
+        if(x_values_list is None):
+            ax.plot(y_values, *plt_plot_args, **kwargs)
+        else:
+            if(len(x_values_list) == len(y_values)):
+                x_values = x_values_list[list_cnt]
+            else:
+                x_values = x_values_list[0]
+            ax.plot(x_values, y_values, *plt_plot_args, **kwargs)
+    
+    if title is not None:
+        ax.set_title(title)
+        
+    return (fig, ax)
+
 def plt_imshow(img, 
                fig_ax = None,
                colorbar = True, 
@@ -520,6 +618,12 @@ def plt_imshow(img,
     
     vmin = kwargs['vmin'] if 'vmin' in kwargs else None
     vmax = kwargs['vmax'] if 'vmax' in kwargs else None
+    
+    try:
+        img = img.detach().cpu().numpy()
+        print('plt_imshow warning: image converted from torch to numpy for plt!')
+    except: pass
+    
     if(not np.iscomplexobj(img)):
         if fig_ax is None:
             fig, ax = plt.subplots()
@@ -532,12 +636,10 @@ def plt_imshow(img,
             plt.setp(ax, xticks=[], yticks=[])
     else:
         if (cmap == 'complex'):
-            # Convert complex data to RGB
                 
             complex_image, data_abs, data_angle = complex2hsv(
                 img, vmin = vmin, vmax = vmax)
         
-            # Calculate min and max angles
             if vmin is None: vmin = data_abs.min()
             if vmax is None: vmax = data_abs.max()
             
@@ -550,7 +652,6 @@ def plt_imshow(img,
             except:
                 max_angle = 0
         
-            # Plot the complex image
             if fig_ax is None:
                 fig, ax = plt.subplots()
             else:
@@ -560,12 +661,11 @@ def plt_imshow(img,
                 plt.setp(ax, xticks=[], yticks=[])
 
             if(colorbar):
-                # Create and plot the color disc as an inset
                 fig, ax_inset = complex2hsv_colorbar(
                     (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], 
                                         transform=ax.transAxes)),
                     vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
-                ax_inset.patch.set_alpha(0)  # Make the background of the inset axis transparent
+                ax_inset.patch.set_alpha(0)  
         else:
             
             if fig_ax is None:

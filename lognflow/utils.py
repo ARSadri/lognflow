@@ -4,9 +4,22 @@ import inspect
 import pathlib
 import numpy as np
 from pathlib import Path
-from .plt_utils import question_dialog
 
 def dummy_function(*args, **kwargs): ...
+
+class DummyClass:
+    def __init__(self, *args, **kwargs):
+        print('warning: this is a dummy class! It returns '
+              'None to whatever you throw at it.')
+
+    def __getattr__(self, name):
+        return self.dummy_function
+
+    def __call__(self, *args, **kwargs):
+        return None
+
+    def dummy_function(self, *args, **kwargs):
+        return None
 
 def is_builtin_collection(obj):
     """
@@ -176,8 +189,10 @@ class SSHSystem:
     A class to handle basic SSH and SFTP operations on a remote system.
 
     Attributes:
-        ssh_client (paramiko.SSHClient): The SSH client for executing commands on the remote system.
-        sftp_client (paramiko.SFTPClient): The SFTP client for file transfer operations.
+        ssh_client (paramiko.SSHClient): The SSH client for executing 
+        commands on the remote system.
+        sftp_client (paramiko.SFTPClient): The SFTP client for file 
+        transfer operations.
     """
 
     def __init__(self, hostname: str, username: str, password: str):
@@ -193,7 +208,8 @@ class SSHSystem:
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self.ssh_client.connect(hostname=hostname, username=username, password=password)
+            self.ssh_client.connect(
+                hostname=hostname, username=username, password=password)
             self.sftp_client = self.ssh_client.open_sftp()
         except Exception as e:
             print(f"Failed to connect to {hostname}: {e}")
@@ -253,14 +269,15 @@ class SSHSystem:
         target_fname: str, interval=30
     ):
         """
-        Monitor a remote folder for a specific file. Once the file appears, transfer and delete
-        other files from the folder.
+        Monitor a remote folder for a specific file. Once the file appears,
+        transfer and delete other files from the folder.
 
         Args:
             remote_folder (Path): The folder on the remote system to monitor.
             local_folder (Path): The local folder where files will be copied.
             target_fname (str): The name of the file to wait for.
-            interval (int, optional): The time interval (in seconds) between each check. Default is 30 seconds.
+            interval (int, optional): The time interval (in seconds) 
+            between each check. Default is 30 seconds.
         """
         interesting_file_path = remote_folder / target_fname
         cnt = 0
@@ -297,7 +314,8 @@ class SSHSystem:
             bool: True if the file exists, False otherwise.
         """
         try:
-            stdin, stdout, stderr = self.ssh_client.exec_command(f'test -f {path} && echo "exists"')
+            stdin, stdout, stderr = self.ssh_client.exec_command(
+                f'test -f {path} && echo "exists"')
             return "exists" in stdout.read().decode()
         except Exception as e:
             print(f"Error checking file {path}: {e}")
@@ -366,8 +384,9 @@ def printv(var, **kwargs):
 
 class Pyrunner:
     """
-    A Jupyter-like Python code runner that executes code in blocks based on cell numbers,
-    supports saving and loading kernel states, and allows interactive execution.
+    A Jupyter-like Python code runner that executes code in blocks based 
+    on cell numbers, supports saving and loading kernel states, and allows 
+    interactive execution.
 
     Attributes:
         fpath (Path): The path to the Python file to execute.
@@ -377,15 +396,18 @@ class Pyrunner:
         exit (bool): A flag to indicate when to stop execution.
     """
 
-    def __init__(self, fpath: str, logger=None):
+    def __init__(self, fpath: str, logger=None, 
+                 block_identifier = 'code_block_id'):
         """
         Initializes the Pyrunner class, runs the Python file in an interactive loop,
         and allows execution of specific code blocks identified by cell numbers.
 
         Args:
             fpath (str): The file path to the Python script to be executed.
-            logger (callable, optional): A logger function to log output (default is None).
+            logger (callable, optional): A logger function to log output 
+            (default is None).
         """
+        self.block_identifier = block_identifier
         self.logger_ = logger
         self.fpath = Path(fpath)
         assert self.fpath.is_file(), f"File {fpath} does not exist."
@@ -403,12 +425,13 @@ class Pyrunner:
 
     def logger(self, toprint: str, end: str = '\n'):
         """
-        Logs the provided message. If a logger is provided, it logs the message using that function.
-        Otherwise, it appends the message to the internal log.
+        Logs the provided message. If a logger is provided, it logs the message 
+        using that function. Otherwise, it appends the message to the internal log.
 
         Args:
             toprint (str): The message to log.
-            end (str, optional): The string appended after each message (default is '\n').
+            end (str, optional): The string appended after each message 
+            (default is '\n').
         """
         toprint = str(toprint) + end
         self.log += toprint
@@ -417,13 +440,15 @@ class Pyrunner:
 
     def save_or_load_kernel_state(self, globals_: dict, saved_state=None):
         """
-        Saves or loads the kernel state using the `dill` library. If `saved_state` is provided, it loads
-        the state into `globals_`. If `saved_state` is None, it returns a serialized form of the current
-        global variables.
+        Saves or loads the kernel state using the `dill` library. 
+        If `saved_state` is provided, it loads
+        the state into `globals_`. If `saved_state` is None, it returns 
+        a serialized form of the current global variables.
 
         Args:
             globals_ (dict): The global variables to save or update.
-            saved_state (bytes, optional): The serialized kernel state to load (default is None).
+            saved_state (bytes, optional): The serialized kernel state to load 
+            (default is None).
 
         Returns:
             bytes: A serialized version of the global variables if saving the state.
@@ -449,30 +474,33 @@ class Pyrunner:
 
     def show(self, globals_: dict, figsize: tuple = (3, 2)) -> dict:
         """
-        Displays available cell blocks for execution and handles user interaction to
-        run specific blocks or manage kernel states (save/load/delete).
+        Displays available cell blocks for execution and handles user 
+        interaction to run specific blocks or manage kernel states 
+        (save/load/delete).
 
         Args:
             globals_ (dict): The global variables of the current session.
-            figsize (tuple, optional): The size of the dialog box (default is (3, 2)).
+            figsize (tuple, optional): The size of the dialog box 
+            (default is (3, 2)).
 
         Returns:
-            dict: A dictionary containing the updated global variables if a cell block is selected.
+            dict: A dictionary containing the updated global variables 
+            if a cell block is selected.
         """
         pyrunner_code = open(self.fpath).read()
-        pattern = r"if\s+pyrunner_cell_no\s*==\s*(\d+):"
+        pattern = r"if\s+" + self.block_identifier + "\s*==\s*(\d+):"
         matches = re.findall(pattern, pyrunner_code)
 
         if len(matches) == 0:
             self.logger(f'Running the pyrunner_code in {self.fpath}')
-            self.logger('No blocks found that check pyrunner_cell_no')
+            self.logger(f'No code blocks found that checks {self.block_identifier}')
             return
 
-        pyrunner_cell_nos = sorted(set(int(num) for num in matches))
+        block_identifiers = sorted(set(int(num) for num in matches))
         buttons = {}
 
-        for pyrunner_cell_no in pyrunner_cell_nos:
-            buttons[f'{pyrunner_cell_no}'] = pyrunner_cell_no
+        for block_identifier in block_identifiers:
+            buttons[f'{block_identifier}'] = block_identifier
         
         # Add options for saved states
         for key in self.saved_state:
@@ -483,6 +511,7 @@ class Pyrunner:
         buttons['exit'] = 'exit'
 
         # Display dialog for user interaction
+        from lognflow.plt_utils import question_dialog
         show_and_ask_result = question_dialog(
             question='Choose a cell number', figsize=figsize, buttons=buttons
         )
@@ -516,7 +545,6 @@ class Pyrunner:
 
         elif isinstance(show_and_ask_result, int):
             globals_['pyrunner_code'] = pyrunner_code
-            globals_['pyrunner_cell_no'] = show_and_ask_result
+            globals_[self.block_identifier] = show_and_ask_result
             return globals_
-
 

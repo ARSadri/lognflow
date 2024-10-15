@@ -64,6 +64,7 @@ from    .plt_utils          import (plt_colorbar,
                                     plt_imshow_subplots,
                                     plt_imshow,
                                     plt_scatter3,
+                                    plt_plot,
                                     plt_confusion_matrix)
 from    typing              import  Union
 
@@ -140,11 +141,10 @@ class lognflow:
         :param time_tag:
             File names can carry time_tags in time.time() format or indices. This 
             is pretty much the most fundamental contribution of lognflow beside
-            carrying the folders and files paths around. By default it is True but
-            all file names will not have time tags if you set it to False or
-            if you don't mention it and create logs with same name, Otherwise,
-            you can give time_tag argument for all logger functions, all of which
-            set it to the default here by default. It can also be a string. options
+            carrying the folders and files paths around. By default it is False and
+            all file names will have time tags if you set it to True. so,
+            you can give time_tag argument for all logger functions, whose 
+            default is this default. It can also be a string: options
             are 'index' or 'time_and_index'. If you use index, instead of time
             stamps, it will simply put an index that counts up after each logging.
         :type time_tag: bool
@@ -156,7 +156,7 @@ class lognflow:
                  log_dir_prefix   : str              = None,
                  log_dir_suffix   : str              = None,
                  exist_ok         : bool             = True,
-                 time_tag         : Union[bool, str] = True,
+                 time_tag         : Union[bool, str] = False,
                  print_text       : bool             = True,
                  main_log_name    : str              = 'log',
                  log_flush_period : int              = 10):
@@ -968,7 +968,7 @@ class lognflow:
     def plot(self, parameter_name: str, 
                    parameter_value_list,
                    *plt_plot_args,
-                   x_values = None,
+                   x_values_list = None,
                    image_format='jpg',
                    dpi=1200,
                    title = None,
@@ -986,11 +986,11 @@ class lognflow:
             :param parameter_value_list: np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-            :param x_values: np.array
-                    if set, must be an np.array of same size of all y values
-                    or a list for each vector in y values where every element
-                    of x-values list is the same as the y-values element in 
-                    their list
+            :param x_values_list: np.array
+                    if set, must be a list of one or many np.array of same size of 
+                    all y values or a list for each vector in y values where 
+                    every element of x-values list is the same as the 
+                    y-values element in their list
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
@@ -998,38 +998,9 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
-        if not is_builtin_collection(parameter_value_list):
-            parameter_value_list = [parameter_value_list]
-        else:
-            parameter_value_list = list(parameter_value_list)
-            
-        if(x_values is not None):
-            if not isinstance(x_values, list):
-                x_values = [x_values]
-        
-            if( not( (len(x_values) == len(parameter_value_list)) | \
-                     (len(x_values) == 1) )):
-                self.text(
-                    self.log_name,
-                    f'x_values for {parameter_name} should have'\
-                    + ' length of 1 or the same as parameters list.')
-                raise ValueError
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        for list_cnt, parameter_value in enumerate(parameter_value_list):
-            if(x_values is None):
-                ax.plot(parameter_value, *plt_plot_args, **kwargs)
-            else:
-                if(len(x_values) == len(parameter_value)):
-                    ax.plot(x_values[list_cnt], parameter_value, 
-                            *plt_plot_args, **kwargs)
-                else:
-                    ax.plot(x_values[0], parameter_value, 
-                            *plt_plot_args, **kwargs)
-        
-        if title is not None:
-            ax.set_title(title)
+        plt_plot(
+            parameter_value_list, *plt_plot_args, 
+            x_values_list = x_values_list, fig_ax = fig_ax, **kwargs)
             
         if not return_figure:
             fpath = self.savefig(
@@ -1041,15 +1012,15 @@ class lognflow:
             return fig, ax
     
     def hist(self, parameter_name: str, 
-                       parameter_value_list,
-                       n_bins = 10,
-                       alpha = 0.5,
-                       labels_list = None,
-                       normalize = False,
-                       image_format='jpg', dpi=1200, title = None,
-                       time_tag: bool = None, 
-                       return_figure = False,
-                       **kwargs):
+                   parameter_value_list,
+                   n_bins = 10,
+                   alpha = 0.5,
+                   labels_list = None,
+                   normalize = False,
+                   image_format='jpg', dpi=1200, title = None,
+                   time_tag: bool = None, 
+                   return_figure = False,
+                   **kwargs):
         """log a single histogram
             If you have a numpy array or a list of arrays (or indexable by
             first dimension, an array of 1D arrays), use this to log a hist

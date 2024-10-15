@@ -354,3 +354,8 @@ History
 * plot_marker is plt_mark
 * fixes for plt_utils
 * all tests passed!
+
+0.12.17 (2024-10-13)
+-------------------
+* fixed a bug in plt_hist2
+* added plt_plot
