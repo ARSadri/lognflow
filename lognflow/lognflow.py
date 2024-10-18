@@ -973,6 +973,7 @@ class lognflow:
                    dpi=1200,
                    title = None,
                    time_tag: bool = None,
+                   fig_ax = None,
                    return_figure = False,
                    **kwargs):
         """log a single plot

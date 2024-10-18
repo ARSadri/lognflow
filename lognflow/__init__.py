@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.12.17'
+__version__ = '0.12.18'
 
 from .lognflow import lognflow, getLogger
 from .printprogress import printprogress
@@ -13,7 +13,8 @@ from .utils import (select_directory,
                     select_file, 
                     is_builtin_collection, 
                     text_to_collection, 
-                    printv)
+                    printv,
+                    block_runner)
 
 from .multiprocessor import multiprocessor
 

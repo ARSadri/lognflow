@@ -382,7 +382,7 @@ def printv(var, **kwargs):
     # Print the information
     print(toprint)
 
-class Pyrunner:
+class block_runner:
     """
     A Jupyter-like Python code runner that executes code in blocks based 
     on cell numbers, supports saving and loading kernel states, and allows 
@@ -399,13 +399,22 @@ class Pyrunner:
     def __init__(self, fpath: str, logger=None, 
                  block_identifier = 'code_block_id'):
         """
-        Initializes the Pyrunner class, runs the Python file in an interactive loop,
+        Initializes the block_runner class, runs the Python file in an interactive loop,
         and allows execution of specific code blocks identified by cell numbers.
 
         Args:
             fpath (str): The file path to the Python script to be executed.
             logger (callable, optional): A logger function to log output 
             (default is None).
+            block_identifier: string that block_runner will be looking for in your
+            code to find blocks of code to run. So you must struction you code
+            to have blocks of code separated using if block_identifier == a_number:
+                e.g.:
+                if block_identifier == 0:
+                    do_this()
+                if block_identifier == 1:
+                    do_that()
+            
         """
         self.block_identifier = block_identifier
         self.logger_ = logger
@@ -421,7 +430,8 @@ class Pyrunner:
             if show_and_ask_result is None:
                 continue
             globals().update(show_and_ask_result)
-            exec(globals().get('pyrunner_code', ''), globals())
+            globals().update({"__name__": "__main__"})
+            exec(globals().get('block_runner_code', ''), globals())
 
     def logger(self, toprint: str, end: str = '\n'):
         """
@@ -487,12 +497,12 @@ class Pyrunner:
             dict: A dictionary containing the updated global variables 
             if a cell block is selected.
         """
-        pyrunner_code = open(self.fpath).read()
+        block_runner_code = open(self.fpath).read()
         pattern = r"if\s+" + self.block_identifier + "\s*==\s*(\d+):"
-        matches = re.findall(pattern, pyrunner_code)
+        matches = re.findall(pattern, block_runner_code)
 
         if len(matches) == 0:
-            self.logger(f'Running the pyrunner_code in {self.fpath}')
+            self.logger(f'Running the block_runner_code in {self.fpath}')
             self.logger(f'No code blocks found that checks {self.block_identifier}')
             return
 
@@ -516,7 +526,7 @@ class Pyrunner:
             question='Choose a cell number', figsize=figsize, buttons=buttons
         )
         if show_and_ask_result is None:
-            self.logger(f'pyrunner: closing reloads, press Exit to close.')
+            self.logger(f'block_runner: closing reloads, press Exit to close.')
             return
 
         # Handle user selection
@@ -544,7 +554,7 @@ class Pyrunner:
                 return
 
         elif isinstance(show_and_ask_result, int):
-            globals_['pyrunner_code'] = pyrunner_code
+            globals_['block_runner_code'] = block_runner_code
             globals_[self.block_identifier] = show_and_ask_result
             return globals_
 

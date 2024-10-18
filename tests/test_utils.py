@@ -61,12 +61,12 @@ def test_save_or_load_kernel_state():
     
     print("State restored successfully!")
 
-def test_Pyrunner():
-    from lognflow.utils import Pyrunner
-    Pyrunner(Path('./test_pyrunner_code.py'), logger = print)
+def test_block_runner():
+    from lognflow.utils import block_runner
+    block_runner(Path('./test_block_runner_code.py'))
 
 if __name__ == '__main__':
-    test_Pyrunner()
+    test_block_runner()
     test_printv()
     test_is_builtin_collection()
     test_ssh_system()

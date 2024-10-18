@@ -355,7 +355,12 @@ History
 * fixes for plt_utils
 * all tests passed!
 
-0.12.17 (2024-10-13)
+0.12.17 (2024-10-17)
 -------------------
 * fixed a bug in plt_hist2
 * added plt_plot
+
+0.12.18 (2024-10-17)
+-------------------
+* allow pyrunner to be imported from lognflow itself
+* bug fixed in lognflow.plot
