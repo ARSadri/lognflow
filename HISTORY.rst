@@ -364,3 +364,8 @@ History
 -------------------
 * allow pyrunner to be imported from lognflow itself
 * bug fixed in lognflow.plot
+
+0.12.19 (2024-10-22)
+-------------------
+* block_runner supports code_block_id to be int, float or string.
+* block_runner supports debugging

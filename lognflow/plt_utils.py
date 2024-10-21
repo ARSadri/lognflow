@@ -1443,7 +1443,7 @@ class transform3D_viewer:
         step_size = float(self.params[f"{step_label}_text_box"].text)
         new_val = current_val + direction * step_size
         self.params[f"{label}_text_box"].set_val(f"{new_val:.6f}")
-  
+
 class _questdiag:
     def __init__(self, question, buttons, figsize, question_hratio):
         
@@ -1472,14 +1472,15 @@ class _questdiag:
         
         if figsize is None:
             if isinstance(question, np.ndarray):
-                figsize = (5, 5)
+                figsize = (7.5, 7.5)
             else:
-                figsize = (5, 1)
-
+                figsize = (5, 2.5)
+            
         # Create the figure and GridSpec layout
         fig = plt.figure(figsize=figsize)
         gs = matplotlib.gridspec.GridSpec(n_rows + 2, n_cols, 
-                      figure=fig, height_ratios=[question_hratio] + [1] * (n_rows + 1))  
+                      figure=fig, 
+                      height_ratios=[question_hratio] + [1] * (n_rows + 1))  
         # First row (3x height) for the question, remaining rows for buttons
         
         # Top section for the question (span the entire width)
@@ -1490,10 +1491,11 @@ class _questdiag:
             if len(question.shape) == 1:
                 ax_question.plot(question)
             elif len(question.shape) == 2:
-                plt_imshow(question, fig_ax = (fig, ax_question),)
+                plt_imshow(question, fig_ax=(fig, ax_question))
             plt.axis('on')  # Keep axis on for plots and images
         else:
-            ax_question.text(0.5, 0.5, str(question), ha='center', va='center', fontsize=12)
+            ax_question.text(0.5, 0.5, str(question), 
+                             ha='center', va='center', fontsize=12)
             ax_question.set_axis_off()  # No axis for text questions
 
         # Create buttons and place them on the grid
@@ -1502,7 +1504,7 @@ class _questdiag:
             row = 2 + i // n_cols
             col = i % n_cols
             button_ax = fig.add_subplot(gs[row, col])
-            button = Button(button_ax, str(label))
+            button = Button(button_ax, label)
             button.on_clicked(self.button_click)
             button_objects.append(button)
     

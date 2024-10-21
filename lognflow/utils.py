@@ -382,6 +382,12 @@ def printv(var, **kwargs):
     # Print the information
     print(toprint)
 
+def find_duplicates(a_list):
+    from collections import Counter
+    element_count = Counter(a_list)
+    duplicates = [item for item, count in element_count.items() if count > 1]
+    return duplicates
+
 class block_runner:
     """
     A Jupyter-like Python code runner that executes code in blocks based 
@@ -431,7 +437,16 @@ class block_runner:
                 continue
             globals().update(show_and_ask_result)
             globals().update({"__name__": "__main__"})
-            exec(globals().get('block_runner_code', ''), globals())
+            try:
+                # exec(globals().get('block_runner_code', ''), globals())
+                import runpy
+                result = runpy.run_path(fpath, init_globals=globals())
+                globals().update(result)
+                
+            except Exception as e:
+                print('-----------Block runner error-------------')
+                print(e)
+                print('-'*40)
 
     def logger(self, toprint: str, end: str = '\n'):
         """
@@ -482,7 +497,7 @@ class block_runner:
         """
         return len(self.saved_state.keys())
 
-    def show(self, globals_: dict, figsize: tuple = (3, 2)) -> dict:
+    def show(self, globals_: dict, figsize: tuple = None) -> dict:
         """
         Displays available cell blocks for execution and handles user 
         interaction to run specific blocks or manage kernel states 
@@ -498,20 +513,36 @@ class block_runner:
             if a cell block is selected.
         """
         block_runner_code = open(self.fpath).read()
-        pattern = r"if\s+" + self.block_identifier + "\s*==\s*(\d+):"
+        
+        # Updated regex to match both numbers (integers, floats) and text identifiers
+        pattern = rf"if\s+{self.block_identifier}\s*==\s*(.+?):"
         matches = re.findall(pattern, block_runner_code)
-
+        
         if len(matches) == 0:
             self.logger(f'Running the block_runner_code in {self.fpath}')
             self.logger(f'No code blocks found that checks {self.block_identifier}')
             return
-
-        block_identifiers = sorted(set(int(num) for num in matches))
+        
+        block_identifiers = []
+        for item in matches:
+            is_number = False
+            try:
+                _item = float(item)
+                is_number = True
+            except: pass
+                
+            if is_number:
+                if _item == int(_item):
+                    _item = int(_item)
+            else:
+                _item = str(item.strip("'").strip('"'))
+            block_identifiers.append(_item)
+        for blk_id_rep in find_duplicates(block_identifiers):
+            self.logger(f'block identifier {blk_id_rep} is used more than once.')
         buttons = {}
-
         for block_identifier in block_identifiers:
             buttons[f'{block_identifier}'] = block_identifier
-        
+            
         # Add options for saved states
         for key in self.saved_state:
             buttons[f'load_{key}'] = f'load_{key}'
@@ -553,8 +584,7 @@ class block_runner:
                 self.logger(f'Deleted state: {key}')
                 return
 
-        elif isinstance(show_and_ask_result, int):
-            globals_['block_runner_code'] = block_runner_code
-            globals_[self.block_identifier] = show_and_ask_result
-            return globals_
+        globals_['block_runner_code'] = block_runner_code
+        globals_[self.block_identifier] = show_and_ask_result
+        return globals_
 
