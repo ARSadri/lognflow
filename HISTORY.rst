@@ -366,3 +366,13 @@ History
 * bug fixed in lognflow.plot
 * block_runner supports code_block_id to be int, float or string.
 * block_runner supports debugging
+
+0.12.19 (2024-10-24)
+-------------------
+* plt_hist2 is easier to use now
+* plt_plot supports shapes N, (1, N)
+* record accepts argument savefig
+* block_runner reads the code before running
+* time_tag is True by default again
+* removed all imports from lognflow for faster loading
+* all tests are passed!

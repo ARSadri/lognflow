@@ -5,7 +5,7 @@ print(f'code_block_id : ', code_block_id)
 
 if code_block_id == 'init':
     print('block name: block init')
-    img = np.random.randn(100, 100)
+    img = np.random.randn(20, 20)
     img[30:50, 30:50] += 10
     plt_imhist(img); plt.show()
 

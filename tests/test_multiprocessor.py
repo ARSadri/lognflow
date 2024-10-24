@@ -11,6 +11,7 @@ def randgen(_):
     return randn
 
 def test_simple_randgen():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     results = multiprocessor(randgen, np.arange(100))
     print(results)
     
@@ -25,6 +26,7 @@ def multiprocessor_targetFunc(iterables_sliced, shareables):
     return(to_return1, 'median', to_return2)
     
 def test_multiprocessor():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
 
     N = 10000
@@ -63,6 +65,7 @@ def test_multiprocessor():
     print('difference of results: ', (direct_medians - medians).sum())
 
 def masked_cross_correlation(iterables_sliced, shareables):
+    print('Testing function', inspect.currentframe().f_code.co_name)
     vec1, vec2 = iterables_sliced
     mask, statistics_func = shareables
     vec1 = vec1[mask==1]
@@ -82,6 +85,7 @@ def masked_cross_correlation(iterables_sliced, shareables):
     return(to_return)
 
 def test_multiprocessor_ccorr():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     data_shape = (1000, 2000)
     data1 = np.random.randn(*data_shape)
@@ -98,6 +102,7 @@ def test_multiprocessor_ccorr():
     print(f'ccorr.shape: {ccorr.shape}')
 
 def error_multiprocessor_targetFunc(iterables_sliced, shareables):
+    print('Testing function', inspect.currentframe().f_code.co_name)
     idx = iterables_sliced
     data, mask, op_type = shareables
     _data = data[idx]
@@ -112,6 +117,7 @@ def error_multiprocessor_targetFunc(iterables_sliced, shareables):
     return(to_return1, 'median', to_return2)    
 
 def test_error_handling_in_multiprocessor():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     
     N = 10000
@@ -147,6 +153,7 @@ def noslice_multiprocessor_targetFunc(iterables_sliced, shareables):
     return(to_return1, 'median', to_return2)    
 
 def test_noslice_multiprocessor():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     
     N = 1000
@@ -174,6 +181,7 @@ def compute_arg_scatterer(iterables_sliced):
     return compute(*iterables_sliced)
 
 def test_loopprocessor():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
 
     N = 16
@@ -212,6 +220,7 @@ def test_loopprocessor():
     print(f'serial processing period: {sp_period}')
     
 def test_multiprocessor_gen():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     N = 8
     D = 100000
     data = (100+10*np.random.randn(N,D)).astype('int')

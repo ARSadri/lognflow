@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import lognflow
 import numpy as np
-
+import inspect
 def test_is_builtin_collection():
 
     # Test the function with various types

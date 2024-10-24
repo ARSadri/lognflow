@@ -127,21 +127,24 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
 
 def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
-              colorbar=True, fig_ax=None, colorbar_label=None):
+              colorbar=True, fig_ax=None, colorbar_label=None,
+              elev=None, azim=None):
     """
-    Plot a 3D histogram with a cmap based on the height of the bars.
+    Plot a 3D histogram with a colormap based on the height of the bars.
 
     Parameters:
     data (array-like): N x 2 array of (x, y) points.
     bins (int): Number of bins in each dimension.
-    cmap (str): Name of the matplotlib colormap to use.
+    cmap (str): Name of the matplotlib colormap to use for the bars.
     xlabel (str): Label for the x-axis.
     ylabel (str): Label for the y-axis.
     zlabel (str): Label for the z-axis.
     title (str): Title of the plot.
-    colorbar (bool): Whether to show a colorbar.
-    fig_ax (tuple): Optional tuple (fig, ax) to plot on.
-    colorbar_label (str): Label for the colorbar.
+    colorbar (bool): Whether to show a colorbar representing bar heights.
+    fig_ax (tuple): Optional tuple (fig, ax) to specify the figure and axis to plot on.
+    colorbar_label (str): Label for the colorbar, if shown.
+    elev (float): Elevation angle in the z-plane for the 3D view.
+    azim (float): Azimuthal angle in the x-y plane for the 3D view.
 
     Returns:
     tuple: (fig, ax) - The figure and axis objects.
@@ -149,56 +152,52 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
     
     assert data.shape[1] == 2, "Data must have shape (N, 2)"
     
-    # Get the 2D histogram data (counts) and the bin edges
     counts, x_edges, y_edges = np.histogram2d(data[:, 0], data[:, 1], bins=bins)
 
-    # Create meshgrid for the bin edges
     x_pos, y_pos = np.meshgrid(x_edges[:-1] + 0.5 * (x_edges[1] - x_edges[0]),
                                y_edges[:-1] + 0.5 * (y_edges[1] - y_edges[0]))
     x_pos = x_pos.ravel()
     y_pos = y_pos.ravel()
     z_pos = np.zeros_like(x_pos)
 
-    # The size of the bars in X and Y directions
-    dx = dy = (x_edges[1] - x_edges[0])  # Same width for all bars
-    dz = counts.ravel()  # The height of each bar is the count
+    dx = dy = (x_edges[1] - x_edges[0])
+    dz = counts.ravel()
 
-    # Normalize dz (bar heights) to the range [0, 1] for the cmap
-    norm_dz = dz / dz.max() if dz.max() > 0 else dz  # Avoid division by zero
+    norm_dz = dz / dz.max() if dz.max() > 0 else dz
 
-    # Get a colormap based on the normalized dz values
     colors = plt.cm.get_cmap(cmap)(norm_dz)
 
-    # Create the figure and 3D axis
     if fig_ax is None:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        if use_bars:
+            ax = fig.add_subplot(111, projection='3d')
+        else:
+            ax = fig.add_subplot(111)
     else:
         fig, ax = fig_ax
     
     if use_bars:
-        # Plot the bars with colors based on dz values
         bars = ax.bar3d(x_pos, y_pos, z_pos, dx, dy, dz, 
-                        color=colors, edgecolor=colors, alpha=1)
+                         color=colors, edgecolor=colors, alpha=1)
+        ax.view_init(elev=elev, azim=azim)
+        if colorbar:
+            mappable = plt.cm.ScalarMappable(cmap=cmap)
+            mappable.set_array(dz)
+            cbar = plt.colorbar(mappable, ax=ax)
+            if colorbar_label is not None:
+                cbar.set_label(colorbar_label)
     else:
-        im = ax.imshow(...)
-    # Adjust viewing angle for better visibility
-    # ax.view_init(elev=20, azim=30)  # Adjust the elevation and azimuthal angles as needed
+        im = ax.imshow(
+            counts.T, cmap=cmap, origin='lower', aspect='auto',
+            extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]])
+        if colorbar:
+            plt_colorbar(im)
 
-    # Labels and title
     if xlabel is not None: ax.set_xlabel(xlabel)
     if ylabel is not None: ax.set_ylabel(ylabel)
     if zlabel is not None: ax.set_zlabel(zlabel)
     if title  is not None: ax.set_title(title)
     
-    if colorbar:
-        # Add a color bar to show the mapping between dz values and the cmap
-        mappable = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=dz.min(), vmax=dz.max()))
-        mappable.set_array([])  # Only necessary for some versions of matplotlib
-        cbar = plt.colorbar(mappable, ax=ax)
-        if colorbar_label is not None:
-            cbar.set_label(colorbar_label)
-
     return fig, ax
 
 def plt_confusion_matrix(cm, 
@@ -457,7 +456,20 @@ class plt_imhist:
                 self.slider.set_val([lower_val, upper_val])
         except ValueError:
             pass
-        
+
+def _listify_1d_list(list_of_obj):
+    if list_of_obj is not None:
+        if len(list_of_obj) > 1:
+            it_is_1d = True
+            for _ in list_of_obj:
+                try:
+                    if len(_) > 1:
+                        it_is_1d = False
+                except: pass
+            if it_is_1d:
+                list_of_obj = [np.array(list_of_obj).squeeze()]
+    return list_of_obj
+
 def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, 
              fig_ax = None, title = None, **kwargs):
     """
@@ -524,11 +536,15 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
         >>> fig, ax = plt_plot(y_values_list, x_values_list)
         >>> plt.show()
     """
+    y_values_list = _listify_1d_list(y_values_list)
+    x_values_list = _listify_1d_list(x_values_list)
+    
     if x_values_list is not None:
-        assert ( (len(x_values_list) == len(y_values_list)) | \
+        assert ( (len(x_values_list) >= len(y_values_list)) | \
                  (len(x_values_list) == 1) ), \
-                f'lognflow/plt_utils/plt_plot: x_values_list should have'\
-                + ' length of 1 or the same as parameters list.'
+                f'lognflow plt_plot: x_values_list has length {len(x_values_list)},'\
+                ' should have length of 1 or the same as parameters list: '\
+                f'{len(y_values_list)}.'
     
     if fig_ax is None:
         fig = plt.figure()

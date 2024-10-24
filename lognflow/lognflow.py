@@ -35,39 +35,25 @@ numpy variables that don't change size can be buffered up to a certain size
 before storing into the directory using log_var(name, var).
 
 """
-import  time
-import  inspect
-import  numpy                                   as np
-import  matplotlib.pyplot                       as plt
-from    matplotlib.pyplot   import imread       as mpl_imread
-from    matplotlib          import animation    as matplotlib_animation
-from    pathlib             import Path         as pathlib_Path
-from    itertools           import product      as itertools_product
-from    sys                 import platform     as sys_platform
-from    sys                 import argv         as sys_argv
-from    os                  import system       as os_system
-from    tempfile            import gettempdir
-from    dataclasses         import dataclass    
-from    .logviewer          import logviewer
-from    .utils              import (repr_raw,
-                                    replace_all,
-                                    select_directory,
-                                    name_from_file,
-                                    is_builtin_collection,
-                                    text_to_collection,
-                                    dummy_function)
-from    .plt_utils          import (plt_colorbar,
-                                    stack_to_frame,
-                                    plt_hist,
-                                    plt_surface, 
-                                    plt_imshow_series,
-                                    plt_imshow_subplots,
-                                    plt_imshow,
-                                    plt_scatter3,
-                                    plt_plot,
-                                    plt_confusion_matrix)
-from    typing              import  Union
+import time
+import atexit
+import inspect
+from   pathlib     import Path       as pathlib_Path
+from   sys         import platform   as sys_platform
+from   sys         import argv       as sys_argv
+from   os          import system     as os_system
+from   tempfile    import gettempdir
+from   dataclasses import dataclass 
+from   typing      import Union
 
+import numpy             as np
+import matplotlib.pyplot as plt
+
+from   .utils            import (repr_raw,
+                                 replace_all,
+                                 select_directory,
+                                 name_from_file,
+                                 text_to_collection)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -76,6 +62,7 @@ class varinlog:
     file_start_time     : float          
     suffix              : str
     log_counter_limit   : int
+    savefig             : bool
 
 @dataclass
 class textinlog:
@@ -141,8 +128,8 @@ class lognflow:
         :param time_tag:
             File names can carry time_tags in time.time() format or indices. This 
             is pretty much the most fundamental contribution of lognflow beside
-            carrying the folders and files paths around. By default it is False and
-            all file names will have time tags if you set it to True. so,
+            carrying the folders and files paths around. By default it is True and
+            all file names will not have time tags if you set it to False. so,
             you can give time_tag argument for all logger functions, whose 
             default is this default. It can also be a string: options
             are 'index' or 'time_and_index'. If you use index, instead of time
@@ -156,10 +143,11 @@ class lognflow:
                  log_dir_prefix   : str              = None,
                  log_dir_suffix   : str              = None,
                  exist_ok         : bool             = True,
-                 time_tag         : Union[bool, str] = False,
+                 time_tag         : Union[bool, str] = True,
                  print_text       : bool             = True,
                  main_log_name    : str              = 'log',
                  log_flush_period : int              = 10):
+        atexit.register(self.flush_all)
         self._init_time = time.time()
         self.log_dir_prefix = log_dir_prefix
         self.log_dir_suffix = log_dir_suffix
@@ -219,6 +207,7 @@ class lognflow:
         self.enabled = True
         self.counted_vars = {}
         self.param_name_set = set()
+        self.close = self.flush_all
         
         #all depricated and will be removed in a few revisions
         self.log_text               = self.text
@@ -708,8 +697,8 @@ class lognflow:
         cnt_limit = int(log_size_limit/(param.size*param.itemsize))
         return cnt_limit
 
-    def record(self, parameter_name: str, parameter_value, 
-                suffix = None, log_size_limit: int = int(1e+7)):
+    def record(self, parameter_name: str, parameter_value, flush = False,
+                suffix = None, log_size_limit: int = int(1e+7), savefig = False):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -765,6 +754,8 @@ class lognflow:
             self.record_flush(log_dirnamesuffix)
             file_start_time = self.time_stamp
             curr_index = 0
+        elif flush:
+            self.record_flush(log_dirnamesuffix)
 
         if(curr_index == 0):
             data_array = np.zeros((log_counter_limit, ) + parameter_value.shape,
@@ -773,27 +764,21 @@ class lognflow:
         
         try:
             time_array[curr_index] = self.time_stamp
-        except:
-            self.text(
-                self.log_name,
-                f'current index {curr_index} cannot be used in the logger')
+        except: pass
         if(parameter_value.shape == data_array[curr_index].shape):
             data_array[curr_index] = parameter_value
         else:
-            self.text(
-                self.log_name,
-                f'Shape of variable {log_dirnamesuffix} cannot change shape '\
-                f'from {data_array[curr_index].shape} '\
-                f'to {parameter_value.shape}. Coppying from the last time.')
-            data_array[curr_index] = data_array[curr_index - 1]
+            data_array[curr_index] = data_array[curr_index - 1] * 0 + np.nan
+        
         self._vars_dict[log_dirnamesuffix] = varinlog(data_array, 
                                                       time_array, 
                                                       curr_index,
                                                       file_start_time,
                                                       suffix,
-                                                      log_counter_limit)
+                                                      log_counter_limit,
+                                                      savefig)
 
-    def record_flush(self, parameter_name: str, suffix: str = None):
+    def record_flush(self, parameter_name: str, suffix: str = None, savefig = None):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
@@ -814,6 +799,8 @@ class lognflow:
         _param_dir = self._get_fpath(param_dir)
         
         _var = self._vars_dict[log_dirnamesuffix]
+        savefig  = _var.savefig if savefig is None else savefig 
+        
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
         if((_var.suffix == 'npz') | (_var.suffix == 'npy')):
@@ -826,6 +813,9 @@ class lognflow:
             np.savetxt(fpath, _var_time_array)
             fpath = _param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
+        if savefig:
+            self.plot(parameter_name, [_var_data_array], '-*', 
+                      x_values_list = [_var_time_array])
         return fpath
     
     def get_record(self, parameter_name: str, suffix: str = None) -> tuple:
@@ -998,7 +988,7 @@ class lognflow:
         """
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
-            
+        from .plt_utils import plt_plot
         plt_plot(
             parameter_value_list, *plt_plot_args, 
             x_values_list = x_values_list, fig_ax = fig_ax, **kwargs)
@@ -1048,6 +1038,7 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
+        from .plt_utils import plt_hist
         fig, ax = plt_hist(parameter_value_list, 
                            n_bins = n_bins, alpha = alpha, 
                            normalize = normalize, 
@@ -1101,6 +1092,7 @@ class lognflow:
                 data_N_by_3 = data_N_by_3.T
                 self.text(
                     None, 'lognflow.scatter3> input dataset is transposed.')
+        from .plt_utils import plt_scatter3
         fig_ax_opt_stack = plt_scatter3(data_N_by_3, title = title,
                      elev_list = elev_list, azim_list = azim_list,
                      make_animation = make_animation, **kwargs)
@@ -1138,6 +1130,7 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
             
+        from .plt_utils import plt_surface
         fig, ax = plt_surface(parameter_value)
         
         if title is not None:
@@ -1241,6 +1234,7 @@ class lognflow:
                 use_stack_to_frame = True
         
         if(use_stack_to_frame):
+            from .plt_utils import stack_to_frame
             parameter_value = stack_to_frame(
                 parameter_value, frame_shape = frame_shape, 
                 borders = borders)
@@ -1248,6 +1242,7 @@ class lognflow:
                 FLAG_img_ready = True
 
         if(FLAG_img_ready):
+            from .plt_utils import plt_imshow
             plt_imshow(parameter_value, 
                        colorbar = colorbar, 
                        remove_axis_ticks = remove_axis_ticks, 
@@ -1316,6 +1311,7 @@ class lognflow:
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
 
+        from .plt_utils import plt_imshow_subplots
         fig, ax = plt_imshow_subplots(images = images,
                                      frame_shape = frame_shape, 
                                      grid_locations = grid_locations,
@@ -1394,7 +1390,8 @@ class lognflow:
         """
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
-            
+        
+        from .plt_utils import plt_imshow_series
         fig, ax = plt_imshow_series(list_of_stacks, 
                                     list_of_masks = list_of_masks,
                                     figsize = figsize,
@@ -1503,7 +1500,7 @@ class lognflow:
     
         """
         if not self.enabled: return
-        
+        from .plt_utils import plt_confusion_matrix
         plt_confusion_matrix(
             cm, target_names=target_names, title=title, 
             cmap=cmap, figsize=figsize)
@@ -1544,6 +1541,8 @@ class lognflow:
             im = ax.imshow(img, animated=True)
             ax.axis('off')
             ims.append([im])
+
+        from matplotlib import animation as matplotlib_animation
         ani = matplotlib_animation.ArtistAnimation(\
             fig, ims, interval = interval, blit = blit, repeat_delay = repeat_delay)
         try:
@@ -1571,23 +1570,6 @@ class lognflow:
                                parameter_value = parameter_value,
                                suffix = 'npz',
                                time_tag = time_tag)
-
-    def close(self):
-        try:
-            self.flush_all()
-        except:
-            print('lognflow: cannot close')
-
-    def __call__(self, *args, **kwargs):
-        """calling the object
-            In the case of the following code::
-                logger = lognflow()
-                logger('Hello lognflow')
-            The text (str(...)) will be passed to the main log text file.
-        """
-        fpath = self.text(None, *args, **kwargs)
-        self.flush_all()
-        return fpath
 
     #towards supporting all that logging supports
     def debug(self, text_to_log):
@@ -1858,7 +1840,8 @@ class lognflow:
                     from torch import load as torch_load 
                     return(torch_load(var_path), var_path)
                 try:    #png
-                    img = mpl_imread(var_path)
+                    from matplotlib.pyplot import imread
+                    img = imread(var_path)
                     return(img, var_path)
                 except: pass
                 try:
@@ -1948,7 +1931,7 @@ class lognflow:
         else:
             flist = list(flist)
             assert pathlib_Path(flist[0]).is_file(), \
-                f'File not found: {flist[0]}. You can use logviewer get_flist'
+                f'File not found: {flist[0]}. You can use get_flist'
         
         if flist:
             n_files = len(flist)
@@ -1959,8 +1942,9 @@ class lognflow:
                 except: pass
             if(read_func is None):
                 try:
-                    fdata = mpl_imread(flist[0])
-                    read_func = mpl_imread
+                    from matplotlib.pyplot import imread
+                    fdata = imread(flist[0])
+                    read_func = imread
                 except: pass
             try:
                 read_func(flist[0])
@@ -2053,12 +2037,16 @@ class lognflow:
                     self.text(None, f'To {fpath_new.name}')
                 flist[fcnt].rename(fpath_new)
 
-    def __del__(self):
-        try:
-            self.flush_all()
-        except:
-            pass
-        
+    def __call__(self, *args, **kwargs):
+        """calling the object
+            In the case of the following code::
+                logger = lognflow()
+                logger('Hello lognflow')
+            The text (str(...)) will be passed to the main log text file.
+        """
+        fpath = self.text(None, *args, **kwargs)
+        return fpath
+
     def __repr__(self):
         return f'{self.log_dir}'
 

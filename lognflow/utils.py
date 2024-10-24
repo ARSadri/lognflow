@@ -1,9 +1,4 @@
-import re
-import time
-import inspect
-import pathlib
-import numpy as np
-from pathlib import Path
+from pathlib import Path as pathlib_Path
 
 def dummy_function(*args, **kwargs): ...
 
@@ -122,7 +117,7 @@ def select_directory(default_directory = './'):
     """ Open dialog to select a directory
         It works for windows and Linux using PyQt5.
     
-       :param default_directory: pathlib.Path
+       :param default_directory: pathlib_Path
                 When dialog opens, it starts from this default directory.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication
@@ -138,7 +133,7 @@ def select_file():
     from PyQt5.QtWidgets import QFileDialog, QApplication
     _ = QApplication([])
     fpath = QFileDialog.getOpenFileName()
-    fpath = Path(fpath[0])
+    fpath = pathlib_Path(fpath[0])
     return(fpath)
 
 def text_to_collection(text):
@@ -168,13 +163,15 @@ def text_to_collection(text):
             return node.s
         elif isinstance(node, ast.Name):
             if node.id == 'array':
-                return np
+                import numpy
+                return numpy
             elif node.id == 'tensor':
                 import torch
                 return torch
         elif isinstance(node, ast.Call):
             func_name = node.func.id
             if func_name == 'array':
+                import numpy as np
                 return np.array([parse_node(arg) for arg in node.args])
             elif func_name == 'tensor':
                 import torch
@@ -216,15 +213,15 @@ class SSHSystem:
             self.ssh_client = None
             self.sftp_client = None
 
-    def ssh_ls(self, path: Path):
+    def ssh_ls(self, path: pathlib_Path):
         """
         List the contents of a directory on the remote system.
 
         Args:
-            path (Path): The path to the directory on the remote system.
+            path (pathlib_Path): The path to the directory on the remote system.
 
         Returns:
-            list: A list of Path objects representing the files in the directory.
+            list: A list of pathlib_Path objects representing the files in the directory.
         """
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
@@ -234,25 +231,25 @@ class SSHSystem:
             print(f"Error listing directory {path}: {e}")
             return []
 
-    def ssh_scp(self, source: Path, destination: Path):
+    def ssh_scp(self, source: pathlib_Path, destination: pathlib_Path):
         """
         Copy a file from the remote system to the local system using SFTP.
 
         Args:
-            source (Path): The path of the file on the remote system.
-            destination (Path): The path where the file will be saved locally.
+            source (pathlib_Path): The path of the file on the remote system.
+            destination (pathlib_Path): The path where the file will be saved locally.
         """
         try:
             self.sftp_client.get(str(source), str(destination))
         except Exception as e:
             print(f"Error copying {source} to {destination}: {e}")
 
-    def ssh_rm(self, path: Path):
+    def ssh_rm(self, path: pathlib_Path):
         """
         Remove a file from the remote system.
 
         Args:
-            path (Path): The path to the file to be removed.
+            path (pathlib_Path): The path to the file to be removed.
 
         Returns:
             tuple: A tuple containing the stdout and stderr outputs from the command.
@@ -265,7 +262,7 @@ class SSHSystem:
             return "", str(e)
 
     def monitor_and_remove(
-        self, remote_folder: Path, local_folder: Path, 
+        self, remote_folder: pathlib_Path, local_folder: pathlib_Path, 
         target_fname: str, interval=30
     ):
         """
@@ -273,14 +270,15 @@ class SSHSystem:
         transfer and delete other files from the folder.
 
         Args:
-            remote_folder (Path): The folder on the remote system to monitor.
-            local_folder (Path): The local folder where files will be copied.
+            remote_folder (pathlib_Path): The folder on the remote system to monitor.
+            local_folder (pathlib_Path): The local folder where files will be copied.
             target_fname (str): The name of the file to wait for.
             interval (int, optional): The time interval (in seconds) 
             between each check. Default is 30 seconds.
         """
         interesting_file_path = remote_folder / target_fname
         cnt = 0
+        import time
         while not self.is_file(interesting_file_path):
             if (cnt % 100) == 0:
                 print(f'Waiting for {interesting_file_path}', end='')
@@ -303,12 +301,12 @@ class SSHSystem:
             print(f"Deleting {file} from remote server")
             self.ssh_rm(file)
 
-    def is_file(self, path: Path) -> bool:
+    def is_file(self, path: pathlib_Path) -> bool:
         """
         Check if a file exists on the remote system.
 
         Args:
-            path (Path): The path to the file on the remote system.
+            path (pathlib_Path): The path to the file on the remote system.
 
         Returns:
             bool: True if the file exists, False otherwise.
@@ -332,6 +330,7 @@ class SSHSystem:
 
 def printv(var, **kwargs):
     # Get the name of the variable passed to the function
+    import inspect
     frame = inspect.currentframe().f_back
     var_name = [name for name, value in frame.f_locals.items() if value is var]
     
@@ -358,6 +357,7 @@ def printv(var, **kwargs):
     except: pass
     
     if is_np_torch:
+        import numpy as np
         arr_size = np.prod(array_shape)
         if 'array_size_threshold' in kwargs:
             array_size_threshold = kwargs['array_size_threshold']
@@ -395,14 +395,14 @@ class block_runner:
     interactive execution.
 
     Attributes:
-        fpath (Path): The path to the Python file to execute.
+        fpath (pathlib_Path): The path to the Python file to execute.
         logger_ (callable): An optional logger function to log messages.
         log (str): A string containing the accumulated log messages.
         saved_state (dict): A dictionary to hold saved kernel states.
         exit (bool): A flag to indicate when to stop execution.
     """
 
-    def __init__(self, fpath: str, logger=None, 
+    def __init__(self, fpath: str, logger=None, figsize = None,
                  block_identifier = 'code_block_id'):
         """
         Initializes the block_runner class, runs the Python file in an interactive loop,
@@ -422,9 +422,11 @@ class block_runner:
                     do_that()
             
         """
+        import runpy
+        self.figsize = figsize
         self.block_identifier = block_identifier
         self.logger_ = logger
-        self.fpath = Path(fpath)
+        self.fpath = pathlib_Path(fpath)
         assert self.fpath.is_file(), f"File {fpath} does not exist."
         self.log = ''
         self.saved_state = {}
@@ -439,7 +441,6 @@ class block_runner:
             globals().update({"__name__": "__main__"})
             try:
                 # exec(globals().get('block_runner_code', ''), globals())
-                import runpy
                 result = runpy.run_path(fpath, init_globals=globals())
                 globals().update(result)
                 
@@ -497,7 +498,7 @@ class block_runner:
         """
         return len(self.saved_state.keys())
 
-    def show(self, globals_: dict, figsize: tuple = None) -> dict:
+    def show(self, globals_: dict) -> dict:
         """
         Displays available cell blocks for execution and handles user 
         interaction to run specific blocks or manage kernel states 
@@ -516,6 +517,7 @@ class block_runner:
         
         # Updated regex to match both numbers (integers, floats) and text identifiers
         pattern = rf"if\s+{self.block_identifier}\s*==\s*(.+?):"
+        import re
         matches = re.findall(pattern, block_runner_code)
         
         if len(matches) == 0:
@@ -537,6 +539,13 @@ class block_runner:
             else:
                 _item = str(item.strip("'").strip('"'))
             block_identifiers.append(_item)
+        for blk in block_identifiers:
+            if isinstance(blk, str):
+                if ('load' in blk) | ('save' in blk) | ('exit' in blk):
+                    self.logger(
+                        f'block identifier {blk} is using a preserved word.'
+                        ' Please do not use load, save and exit to name your'
+                        'code blocks.')
         for blk_id_rep in find_duplicates(block_identifiers):
             self.logger(f'block identifier {blk_id_rep} is used more than once.')
         buttons = {}
@@ -554,7 +563,7 @@ class block_runner:
         # Display dialog for user interaction
         from lognflow.plt_utils import question_dialog
         show_and_ask_result = question_dialog(
-            question='Choose a cell number', figsize=figsize, buttons=buttons
+            question='Choose a cell number', figsize=self.figsize, buttons=buttons
         )
         if show_and_ask_result is None:
             self.logger(f'block_runner: closing reloads, press Exit to close.')

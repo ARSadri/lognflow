@@ -3,15 +3,17 @@
 """Tests for `lognflow` package."""
 import pytest
 import time
+import inspect
 import matplotlib.pyplot as plt
 import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
     transform3D_viewer, plt_mark, plt_contours, question_dialog,
-    plt_plot)
+    plt_plot, plt_hist2)
 import numpy as np
 
 def test_transform3D_viewer():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     in_pointcloud = np.random.randn(100, 3)
     moving_inds = np.where((in_pointcloud[:, 0] > 0) & 
                            (in_pointcloud[:, 1] > 0) & 
@@ -45,9 +47,9 @@ def test_transform3D_viewer():
     tp.figure()
     plt.show()
     print(tp.PC[moving_inds].mean(0))
-
     
 def test_numbers_as_images():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     dataset_shape = (10, 10, 64, 64)
     fontsize = 10
     dataset = lognflow.plt_utils.numbers_as_images_4D(
@@ -66,7 +68,7 @@ def test_numbers_as_images():
     plt.show()
 
 def test_plot_gaussian_gradient():
-    print('test_plot_gaussian_gradient')
+    print('Testing function', inspect.currentframe().f_code.co_name)
     x = np.arange(0, 2, 0.1)
     mu = x**2
     std = mu**0.5
@@ -92,6 +94,7 @@ def test_plot_gaussian_gradient():
     pgg.show()
 
 def test_plt_fig_to_numpy():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     fig, ax = plt.subplots(111)
     ax[0].imshow(np.random.rand(100, 100))
     np_data = lognflow.plt_utils.plt_fig_to_numpy(fig)
@@ -99,12 +102,14 @@ def test_plt_fig_to_numpy():
     plt.close()
 
 def test_plt_imshow_series():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     data = [np.random.rand(10, 100, 100),
             np.random.rand(10, 10, 10)]
     lognflow.plt_utils.plt_imshow_series(data)
     plt.show()
 
 def test_plt_imshow_subplots():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     data = np.random.rand(15, 100, 100, 3)
     lognflow.plt_utils.plt_imshow_subplots(data, colorbar = False)
 
@@ -121,15 +126,18 @@ def test_plt_imshow_subplots():
     plt.show()
 
 def test_plt_imshow():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     data = np.random.rand(100, 100) + 1j * np.random.rand(100, 100)
     plt_imshow(data, cmap = 'complex')
     plt.show()
     
 def test_complex2hsv_colorbar():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     complex2hsv_colorbar()
     plt.show()
 
 def test_plt_imhist():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     img = np.zeros((100, 100))
     indsi, indsj = np.where(img == 0)
     mask = ((indsi - 30)**2 + (indsj - 30)**2)**0.5 > 15
@@ -142,7 +150,7 @@ def test_plt_imhist():
     plt.show()
 
 def test_plt_imshow_complex():
-    
+    print('Testing function', inspect.currentframe().f_code.co_name)
     comx, comy = np.meshgrid(np.arange(-7, 8, 1), np.arange(-7, 8, 1))
     com = comx + 1j * comy
     print(comx)
@@ -184,6 +192,7 @@ def test_plt_imshow_complex():
     plt.show()
 
 def test_plt_mark():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     coords = np.random.rand(1000, 2)*100
     fig, ax, markersize = plt_mark(
         coords, fig_ax=None, figsize=None,
@@ -195,6 +204,7 @@ def test_plt_mark():
     plt.show()
 
 def test_plt_contours():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     yy, xx = np.meshgrid(np.arange(100), np.arange(50))
     Z_list = [np.exp(- ((xx-15)**2 + (yy-30)**2)**0.5 / 18), 
               np.exp(- ((xx-35)**2 + (yy-70)**2)**0.5 / 18) ]
@@ -202,6 +212,7 @@ def test_plt_contours():
     plt.show()
 
 def test_question_dialog():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     vec = np.random.rand(100)
     img = np.random.rand(100, 100)
     question = 'how good is it?'
@@ -214,28 +225,51 @@ def test_question_dialog():
     print(result)
 
 def test_stack_to_frame():
-   data4d = np.random.rand(25, 32, 32, 3)
-   img = lognflow.plt_utils.stack_to_frame(data4d, borders = np.nan)
-   plt.figure()
-   plt.imshow(img)
-   
-   data4d = np.random.rand(32, 32, 16, 16, 3)
-   stack = data4d.reshape(-1, *data4d.shape[2:])
-   frame = lognflow.plt_utils.stack_to_frame(stack, borders = np.nan)
-   plt.figure()
-   im = plt.imshow(frame)
-   lognflow.plt_utils.plt_colorbar(im)
-   plt.show()
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    data4d = np.random.rand(25, 32, 32, 3)
+    img = lognflow.plt_utils.stack_to_frame(data4d, borders = np.nan)
+    plt.figure()
+    plt.imshow(img)
+    
+    data4d = np.random.rand(32, 32, 16, 16, 3)
+    stack = data4d.reshape(-1, *data4d.shape[2:])
+    frame = lognflow.plt_utils.stack_to_frame(stack, borders = np.nan)
+    plt.figure()
+    im = plt.imshow(frame)
+    lognflow.plt_utils.plt_colorbar(im)
+    plt.show()
 
 def test_plt_plot():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     y_values_list = [[1, 2, 3], [4, 5, 6]]
-    x_values_list = [[1, 2, 3]]
-    plt_plot(y_values_list, '-*', x_values_list = x_values_list)
     plt_plot(y_values_list, '-*')
+
+    x_values_list = [[10, 12, 30]]
+    plt_plot(y_values_list, '-*', x_values_list = x_values_list)
+
+    y_values_list = [1, 2, 3]
+    plt_plot(y_values_list, '-*')
+    
+    x_values_list = [10, 12, 30]
+    plt_plot(y_values_list, '-*', x_values_list = x_values_list)
+    
+    plt.show()
+
+def test_plt_hist2():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    vec1 = np.array([np.random.randn(100), np.random.randn(100) + 10])
+    vec2 = np.array([np.random.randn(100), np.random.randn(100) + 10])
+    data = np.array([vec1.ravel(), vec2.ravel()]).T
+    
+    plt_hist2(data)
+    
+    plt_hist2(data, use_bars = False)
+    
     plt.show()
 
 if __name__ == '__main__':
     test_plt_plot()
+    test_plt_hist2()
     test_plt_imshow_complex()
     test_question_dialog()
     test_plt_contours()

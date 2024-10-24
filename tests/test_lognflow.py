@@ -2,18 +2,17 @@
 
 """Tests for `lognflow` package."""
 import pytest
-
+import inspect
 import time
 import numpy as np
-import matplotlib.pyplot as plt
-from lognflow import (
-    lognflow, printprogress, select_directory)
-from lognflow.utils import stacks_to_frames, text_to_collection
+
+from lognflow import lognflow, printprogress, select_directory
 
 import tempfile
 temp_dir = tempfile.gettempdir()
 
 def test_log_index():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for putting index instead of time_stamp')
     logger.save('testa', 'testa', time_tag = False)
@@ -27,6 +26,7 @@ def test_log_index():
     logger.save('testd', 'test9', time_tag = 'time_and_index')
     
 def test_lognflow_conflict_in_names():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for conflict in names')
     logger1 = lognflow(logger.log_dir)
@@ -35,6 +35,7 @@ def test_lognflow_conflict_in_names():
     logger2(logger2.log_dir)
 
 def test_text():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, print_text = False)
     logger('This is a test for text')    
     for _ in range(10000):
@@ -58,6 +59,7 @@ def test_text():
         logger(f'{_}')
 
 def test_logger():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     ''' test the logger call funciton
         when lognflow object is made, you can call it.
         If it is called with a string as input, it will log that into the
@@ -83,6 +85,7 @@ def test_logger():
     logger.save('test/c', c, suffix = 'txt')
 
 def test_log_flush_period():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, log_flush_period = 30)
     logger('This is a test for lognflow and record')    
     
@@ -100,6 +103,7 @@ def test_log_flush_period():
                     'For other log files you need to mention the log_name')
 
 def test_record():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for lognflow and record')    
 
@@ -107,19 +111,47 @@ def test_record():
         logger.record('vars/vec/v.to.txt', np.random.rand(10000))
         
 def test_record_without_time_stamp():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for lognflow and record')    
 
     for _ in range(10):
         logger.save('vars/vec/v', np.random.rand(10000), time_tag = False)
+
+def test_record_savefig():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    logger = lognflow(temp_dir)
+    logger('This is a test for lognflow and record')    
+
+    var = 0
+    for _ in printprogress(range(1000)):
+        time.sleep(0.001)
+        var += np.random.rand(1)
+        logger.record('vars/vec/v.to.txt', var, savefig = True)
+
+def test_get_record():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    logger = lognflow(temp_dir)
+    logger('This is a test for lognflow and record')    
+
+    var = 0
+    for _ in printprogress(range(500)):
+        time.sleep(0.001)
+        var += np.random.rand(10000)
+        logger.record('vars/vec/v.to.txt', var)
         
+    time_arr, data_arr = logger.get_record('vars/vec/v.to.txt')
+    logger.plot('vars/vec/v', data_arr[:, 0], '-*', x_values_list = [time_arr])
+    
 def test_log_animation():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(32, 100, 100)
     logger = lognflow(temp_dir)
     logger('This is a test for log_animation')    
     logger.log_animation('var1',var1)
 
 def test_save_matlab():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for saving MATLAB files using a dictionary')    
     data_to_save = dict(data1 = np.random.rand(3,3),
@@ -128,6 +160,7 @@ def test_save_matlab():
     logger.save('MATLAB_test.mat', data_to_save)
 
 def test_save():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(100)
     
     logger = lognflow(temp_dir)
@@ -141,6 +174,7 @@ def test_save():
     logger.save('a_dict2', a_dict, suffix = 'txt')
 
 def test_plot():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(100)
     var2 = 3 + np.random.rand(100)
     var3 = 6 + np.random.rand(100)
@@ -153,6 +187,7 @@ def test_plot():
     logger.plot('vars', [var1, var2, var3], '-*')
     
 def test_hist():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(10000)
     var2 = 3 + np.random.rand(10000)
     var3 = 6 + np.random.rand(10000)
@@ -169,6 +204,7 @@ def test_hist():
                     n_bins = 100)
     
 def test_scatter3():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(100)
     var2 = 3 + np.random.rand(100)
     var3 = 6 + np.random.rand(100)
@@ -185,12 +221,15 @@ def test_scatter3():
                     log_animation_kwargs = {'interval' : 100})
     
 def test_savefig():
-    plt.imshow(np.random.rand(100, 100))
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    from lognflow.plt_utils import plt_imshow
+    plt_imshow(np.random.rand(100, 100))
     logger = lognflow(temp_dir)
     logger('This is a test for savefig')    
     logger.savefig('var3d')        
     
 def test_hexbin():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.randn(10000)
     var2 = 3 + np.random.randn(10000)
 
@@ -200,17 +239,20 @@ def test_hexbin():
     logger.hexbin('hexbin', [var1, var2])    
 
 def test_imshow():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for imshow')    
     logger.imshow('var2d', np.random.rand(100, 100))    
     logger.imshow('var2d_100_of_them', np.random.rand(25, 100, 100))
 
 def test_surface():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for surface')    
     logger.surface('var3d', np.random.rand(100, 100))    
 
 def test_imshow_series():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     """ 
         When we have 8 set of images, each is 100x100 and there are 9 of them 
         which will appear as 3x3 tile.
@@ -219,6 +261,8 @@ def test_imshow_series():
     logger('This is a test for prepare_stack_of_images')
 
     stack_1 = np.random.rand(8, 9, 100, 100)
+    from lognflow.plt_utils import stacks_to_frames
+    
     stack_1 = stacks_to_frames(stack_1)
     stack_2 = np.random.rand(8, 100, 100)
     stack_3 = np.random.rand(8, 9, 100, 100, 3)
@@ -248,6 +292,7 @@ def test_imshow_series():
                              text_as_colorbar = True)
 
 def test_names_with_slashes_and_backslashes():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for test_names_with_slashes_and_backslashes')   
 
@@ -261,6 +306,7 @@ def test_names_with_slashes_and_backslashes():
     logger.save(r'test_param4\d2/e', _imgs)
 
 def test_log_confusion_matrix():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     from sklearn.metrics import confusion_matrix
     
     vec1 = np.random.rand(10000) > 0.8
@@ -272,12 +318,14 @@ def test_log_confusion_matrix():
     logger.log_confusion_matrix('cm1', cm, title = 'test_log_confusion_matrix')
 
 def test_rename():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for test_rename')
     logger.rename(logger.log_dir.name + '_new_name')
     logger('This is another test for test_rename')
     
 def test_save_text():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for test_save_text', flush = True)
     var = 2
@@ -286,6 +334,7 @@ def test_save_text():
     logger.save('text_log\a', var, suffix='pdb', time_tag = False)
     
 def test_imshow_complex():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('This is a test for test_imshow_complex', flush = True)
     
@@ -295,8 +344,9 @@ def test_imshow_complex():
     logger.imshow('mat', mat)
     
 def test_replace_time_with_index():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
-    logger('Well this is a test for reading using logger')
+    logger('This is a test for reading using logger')
     
     for _ in range(5):
         logger.save('test_param', np.array([_]))
@@ -318,8 +368,9 @@ def test_replace_time_with_index():
     logger(data_out)
 
 def test_copy_file():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
-    logger('Well this is a test for copying files')
+    logger('This is a test for copying files')
     
     var = np.random.rand(10)
     fpath = logger.save('var', var, suffix = 'txt')
@@ -331,8 +382,9 @@ def test_copy_file():
     assert str(var) == var_check
     
 def test_copy_list_of_files():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
-    logger('Well this is a test for copy list of files')
+    logger('This is a test for copy list of files')
     
     logger.save('test/var', np.random.rand(10), suffix = 'txt')
     logger.save('test/var', np.random.rand(10), suffix = 'fasta')
@@ -347,19 +399,22 @@ def test_copy_list_of_files():
         assert var_check1 == var_check2
     
 def test_imshow_subplots():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
-    logger('Well this is a test for imshow_subplots')
+    logger('This is a test for imshow_subplots')
     images = np.random.rand(20, 100, 100)
     logger.imshow_subplots('images', images, frame_shape = (4, 5))
 
 def test_copy():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger1 = lognflow(temp_dir)
-    fpath = logger1('Well this is a test for test_copy')
-    
+    fpath = logger1('This is a test for test_copy', flush = True)
+
     logger2 = lognflow(temp_dir)
     logger2.copy('some_text.txt', fpath)
 
 def test_log_images_to_pdf():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('test log images in pdf')
     
@@ -371,6 +426,7 @@ def test_log_images_to_pdf():
         'im1_all', parameter_value = images, time_tag = False)
     
 def test_variables_to_pdf():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('test log variables in pdf')
     
@@ -379,14 +435,16 @@ def test_variables_to_pdf():
     logger.variables_to_pdf('im1_all', 'im1*.*', time_tag = False)
 
 def test_log_code():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('test log variables in pdf')
     
     logger.log_code(__file__)
 
 def test_get_flist_multiple_directories():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
-    logger('Well this is a test for test_multiple_directories_get_flist')
+    logger('This is a test for test_multiple_directories_get_flist')
     
     logger.save('dir1/dir/var', np.random.rand(100))
     logger.save('dir2/dir/var', np.random.rand(100))
@@ -397,9 +455,10 @@ def test_get_flist_multiple_directories():
     [print(logger.name_from_file(_)) for _ in flist]
         
 def test_get_stack_from_files():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     
-    logger('Well this is a test for get_stack_from_files')
+    logger('This is a test for get_stack_from_files')
 
     for _ in range(5):
         logger.save('A/img', np.random.rand(100, 100))
@@ -439,11 +498,12 @@ def test_get_stack_from_files():
         
         logger.imshow_series('data_samples', 
                                  [dataset_A, dataset_B], dpi = 300)
-        _ = logger._loggers_dict['main_log.txt'].log_size
+        _ = logger._loggers_dict['log.txt'].log_size
         logger('Size of the log file in bytes is: ' \
                + f'{_}')
 
 def test_text_to_object():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, time_tag = False)
     test_list = ['asdf', 1243, "dd"]
     logger.save('test_list', test_list, suffix = 'txt')
@@ -453,6 +513,7 @@ def test_text_to_object():
     
     flist = logger.get_flist('*')
     print(flist)
+    from lognflow.utils import text_to_collection
     for file_name_input in flist:
         print('='*60)
         print(f'file name: {file_name_input}')
@@ -461,11 +522,14 @@ def test_text_to_object():
         print('text read from the file:')
         print(txt)
         print('- '*30)
+
+
         ext_obj = text_to_collection(txt)
         print(f'Extracted object is of type {type(ext_obj)}:')
         print(ext_obj)
 
 def test_load_specific_fname():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('test get single specific fname')
     
@@ -480,6 +544,7 @@ def test_load_specific_fname():
     assert vec_out == vec
 
 def test_get_stack_from_names():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('test get single specific fname')
     
@@ -491,6 +556,7 @@ def test_get_stack_from_names():
     print(len(images))
 
 def test_depricated_logviewer():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
     logger('testing the depricated logviewer')
     
@@ -498,6 +564,7 @@ def test_depricated_logviewer():
     print(logger.logged.load('test*'))
 
 def test_log_list_dict_read_back():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, time_tag = False)
     logger('testing the save for list and dict')
     try:
@@ -514,6 +581,7 @@ def test_log_list_dict_read_back():
         print(f'{x} --> {y}')
 
 def test_lognflow_here():
+    print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(log_dir = './')
     logger('test')
 
@@ -521,18 +589,27 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #===========================#
-
-    test_imshow_subplots()
+    test_copy()
+    test_replace_time_with_index()
+    test_variables_to_pdf()
+    test_copy_file()
+    test_log_code()    
+    test_log_index()
+    test_copy_list_of_files()
+    test_text()
+    test_save_text()
+    test_lognflow_conflict_in_names()
+    test_rename()
+    test_logger()
+    test_log_flush_period()
+    test_record_savefig()
+    test_get_record()
+    test_record()
+    test_record_without_time_stamp()
     test_log_list_dict_read_back()
-    test_plot()
     test_save_matlab()
     test_save()
-    test_log_animation()
-    test_savefig()
-    test_hexbin()
-    test_log_confusion_matrix()
     test_names_with_slashes_and_backslashes()
-    test_copy()
     test_log_code()
     test_get_stack_from_files()
     test_get_stack_from_names()
@@ -540,24 +617,17 @@ if __name__ == '__main__':
     test_load_specific_fname()
     test_text_to_object()
     test_depricated_logviewer()
-    test_replace_time_with_index()
-    test_hist()
-    test_variables_to_pdf()
-    test_log_images_to_pdf()
-    test_copy_file()
-    test_log_code()    
-    test_log_index()
+    
     test_imshow()
-    test_copy_list_of_files()
     test_imshow_series()
     test_imshow_complex()
-    test_record()
-    test_text()
-    test_save_text()
+    test_imshow_subplots()
+    test_log_images_to_pdf()
+    test_log_animation()
+    test_hexbin()
     test_surface()
-    test_lognflow_conflict_in_names()
-    test_rename()
-    test_logger()
-    test_log_flush_period()
-    test_record_without_time_stamp()
+    test_log_confusion_matrix()
     test_scatter3()
+    test_plot()
+    test_hist()
+    test_savefig()
