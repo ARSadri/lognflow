@@ -37,12 +37,22 @@ def test_ssh_system():
         print('SSH test not passed maybe because you did not set the credentials.')
     
 def test_printv():
-    test1 = np.random.rand(10000)
+    test1 = 123
     lognflow.utils.printv(test1)
-    test2 = 123
+    test2 = 123.2
     lognflow.utils.printv(test2)
-    test3 = [1243, 'asdf', 21]
+    test3 = np.random.rand(10000)
     lognflow.utils.printv(test3)
+    test4 = [test3, 'asdf', 21]
+    lognflow.utils.printv(test4)
+    test5 = {'A':test3, 'B': test4}
+    lognflow.utils.printv(test5)
+    test55 = {'A':test5, 'C': test4}
+    lognflow.utils.printv(test55)
+    test6 = [test3, 'asdf', 21]*200
+    lognflow.utils.printv(test6)
+    test7 = 'asdf'*200000
+    lognflow.utils.printv(test7)
 
 def test_save_or_load_kernel_state():
     vec = np.random.rand(100)
@@ -66,7 +76,7 @@ def test_block_runner():
     block_runner(Path('./test_block_runner_code.py'))
 
 if __name__ == '__main__':
-    test_block_runner()
     test_printv()
+    test_block_runner()
     test_is_builtin_collection()
     test_ssh_system()

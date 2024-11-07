@@ -88,16 +88,16 @@ def repr_raw(text):
         the input text, returns the fixed string
         
     """
-    escape_dict={'\a':r'\a',
-                 '\b':r'\b',
-                 '\c':r'\c',
-                 '\f':r'\f',
-                 '\n':r'\n',
-                 '\r':r'\r',
-                 '\t':r'\t',
-                 '\v':r'\v',
-                 '\'':r'\'',
-                 '\"':r'\"'}
+    escape_dict={r'\a':r'\a',
+                 r'\b':r'\b',
+                 r'\c':r'\c',
+                 r'\f':r'\f',
+                 r'\n':r'\n',
+                 r'\r':r'\r',
+                 r'\t':r'\t',
+                 r'\v':r'\v',
+                 r'\'':r'\'',
+                 r'\"':r'\"'}
     new_string=''
     for char in text:
         try: 
@@ -328,8 +328,44 @@ class SSHSystem:
         if self.ssh_client:
             self.ssh_client.close()
 
-def printv(var, **kwargs):
-    # Get the name of the variable passed to the function
+def printv(var, logger = print, tab = 0,
+           array_size_threshold = 1e6,
+           string_length_threshold = 1e4):
+    """printv
+    Provides a detailed description of a variable, including its type, size, and basic statistics,
+    and logs the output using a specified logger. This function is particularly useful for inspecting
+    variables in machine learning workflows and large data structures.
+
+    Parameters:
+    ----------
+    var : any
+        The variable to be logged and described.
+    logger : callable, optional
+        A function to output the description, such as `print` or a logging function. Default is `print`.
+    tab : int, optional
+        The indentation level for nested structures. Default is 0.
+    array_size_threshold : float, optional
+        The maximum number of elements in an array-like structure to print its statistics
+        (min, max, mean, std). Default is 1e6.
+    string_length_threshold : float, optional
+        The maximum character length for displaying string representations of the variable.
+        Beyond this length, only a truncated representation is shown. Default is 1e4.
+
+    Returns:
+    -------
+    int
+        The length of the logged description string.
+
+    Notes:
+    ------
+    - For `int`, `float`, or `bool` types, the function logs the value directly.
+    - For arrays (NumPy or PyTorch), it logs the shape, data type, device, and optionally
+      basic statistics (if array size is below `array_size_threshold`).
+    - For lists, tuples, and dictionaries, the function logs the length and recursively
+      inspects each element up to `string_length_threshold`.
+    - For strings and other data types, it truncates and displays the string if it's too long.
+    """
+    
     import inspect
     frame = inspect.currentframe().f_back
     var_name = [name for name, value in frame.f_locals.items() if value is var]
@@ -340,29 +376,29 @@ def printv(var, **kwargs):
     else:
         var_name = 'variable'
 
-    is_np_torch = True
-    var_class = type(var).__name__
-    toprint = f'{var_class} {var_name}: '
+    toprint = f'{var_name}: {type(var).__name__}'
+    
+    if (isinstance(var, int)) | (isinstance(var, float)) | (isinstance(var, bool)):
+        toprint += ', ' + str(var)
+        logger(toprint)
+        return len(toprint)
     try:
         array_shape = var.shape
-        toprint += f'shape={array_shape}'
+        is_np_or_torch = True
     except: 
-        is_np_torch = False
-    try:
-        array_dtype = var.dtype
-        toprint += f', dtype={array_dtype}'
-    except: pass
-    try:
-        toprint += f', device={var.device}'
-    except: pass
-    
-    if is_np_torch:
+        is_np_or_torch = False
+    if is_np_or_torch:
         import numpy as np
+        toprint += f', shape={array_shape}'
+        try:
+            array_dtype = var.dtype
+            toprint += f', dtype={array_dtype}'
+        except: pass
+        try:
+            toprint += f', device={var.device}'
+        except: pass
+        
         arr_size = np.prod(array_shape)
-        if 'array_size_threshold' in kwargs:
-            array_size_threshold = kwargs['array_size_threshold']
-        else:
-            array_size_threshold = 1e+6
         if arr_size < array_size_threshold:
             try:
                 toprint += f', min={var.min():.6f}'
@@ -376,11 +412,46 @@ def printv(var, **kwargs):
             try:
                 toprint += f', std={var.std():.6f}'
             except: pass
+        logger(toprint)
+        return len(toprint)
+
+    if is_builtin_collection(var):
+        toprint += f', len={len(var)}'
+        if isinstance(var, (list, tuple)):
+            logger(toprint)
+            len_toprint = 0
+            tab += 1
+            for idx, item in enumerate(var):
+                logger('    ' * tab + f"{var_name}[{idx}]: ", end = '')
+                len_toprint += printv(item, logger, tab = tab,
+                                      array_size_threshold = array_size_threshold,
+                                      string_length_threshold = string_length_threshold)
+                if len_toprint > string_length_threshold:
+                    logger(f"... too long")
+                    break
+            return len(toprint) + len_toprint
+        elif isinstance(var, dict):
+            logger(toprint)
+            len_toprint = 0
+            tab += 1
+            for key, item in var.items():
+                logger('    '*tab + f"{var_name}[{repr(key)}]: ", end = '')
+                len_toprint += printv(item, logger, tab = tab,
+                                      array_size_threshold = array_size_threshold,
+                                      string_length_threshold = string_length_threshold)
+                if len_toprint > string_length_threshold:
+                    logger(f"... too long")
+                    break
+            return len(toprint) + len_toprint
             
-    if not is_np_torch:
-        toprint += str(var)
-    # Print the information
-    print(toprint)
+    var_str = str(var)
+    if len(var_str) > string_length_threshold:
+        toprint += ', too long'
+        var_str = var_str[:int(string_length_threshold // 10)] + ' ...' + \
+            var_str[-int(string_length_threshold // 10):]
+    toprint += ', ' + var_str
+    logger(toprint)
+    return len(toprint)
 
 def find_duplicates(a_list):
     from collections import Counter

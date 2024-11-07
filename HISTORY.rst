@@ -376,3 +376,8 @@ History
 * time_tag is True by default again
 * removed all imports from lognflow for faster loading
 * all tests are passed!
+
+0.13.00 (2024-11-24)
+-------------------
+* should have added a revision in the last "patch"
+* allow access to plt_imhist fig_ax

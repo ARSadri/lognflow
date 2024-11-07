@@ -359,7 +359,8 @@ class plt_imhist:
         
         try:
             in_image = in_image.detach().cpu().numpy()
-            print('plt_imhist warning: image converted from torch to numpy for plt!')
+            print('plt_imhist warning: '
+                  'image converted from torch to numpy for plt!')
         except: pass
 
         # Adjust figsize to provide more space if needed
@@ -367,6 +368,8 @@ class plt_imhist:
             1, 2, figsize=figsize,
             gridspec_kw={'width_ratios': [5, 1], 'wspace': 0.1})
         self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)
+        
+        self.fig_ax = self.fig, axs[0]
         
         # Display the image
         self.im = axs[0].imshow(in_image, **kwargs_for_imshow)

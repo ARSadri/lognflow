@@ -293,7 +293,7 @@ class lognflow:
                 path like name such as myscript/myvar.
             :param source: str
                 if source.is_file() then it is copied into its new location.
-                Otherwise, we use logger.logged.get_flist(source, suffix) to 
+                Otherwise, we use logger.get_flist(source, suffix) to 
                 obtain a list of files matching the source and copy them into
                 their new location.
         """
@@ -312,7 +312,7 @@ class lognflow:
                 raise ValueError
         except:
             try:
-                flist = self.logged.get_flist(source, suffix)
+                flist = self.get_flist(source, suffix)
             except Exception as e:
                 print(str(e))
         assert flist, \
@@ -409,7 +409,7 @@ class lognflow:
     def _param_dir_name_suffix(self, parameter_name: str, suffix: str = None):
         
         assert isinstance(parameter_name, str), \
-            f'The parameter name {parameter_name} is not a string.' \
+            f'lognflow: The parameter name {parameter_name} is not a string.' \
             + f' It is of type {type(parameter_name)}.' \
             + 'Perhaps you forgot to pass the name of the variable first.'
         parameter_name = ''.join(
@@ -1446,7 +1446,7 @@ class lognflow:
                          time_tag: bool = None,
                          dpi = 1200,
                          **kwargs):
-        images = self.logged.get_stack_from_names(parameter_value)
+        images = self.get_stack_from_names(parameter_value)
         self.images_to_pdf(
             parameter_name, images, time_tag, dpi, **kwargs)
 
@@ -1588,22 +1588,22 @@ class lognflow:
     def save_torch(self, name, x):
         if isinstance(x, dict):
             for key in x.keys():
-                log_dict(name+'/'+key, x[key])
+                self.save_torch(name+'/'+key, x[key])
         else:
             self.save(name, x.detach().cpu().numpy())
 
     def load_torch(self, name):
         self.assert_log_dir()
-        flist = self.logged.get_flist(name)
+        flist = self.get_flist(name)
         for fpath in flist:
             if fpath.is_file():
                 vname = self.name_from_file(fpath)
-                out = self.logged.load(vname)
+                out = self.load(vname)
                 return torch.from_numpy(out).cuda()
             if fpath.is_dir():
                 fpath_str = str(fpath.absolute())
                 vname = fpath_str.split(str(self.log_dir))[1][1:]
-                flist_dir = self.logged.get_flist(vname + '/*')
+                flist_dir = self.get_flist(vname + '/*')
                 output = {}
                 for fpath_inner in flist_dir:
                     key = fpath_inner.stem
