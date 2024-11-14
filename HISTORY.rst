@@ -377,7 +377,13 @@ History
 * removed all imports from lognflow for faster loading
 * all tests are passed!
 
-0.13.00 (2024-11-24)
+0.13.00 (2024-11-8)
 -------------------
 * should have added a revision in the last "patch"
 * allow access to plt_imhist fig_ax
+
+0.13.00 (2024-11-24)
+-------------------
+* turned title into str when passing to plt_utils functions
+* plt_imshow_subplots bug fixed for when fram_shape is given
+* crtical bugs fixed in plt_imshow_series

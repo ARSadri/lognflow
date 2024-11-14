@@ -268,6 +268,7 @@ def test_plt_hist2():
     plt.show()
 
 if __name__ == '__main__':
+    test_plt_imshow_series()
     test_plt_plot()
     test_plt_hist2()
     test_plt_imshow_complex()
@@ -280,7 +281,6 @@ if __name__ == '__main__':
     test_plt_imshow_subplots()
     test_plt_imhist()
     test_plt_imshow()
-    test_plt_imshow_series()
     test_numbers_as_images()
     test_plt_fig_to_numpy()
     test_stack_to_frame()

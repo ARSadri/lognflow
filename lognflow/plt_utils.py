@@ -374,6 +374,7 @@ class plt_imhist:
         # Display the image
         self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
         if title is not None:
+            title = str(title)
             axs[0].set_title(title)
         axs[0].axis('off')
         
@@ -566,6 +567,7 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
             ax.plot(x_values, y_values, *plt_plot_args, **kwargs)
     
     if title is not None:
+        title = str(title)
         ax.set_title(title)
         
     return (fig, ax)
@@ -738,6 +740,7 @@ def plt_imshow(img,
                 ax[1].xaxis.set_ticks_position('none')
                 ax[1].yaxis.set_ticks_position('none')
     if title is not None:
+        title = str(title)
         fig.suptitle(title)
         fig.canvas.manager.window.setWindowTitle(title)
         
@@ -785,6 +788,7 @@ def plt_scatter3(
                data_N_by_3[:, 2], **kwargs)
     
     if title is not None:
+        title = str(title)
         ax.set_title(title)
         fig.canvas.manager.window.setWindowTitle(title)
 
@@ -1033,29 +1037,54 @@ def plt_imshow_series(list_of_stacks,
                       list_of_titles_rows = None,
                       fontsize = None,
                       transpose = True,
+                      title = None,
                       ):
-    """ imshow a stack of images or sets of images in a shelf,
-        input must be a list or array of images
-        
-        Each element of the list can appear as either:
-        * n_im, n_r x n_c
-        * n_im, n_r x  3  x 1
-        * n_im, n_r x n_c x 3
-
-        :param list_of_stacks
-                list_of_stacks would include arrays iterable by their
-                first dimension.
-        :param borders: float
-                borders between tiles will be filled with this variable
-                default: np.nan
     """
+    Display a grid of image stacks with optional masking, titles, and colorbars.
+
+    Parameters:
+    -----------
+    list_of_stacks : list of np.ndarray
+        List of 3D or 4D arrays where each array represents a stack of images.
+    list_of_masks : list of np.ndarray, optional
+        List of masks to apply to each stack of images. Each mask should have
+        the same dimensions as the images in the corresponding stack.
+    figsize : tuple of float, optional
+        Size of the figure in inches. If None, calculated based on `figsize_ratio`.
+    figsize_ratio : float, default=1
+        Scaling factor for automatic figure size calculation.
+    text_as_colorbar : bool, default=False
+        If True, displays max, mean, and min values as text on each image.
+    colorbar : bool, default=False
+        If True, displays a colorbar for each image.
+    cmap : str, default='viridis'
+        Colormap to apply to the images.
+    list_of_titles_columns : list of str, optional
+        List of titles for each column. Should match the number of images in each stack.
+    list_of_titles_rows : list of str, optional
+        List of titles for each row. Should match the number of stacks.
+    fontsize : int, optional
+        Font size for displayed text. If None, calculated based on figure size.
+    transpose : bool, default=True
+        If True, stacks are displayed in rows. If False, in columns.
+    title : str, optional
+        Overall title for the figure.
+
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The created matplotlib figure object.
+    None
+        Placeholder return for consistency.
+    """
+    
     n_stacks = len(list_of_stacks)
     if(list_of_masks is not None):
         assert len(list_of_masks) == n_stacks, \
             f'the number of masks, {len(list_of_masks)} and ' \
             + f'stacks {n_stacks} should be the same'
      
-    n_imgs = list_of_stacks[0].shape[0]
+    n_imgs = len(list_of_stacks[0])
     for ind, stack in enumerate(list_of_stacks):
         assert stack.shape[0] == n_imgs, \
             'All members of the given list should have same number of images.' \
@@ -1067,18 +1096,19 @@ def plt_imshow_series(list_of_stacks,
              'image in a list.'
 
     if (list_of_titles_columns is not None):
-        assert len(list_of_titles_columns) == n_stacks, \
-            'len(list_of_titles_columns) should be len(list_of_stacks)' \
-            + f' but it is {len(list_of_titles_columns)}.'
+        assert len(list_of_titles_columns) == n_imgs, \
+            f'len(list_of_titles_columns): {len(list_of_titles_columns)}, ' \
+            + f'should be len(list_of_stacks[0]): {n_imgs}'
+
     if (list_of_titles_rows is not None):
-        assert len(list_of_titles_rows) == n_imgs, \
-            'len(list_of_titles_rows) should be len(list_of_stacks[0])' \
-            + f' but it is {len(list_of_titles_rows)}.'
+        assert len(list_of_titles_rows) == n_stacks, \
+            f'len(list_of_titles_rows): {len(list_of_titles_rows)}, ' \
+            + f'should be len(list_of_stacks): {n_stacks}'
             
     if figsize is None:
-        figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio)
+        figsize = (n_stacks*figsize_ratio,n_imgs*figsize_ratio)
         if transpose:
-            figsize = (n_stacks*figsize_ratio,n_imgs*figsize_ratio)
+            figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio)
     if fontsize is None:
         fontsize = int(max(figsize)/4)
     
@@ -1139,15 +1169,18 @@ def plt_imshow_series(list_of_stacks,
             ax.set_aspect('equal')
             if (list_of_titles_columns is not None):
                 if img_cnt == 0:
-                    ax.set_title(list_of_titles_columns[stack_cnt])
+                    ax.set_ylabel(list_of_titles_rows[stack_cnt])
             if (list_of_titles_rows is not None):
                 if stack_cnt == 0:
-                    ax.set_ylabel(list_of_titles_rows[img_cnt])
+                    ax.set_title(list_of_titles_columns[img_cnt])
             if (img_cnt > 0) & (stack_cnt > 0):
                 ax.axis('off')
             if(colorbar):
                 cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
                 cbar.ax.tick_params(labelsize=1)
+    if title is not None:
+        fig.suptitle(title)
+        fig.canvas.manager.window.setWindowTitle(title)
     return fig, None
 
 def plt_imshow_subplots(
@@ -1193,8 +1226,8 @@ def plt_imshow_subplots(
             cols = int(np.ceil(np.sqrt(N)))
             rows = int(np.ceil(N / cols))
         else:
-            cols, rows = frame_shape
-            N = np.maximum(N, cols * rows)
+            rows, cols = frame_shape
+            N = np.minimum(N, rows * cols)
         
         # Generate grid locations with dynamic spacing
         spacing = max(max_width, max_height) * (1 + inter_image_margin)
@@ -1241,6 +1274,7 @@ def plt_imshow_subplots(
                 plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
                              colorbar_pad_fraction=colorbar_pad_fraction)
     if title is not None:
+        title = str(title)
         fig.suptitle(title)
         fig.canvas.manager.window.setWindowTitle(title)
     
@@ -1661,6 +1695,7 @@ def plt_contours(
     ax.set_aspect('equal')
 
     if title is not None:
+        title = str(title)
         ax.set_title(title)
         fig.canvas.manager.window.setWindowTitle(title)
     

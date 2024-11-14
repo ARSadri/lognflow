@@ -382,6 +382,23 @@ def printv(var, logger = print, tab = 0,
         toprint += ', ' + str(var)
         logger(toprint)
         return len(toprint)
+    
+    has_element_0 = False
+    try:
+        var_ = var.item()
+        has_element_0 = True
+    except: pass
+    if has_element_0:
+        try:
+            var[1]
+        except:
+            toprint += ', ' + str(var_)
+            logger(toprint)
+            return len(toprint)
+
+
+            
+    
     try:
         array_shape = var.shape
         is_np_or_torch = True

@@ -37,6 +37,8 @@ def test_ssh_system():
         print('SSH test not passed maybe because you did not set the credentials.')
     
 def test_printv():
+    test0 = np.random.rand(10).max()
+    lognflow.utils.printv(test0)
     test1 = 123
     lognflow.utils.printv(test1)
     test2 = 123.2
