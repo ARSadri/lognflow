@@ -382,8 +382,12 @@ History
 * should have added a revision in the last "patch"
 * allow access to plt_imhist fig_ax
 
-0.13.00 (2024-11-24)
+0.13.01 (2024-11-14)
 -------------------
 * turned title into str when passing to plt_utils functions
 * plt_imshow_subplots bug fixed for when fram_shape is given
 * crtical bugs fixed in plt_imshow_series
+
+0.13.02 (2024-11-15)
+-------------------
+* added vmin and vmax to plt_imshow_series

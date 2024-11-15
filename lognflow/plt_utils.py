@@ -328,7 +328,7 @@ def plt_colorbar(mappable, colorbar_aspect=3, colorbar_pad_fraction=0.05):
 def plt_violinplot(
         dataset:list, positions, facecolor = None, edgecolor = None, 
         alpha = 0.5, label = None, fig_and_ax : tuple = None, 
-        plt_violinplot_kwargs = {}):
+        title = None, plt_violinplot_kwargs = {}):
     
     if(fig_and_ax is None):
         fig, ax = plt.subplots(1)
@@ -348,6 +348,12 @@ def plt_violinplot(
                     v.set_edgecolor(facecolor)
             else:
                 vp.set_edgecolor(facecolor)
+
+    if title is not None:
+        title = str(title)
+        fig.suptitle(title)
+        fig.canvas.manager.window.setWindowTitle(title)
+
     return fig, ax
 
 class plt_imhist:
@@ -1037,7 +1043,13 @@ def plt_imshow_series(list_of_stacks,
                       list_of_titles_rows = None,
                       fontsize = None,
                       transpose = True,
+                      vmin = None,
+                      vmax = None,
                       title = None,
+                      colorbar_fraction=0.046,
+                      colorbar_pad=0.04,
+                      colorbar_labelsize = 1,
+                      grid_width_space=0.025,
                       ):
     """
     Display a grid of image stacks with optional masking, titles, and colorbars.
@@ -1069,7 +1081,10 @@ def plt_imshow_series(list_of_stacks,
         If True, stacks are displayed in rows. If False, in columns.
     title : str, optional
         Overall title for the figure.
-
+    vmin : float, optional
+        vmin for all imshows
+    vmax : float, optional
+        vmax for all imshows
     Returns:
     --------
     fig : matplotlib.figure.Figure
@@ -1118,9 +1133,9 @@ def plt_imshow_series(list_of_stacks,
     else:
         gs1 = matplotlib.gridspec.GridSpec(n_imgs, n_stacks)
     if(colorbar):
-        gs1.update(wspace=0.25, hspace=0)
+        gs1.update(wspace=10 * grid_width_space, hspace=0)
     else:
-        gs1.update(wspace=0.025, hspace=0) 
+        gs1.update(wspace=grid_width_space, hspace=0) 
     
     for img_cnt in range(n_imgs):
         for stack_cnt in range(n_stacks):
@@ -1144,8 +1159,10 @@ def plt_imshow_series(list_of_stacks,
                 np.isnan(data_canvas_stat) == 0]
             data_canvas_stat = data_canvas_stat[
                 np.isinf(data_canvas_stat) == 0]
-            vmin = data_canvas_stat.min()
-            vmax = data_canvas_stat.max()
+            if vmin is None:
+                vmin = data_canvas_stat.min()
+            if vmax is None:
+                vmax = data_canvas_stat.max()
             im = ax.imshow(data_canvas, 
                             vmin = vmin, 
                             vmax = vmax,
@@ -1176,9 +1193,11 @@ def plt_imshow_series(list_of_stacks,
             if (img_cnt > 0) & (stack_cnt > 0):
                 ax.axis('off')
             if(colorbar):
-                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-                cbar.ax.tick_params(labelsize=1)
+                cbar = plt.colorbar(im, ax=ax, fraction=colorbar_fraction, pad=colorbar_pad)
+                cbar.ax.tick_params(labelsize = colorbar_labelsize)
+
     if title is not None:
+        title = str(title)
         fig.suptitle(title)
         fig.canvas.manager.window.setWindowTitle(title)
     return fig, None

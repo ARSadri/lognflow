@@ -103,9 +103,32 @@ def test_plt_fig_to_numpy():
 
 def test_plt_imshow_series():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    data = [np.random.rand(10, 100, 100),
-            np.random.rand(10, 10, 10)]
-    lognflow.plt_utils.plt_imshow_series(data)
+    data = [1 + np.random.rand(10, 100, 100),
+            1 + np.random.rand(10, 10, 10)]
+    mask0 = data[0][0]*0 + 1
+    mask0[::2, ::2] = 0
+    mask1 = data[1][0] != 0
+    list_of_masks = [mask0, mask1]
+    lognflow.plt_utils.plt_imshow_series(
+        list_of_stacks = data, 
+        list_of_masks = list_of_masks,
+        figsize = None,
+        figsize_ratio = 1,
+        text_as_colorbar = False,
+        colorbar = True,
+        cmap = 'viridis',
+        list_of_titles_columns = None,
+        list_of_titles_rows = None,
+        fontsize = None,
+        transpose = True,
+        vmin = None,
+        vmax = None,
+        title = None,
+        colorbar_fraction=0.046,
+        colorbar_pad=0.04,
+        colorbar_labelsize = 10,
+        grid_width_space=0.025,
+        )
     plt.show()
 
 def test_plt_imshow_subplots():
@@ -268,7 +291,7 @@ def test_plt_hist2():
     plt.show()
 
 if __name__ == '__main__':
-    test_plt_imshow_series()
+    test_plt_imshow_series(); exit()
     test_plt_plot()
     test_plt_hist2()
     test_plt_imshow_complex()
