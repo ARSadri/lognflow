@@ -303,7 +303,8 @@ def complex2hsv_colorbar(
 
     return fig, ax
 
-def plt_colorbar(mappable, colorbar_aspect=3, colorbar_pad_fraction=0.05):
+def plt_colorbar(mappable, colorbar_aspect=3, 
+                 colorbar_pad_fraction=0.05, colorbar_invisible = False):
     """
     Add a colorbar to the current axis with consistent width.
 
@@ -317,12 +318,15 @@ def plt_colorbar(mappable, colorbar_aspect=3, colorbar_pad_fraction=0.05):
     Returns:
         Colorbar: The colorbar added to the axis.
     """
+
     ax = mappable.axes
     fig = ax.figure
     divider = make_axes_locatable(ax)
     width = ax.get_position().width / colorbar_aspect
     cax = divider.append_axes("right", size=width, pad=colorbar_pad_fraction)
     cbar = fig.colorbar(mappable, cax=cax)
+    if colorbar_invisible:
+        cbar.ax.set_visible(False)
     return cbar
 
 def plt_violinplot(
@@ -586,6 +590,7 @@ def plt_imshow(img,
                cmap = None,
                angle_cmap = None,
                portrait = None,
+               aspect = 'equal',
                **kwargs):
     """
     Display an image or a complex-valued image using matplotlib's imshow.
@@ -628,7 +633,10 @@ def plt_imshow(img,
     portrait : bool, optional
         If True, the figure will be set up in portrait mode. If None, the function 
         will automatically determine the orientation based on the window dimensions.
-        
+    
+    aspect : str, optional
+        by default I set the aspect ratio to equal
+    
     **kwargs : keyword arguments
         Additional keyword arguments passed to `imshow`, such as `vmin`, `vmax`, 
         etc.
@@ -749,7 +757,10 @@ def plt_imshow(img,
         title = str(title)
         fig.suptitle(title)
         fig.canvas.manager.window.setWindowTitle(title)
-        
+    
+    if aspect is not None:
+        ax.set_aspect(aspect)
+    
     return fig, ax
 
 def plt_hist(vectors_list, fig_ax = None,
@@ -1035,63 +1046,111 @@ class plot_gaussian_gradient:
 def plt_imshow_series(list_of_stacks, 
                       list_of_masks = None,
                       figsize = None,
-                      figsize_ratio = 1,
                       text_as_colorbar = False,
                       colorbar = False,
                       cmap = 'viridis',
                       list_of_titles_columns = None,
                       list_of_titles_rows = None,
                       fontsize = None,
-                      transpose = True,
                       vmin = None,
                       vmax = None,
                       title = None,
-                      colorbar_fraction=0.046,
-                      colorbar_pad=0.04,
+                      colorbar_last_only = True,
+                      colorbar_fraction = 0.046,
+                      colorbar_pad = 0.04,
                       colorbar_labelsize = 1,
-                      grid_width_space=0.025,
+                      grid_width_space = 0.0,
+                      remove_axis_ticks = True,
+                      aspect = 'equal',
+                      **kwargs,
                       ):
+    
     """
-    Display a grid of image stacks with optional masking, titles, and colorbars.
-
+    Displays a grid of image series for comparison with optional customization for annotations, colorbars, and formatting.
+    
     Parameters:
-    -----------
-    list_of_stacks : list of np.ndarray
-        List of 3D or 4D arrays where each array represents a stack of images.
-    list_of_masks : list of np.ndarray, optional
-        List of masks to apply to each stack of images. Each mask should have
-        the same dimensions as the images in the corresponding stack.
-    figsize : tuple of float, optional
-        Size of the figure in inches. If None, calculated based on `figsize_ratio`.
-    figsize_ratio : float, default=1
-        Scaling factor for automatic figure size calculation.
-    text_as_colorbar : bool, default=False
-        If True, displays max, mean, and min values as text on each image.
-    colorbar : bool, default=False
-        If True, displays a colorbar for each image.
-    cmap : str, default='viridis'
-        Colormap to apply to the images.
-    list_of_titles_columns : list of str, optional
-        List of titles for each column. Should match the number of images in each stack.
-    list_of_titles_rows : list of str, optional
-        List of titles for each row. Should match the number of stacks.
-    fontsize : int, optional
-        Font size for displayed text. If None, calculated based on figure size.
-    transpose : bool, default=True
-        If True, stacks are displayed in rows. If False, in columns.
-    title : str, optional
-        Overall title for the figure.
-    vmin : float, optional
-        vmin for all imshows
-    vmax : float, optional
-        vmax for all imshows
+        list_of_stacks (list): 
+            A list of 3D or 4D arrays, each representing a stack of images. 
+            All stacks must have the same number of images.
+            
+        list_of_masks (list, optional): 
+            A list of masks corresponding to the stacks. Each mask should have the same shape 
+            as the images in its respective stack. If provided, masked areas will be ignored 
+            when calculating statistics. Defaults to None.
+            
+        figsize (tuple, optional): 
+            The overall size of the figure in inches. If None, it is determined based on 
+            the number of stacks and images. Defaults to None.
+            
+        text_as_colorbar (bool, optional): 
+            If True, displays the maximum, mean, and minimum values of each image as text 
+            in place of a colorbar. Defaults to False.
+            
+        colorbar (bool, optional): 
+            If True, displays a colorbar for each subplot. Defaults to False.
+            
+        cmap (str, optional): 
+            The colormap to use for displaying the images. Defaults to 'viridis'.
+            
+        list_of_titles_columns (list, optional): 
+            Titles for each column in the grid. Must have a length equal to the number 
+            of images in each stack. Defaults to None.
+            
+        list_of_titles_rows (list, optional): 
+            Titles for each row in the grid. Must have a length equal to the number of stacks. 
+            Defaults to None.
+            
+        fontsize (int, optional): 
+            Font size for the text annotations. If None, it is determined based on the figure size. 
+            Defaults to None.
+            
+        vmin (float, optional): 
+            The minimum value for image normalization. If None, it is automatically calculated 
+            from the image data. Defaults to None.
+            
+        vmax (float, optional): 
+            The maximum value for image normalization. If None, it is automatically calculated 
+            from the image data. Defaults to None.
+            
+        title (str, optional): 
+            The title for the entire figure. Defaults to None.
+            
+        colorbar_last_only (bool, optional): 
+            If True, displays a colorbar only for the last column. Defaults to False.
+            
+        colorbar_fraction (float, optional): 
+            Fraction of the original axis allocated for the colorbar. Defaults to 0.046.
+            
+        colorbar_pad (float, optional): 
+            Padding between the image and colorbar. Defaults to 0.04.
+            
+        colorbar_labelsize (int, optional): 
+            Label size for the colorbar. Defaults to 1.
+            
+        grid_width_space (float, optional): 
+            Horizontal spacing between grid columns. Defaults to 0.0.
+            
+        remove_axis_ticks (bool, optional): 
+            If True, removes axis ticks from all subplots. Defaults to True.
+            
+        aspect (str, optional): 
+            Aspect ratio of the displayed images. Defaults to 'equal'.
+            
+        **kwargs: 
+            Additional keyword arguments to pass to the `imshow` function.
+    
     Returns:
-    --------
-    fig : matplotlib.figure.Figure
-        The created matplotlib figure object.
-    None
-        Placeholder return for consistency.
+        tuple:
+            - fig (matplotlib.figure.Figure): The created figure.
+            - None: Placeholder for potential additional return values.
+            
+    Raises:
+        AssertionError: 
+            If the input lists do not meet the expected shapes or lengths.
     """
+    
+    if colorbar_last_only:
+        colorbar = False
     
     n_stacks = len(list_of_stacks)
     if(list_of_masks is not None):
@@ -1101,7 +1160,7 @@ def plt_imshow_series(list_of_stacks,
      
     n_imgs = len(list_of_stacks[0])
     for ind, stack in enumerate(list_of_stacks):
-        assert stack.shape[0] == n_imgs, \
+        assert len(stack) == n_imgs, \
             'All members of the given list should have same number of images.' \
             f' while the stack indexed as {ind} has length {len(stack)}.'
         assert (len(stack.shape) == 3) | (len(stack.shape) == 4), \
@@ -1121,31 +1180,27 @@ def plt_imshow_series(list_of_stacks,
             + f'should be len(list_of_stacks): {n_stacks}'
             
     if figsize is None:
-        figsize = (n_stacks*figsize_ratio,n_imgs*figsize_ratio)
-        if transpose:
-            figsize = (n_imgs*figsize_ratio,n_stacks*figsize_ratio)
+        if(colorbar):
+            figsize = (n_imgs* 2, n_stacks)
+        else:
+            figsize = (n_imgs, n_stacks)
+
     if fontsize is None:
-        fontsize = int(max(figsize)/4)
+        fontsize = int(max(figsize)/10)
+        if fontsize > 8: fontsize = 8
     
     fig = plt.figure(figsize = figsize)
-    if transpose:
+    if colorbar_last_only:
+        gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs + 1)
+    else:
         gs1 = matplotlib.gridspec.GridSpec(n_stacks, n_imgs)
-    else:
-        gs1 = matplotlib.gridspec.GridSpec(n_imgs, n_stacks)
-    if(colorbar):
-        gs1.update(wspace=10 * grid_width_space, hspace=0)
-    else:
-        gs1.update(wspace=grid_width_space, hspace=0) 
+    if grid_width_space:
+        gs1.update(wspace=grid_width_space, hspace=0)
     
     for img_cnt in range(n_imgs):
         for stack_cnt in range(n_stacks):
-            if transpose:
-                ax = plt.subplot(gs1[stack_cnt, img_cnt])
-            else:
-                ax = plt.subplot(gs1[img_cnt, stack_cnt])
-            plt.axis('on')
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
+            ax = plt.subplot(gs1[stack_cnt, img_cnt])
+            
             data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
             if(list_of_masks is not None):
                 mask = list_of_masks[stack_cnt]
@@ -1163,10 +1218,18 @@ def plt_imshow_series(list_of_stacks,
                 vmin = data_canvas_stat.min()
             if vmax is None:
                 vmax = data_canvas_stat.max()
+
             im = ax.imshow(data_canvas, 
-                            vmin = vmin, 
-                            vmax = vmax,
-                            cmap = cmap)
+                           cmap = cmap, vmin = vmin, vmax = vmax, **kwargs)
+            if(remove_axis_ticks):
+                plt.setp(ax, xticks=[], yticks=[])
+            
+            if aspect is not None:
+                ax.set_aspect(aspect)
+            
+            if colorbar | colorbar_last_only:
+                plt_colorbar(im, colorbar_invisible = img_cnt != n_imgs - 1)
+            
             if(text_as_colorbar):
                 ax.text(data_canvas.shape[0]*0,
                          data_canvas.shape[1]*0.05,
@@ -1183,19 +1246,14 @@ def plt_imshow_series(list_of_stacks,
                          f'{data_canvas.min():.6f}', 
                          color = 'yellow',
                          fontsize = fontsize)
-            ax.set_aspect('equal')
-            if (list_of_titles_columns is not None):
+            
+            if (list_of_titles_rows is not None):
                 if img_cnt == 0:
                     ax.set_ylabel(list_of_titles_rows[stack_cnt])
-            if (list_of_titles_rows is not None):
+            if (list_of_titles_columns is not None):
                 if stack_cnt == 0:
                     ax.set_title(list_of_titles_columns[img_cnt])
-            if (img_cnt > 0) & (stack_cnt > 0):
-                ax.axis('off')
-            if(colorbar):
-                cbar = plt.colorbar(im, ax=ax, fraction=colorbar_fraction, pad=colorbar_pad)
-                cbar.ax.tick_params(labelsize = colorbar_labelsize)
-
+            
     if title is not None:
         title = str(title)
         fig.suptitle(title)

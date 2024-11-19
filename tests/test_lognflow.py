@@ -290,6 +290,21 @@ def test_imshow_series():
     logger.imshow_series(parameter_name = 'imshow_series\\', 
                              list_of_stacks = imgs, 
                              text_as_colorbar = True)
+    
+    data = [1 + np.random.rand(10, 100, 100),
+            1 + np.random.rand(10, 10, 10)]
+    mask0 = data[0][0]*0 + 1
+    mask0[::2, ::2] = 0
+    mask1 = data[1][0] != 0
+    list_of_masks = [mask0, mask1]
+    logger.imshow_series(parameter_name = 'imshow_series2\\',
+        list_of_stacks = data, 
+        list_of_masks = list_of_masks,
+        list_of_titles_columns = np.arange(10),
+        list_of_titles_rows = np.arange(2),
+        colorbar_last_only = True,
+        colorbar_labelsize = 10,
+        )
 
 def test_names_with_slashes_and_backslashes():
     print('Testing function', inspect.currentframe().f_code.co_name)

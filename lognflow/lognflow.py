@@ -1333,32 +1333,38 @@ class lognflow:
     
     def imshow_series(self, 
                           parameter_name: str,
-                          list_of_stacks: list,
+                          list_of_stacks, 
                           list_of_masks = None,
                           figsize = None,
-                          figsize_ratio = 1,
                           text_as_colorbar = False,
                           colorbar = False,
                           cmap = 'viridis',
                           list_of_titles_columns = None,
                           list_of_titles_rows = None,
                           fontsize = None,
-                          transpose = False,
+                          vmin = None,
+                          vmax = None,
+                          title = None,
+                          colorbar_last_only = True,
+                          colorbar_fraction = 0.046,
+                          colorbar_pad = 0.04,
+                          colorbar_labelsize = 1,
+                          grid_width_space = 0.0,
+                          remove_axis_ticks = True,
+                          aspect = 'equal',
                           image_format='jpg', 
                           dpi=1200,
                           time_tag: bool = None,
-                          return_figure = False):
+                          return_figure = False,
+                          **kwargs):
+                          
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
             stacks of images and put them in a list. Then each
             element of the list is supposed to be iteratable by the first
             dimension, which should be the same size for all elements in 
-            the list.
-            This function will start putting them in coloumns of a canvas.
-            If you have an image with many channels, call 
-            prepare_stack_of_images on the list to make a large single
-            image by tiling the channels of that element beside each other.
-            This is very useful when it comes to self-supervised ML.
+            the list. This function will start putting them in rows of a canvas.
+            If you have an image with many channels.
             
             Each element of the list must appear as either:
             n_frm x n_row x n_clm if there are n_frm images 
@@ -1372,18 +1378,80 @@ class lognflow:
                     examples: myvar or myscript/myvar
                     parameter_name can be just a name e.g. myvar, or could be a
                     path like name such as myscript/myvar.
-            :param list_of_stacks: list
-                    List of stack of images, each of which can be a
-                    n_F x n_r x n_c. Notice that n_F should be the same for all
-                    elements of the list.
-            :param list_of_masks: list
-                    the same as the list_of_stacks and will be used to make
-                    accurate colorbars
-            :param text_as_colorbar: bool
-                    if True, max and mean and min of each image will be written
-                    on it.
-            :param colorbar: bool
-                    actual colorbar for each iamge will be shown
+
+            Displays a grid of image series for comparison with optional customization for annotations, colorbars, and formatting.
+            
+            Parameters:
+                list_of_stacks (list): 
+                    A list of 3D or 4D arrays, each representing a stack of images. 
+                    All stacks must have the same number of images.
+                    
+                list_of_masks (list, optional): 
+                    A list of masks corresponding to the stacks. Each mask should have the same shape 
+                    as the images in its respective stack. If provided, masked areas will be ignored 
+                    when calculating statistics. Defaults to None.
+                    
+                figsize (tuple, optional): 
+                    The overall size of the figure in inches. If None, it is determined based on 
+                    the number of stacks and images. Defaults to None.
+                    
+                text_as_colorbar (bool, optional): 
+                    If True, displays the maximum, mean, and minimum values of each image as text 
+                    in place of a colorbar. Defaults to False.
+                    
+                colorbar (bool, optional): 
+                    If True, displays a colorbar for each subplot. Defaults to False.
+                    
+                cmap (str, optional): 
+                    The colormap to use for displaying the images. Defaults to 'viridis'.
+                    
+                list_of_titles_columns (list, optional): 
+                    Titles for each column in the grid. Must have a length equal to the number 
+                    of images in each stack. Defaults to None.
+                    
+                list_of_titles_rows (list, optional): 
+                    Titles for each row in the grid. Must have a length equal to the number of stacks. 
+                    Defaults to None.
+                    
+                fontsize (int, optional): 
+                    Font size for the text annotations. If None, it is determined based on the figure size. 
+                    Defaults to None.
+                    
+                vmin (float, optional): 
+                    The minimum value for image normalization. If None, it is automatically calculated 
+                    from the image data. Defaults to None.
+                    
+                vmax (float, optional): 
+                    The maximum value for image normalization. If None, it is automatically calculated 
+                    from the image data. Defaults to None.
+                    
+                title (str, optional): 
+                    The title for the entire figure. Defaults to None.
+                    
+                colorbar_last_only (bool, optional): 
+                    If True, displays a colorbar only for the last column. Defaults to False.
+                    
+                colorbar_fraction (float, optional): 
+                    Fraction of the original axis allocated for the colorbar. Defaults to 0.046.
+                    
+                colorbar_pad (float, optional): 
+                    Padding between the image and colorbar. Defaults to 0.04.
+                    
+                colorbar_labelsize (int, optional): 
+                    Label size for the colorbar. Defaults to 1.
+                    
+                grid_width_space (float, optional): 
+                    Horizontal spacing between grid columns. Defaults to 0.0.
+                    
+                remove_axis_ticks (bool, optional): 
+                    If True, removes axis ticks from all subplots. Defaults to True.
+                    
+                aspect (str, optional): 
+                    Aspect ratio of the displayed images. Defaults to 'equal'.
+                    
+                **kwargs: 
+                    Additional keyword arguments to pass to the `imshow` function.
+
             :param time_tag: bool
                     Wheather if the time stamp is in the file name or not.
                     
@@ -1392,17 +1460,27 @@ class lognflow:
         time_tag = self.time_tag if (time_tag is None) else time_tag
         
         from .plt_utils import plt_imshow_series
-        fig, ax = plt_imshow_series(list_of_stacks, 
-                                    list_of_masks = list_of_masks,
-                                    figsize = figsize,
-                                    figsize_ratio = figsize_ratio,
-                                    text_as_colorbar = text_as_colorbar,
-                                    colorbar = colorbar,
-                                    cmap = cmap,
-                                    list_of_titles_columns = list_of_titles_columns,
-                                    list_of_titles_rows = list_of_titles_rows,
-                                    fontsize = fontsize,
-                                    transpose = transpose)
+        fig, ax = plt_imshow_series(
+            list_of_stacks          = list_of_stacks, 
+            list_of_masks           = list_of_masks,
+            figsize                 = figsize,
+            text_as_colorbar        = text_as_colorbar,
+            colorbar                = colorbar,
+            cmap                    = cmap,
+            list_of_titles_columns  = list_of_titles_columns,
+            list_of_titles_rows     = list_of_titles_rows,
+            fontsize                = fontsize,
+            vmin                    = vmin,
+            vmax                    = vmax,
+            title                   = title,
+            colorbar_last_only      = colorbar_last_only,
+            colorbar_fraction       = colorbar_fraction,
+            colorbar_pad            = colorbar_pad,
+            colorbar_labelsize      = colorbar_labelsize,
+            grid_width_space        = grid_width_space,
+            remove_axis_ticks       = remove_axis_ticks,
+            aspect                  = aspect,
+            **kwargs)
             
         if not return_figure:
             fpath = self.savefig(

@@ -112,22 +112,10 @@ def test_plt_imshow_series():
     lognflow.plt_utils.plt_imshow_series(
         list_of_stacks = data, 
         list_of_masks = list_of_masks,
-        figsize = None,
-        figsize_ratio = 1,
-        text_as_colorbar = False,
-        colorbar = True,
-        cmap = 'viridis',
-        list_of_titles_columns = None,
-        list_of_titles_rows = None,
-        fontsize = None,
-        transpose = True,
-        vmin = None,
-        vmax = None,
-        title = None,
-        colorbar_fraction=0.046,
-        colorbar_pad=0.04,
+        list_of_titles_columns = np.arange(10),
+        list_of_titles_rows = np.arange(2),
+        colorbar_last_only = True,
         colorbar_labelsize = 10,
-        grid_width_space=0.025,
         )
     plt.show()
 

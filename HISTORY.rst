@@ -391,3 +391,7 @@ History
 0.13.02 (2024-11-15)
 -------------------
 * added vmin and vmax to plt_imshow_series
+
+0.13.02 (2024-11-19)
+-------------------
+* plt_imshow_series updated heavily.
