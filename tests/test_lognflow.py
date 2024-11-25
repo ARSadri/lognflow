@@ -324,13 +324,15 @@ def test_log_confusion_matrix():
     print('Testing function', inspect.currentframe().f_code.co_name)
     from sklearn.metrics import confusion_matrix
     
-    vec1 = np.random.rand(10000) > 0.8
-    vec2 = np.random.rand(10000) > 0.2
+    n_classes = 20
+    vec1 = (np.random.rand(10000)*n_classes).astype('int')
+    vec2 = (np.random.rand(10000)*n_classes).astype('int')
+    target_names = np.arange(n_classes)
     
     cm = confusion_matrix(vec1, vec2, normalize='all')
     logger = lognflow(temp_dir)
     logger('This is a test for log_confusion_matrix')
-    logger.log_confusion_matrix('cm1', cm, title = 'test_log_confusion_matrix')
+    logger.log_confusion_matrix('cm1', cm, target_names = target_names)
 
 def test_rename():
     print('Testing function', inspect.currentframe().f_code.co_name)

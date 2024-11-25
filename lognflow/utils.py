@@ -261,9 +261,9 @@ class SSHSystem:
             print(f"Error removing file {path}: {e}")
             return "", str(e)
 
-    def monitor_and_remove(
-        self, remote_folder: pathlib_Path, local_folder: pathlib_Path, 
-        target_fname: str, interval=30
+    def monitor_and_move(
+        self, remote_folder: pathlib_Path, target_fname: str,
+        local_folder: pathlib_Path, interval=30
     ):
         """
         Monitor a remote folder for a specific file. Once the file appears,
@@ -329,8 +329,8 @@ class SSHSystem:
             self.ssh_client.close()
 
 def printv(var, logger = print, tab = 0,
-           array_size_threshold = 1e6,
-           string_length_threshold = 1e4):
+           arr_size_max = 1e6, arr_size_min = 50,
+           str_len_max = 1e4, str_len_min = 50):
     """printv
     Provides a detailed description of a variable, including its type, size, and basic statistics,
     and logs the output using a specified logger. This function is particularly useful for inspecting
@@ -344,13 +344,17 @@ def printv(var, logger = print, tab = 0,
         A function to output the description, such as `print` or a logging function. Default is `print`.
     tab : int, optional
         The indentation level for nested structures. Default is 0.
-    array_size_threshold : float, optional
+    arr_size_max : int, optional
         The maximum number of elements in an array-like structure to print its statistics
         (min, max, mean, std). Default is 1e6.
-    string_length_threshold : float, optional
+    arr_size_min : int, optional
+        if the size of a numpu or torch array is less than this we just print it.
+    str_len_max : float, optional
         The maximum character length for displaying string representations of the variable.
         Beyond this length, only a truncated representation is shown. Default is 1e4.
-
+    str_len_min : float, optional
+        The minimum character length for displaying string representations of the variable.
+        Below this length, the str of the parameter is shown. Default is 50.
     Returns:
     -------
     int
@@ -360,9 +364,9 @@ def printv(var, logger = print, tab = 0,
     ------
     - For `int`, `float`, or `bool` types, the function logs the value directly.
     - For arrays (NumPy or PyTorch), it logs the shape, data type, device, and optionally
-      basic statistics (if array size is below `array_size_threshold`).
+      basic statistics (if array size is below `arr_size_max`).
     - For lists, tuples, and dictionaries, the function logs the length and recursively
-      inspects each element up to `string_length_threshold`.
+      inspects each element up to `str_len_max`.
     - For strings and other data types, it truncates and displays the string if it's too long.
     """
     
@@ -395,10 +399,6 @@ def printv(var, logger = print, tab = 0,
             toprint += ', ' + str(var_)
             logger(toprint)
             return len(toprint)
-
-
-            
-    
     try:
         array_shape = var.shape
         is_np_or_torch = True
@@ -416,7 +416,7 @@ def printv(var, logger = print, tab = 0,
         except: pass
         
         arr_size = np.prod(array_shape)
-        if arr_size < array_size_threshold:
+        if arr_size < arr_size_max:
             try:
                 toprint += f', min={var.min():.6f}'
             except: pass
@@ -429,11 +429,19 @@ def printv(var, logger = print, tab = 0,
             try:
                 toprint += f', std={var.std():.6f}'
             except: pass
+        if arr_size < arr_size_min:
+            toprint += '\n' + str(var) + ' <--' + var_name
+            
         logger(toprint)
         return len(toprint)
 
     if is_builtin_collection(var):
         toprint += f', len={len(var)}'
+        var_str = str(var)
+        if len(var_str) < str_len_min:
+            toprint += ', ' + var_str
+            logger(toprint)
+            return len(toprint)
         if isinstance(var, (list, tuple)):
             logger(toprint)
             len_toprint = 0
@@ -441,9 +449,9 @@ def printv(var, logger = print, tab = 0,
             for idx, item in enumerate(var):
                 logger('    ' * tab + f"{var_name}[{idx}]: ", end = '')
                 len_toprint += printv(item, logger, tab = tab,
-                                      array_size_threshold = array_size_threshold,
-                                      string_length_threshold = string_length_threshold)
-                if len_toprint > string_length_threshold:
+                                      arr_size_max = arr_size_max,
+                                      str_len_max = str_len_max)
+                if len_toprint > str_len_max:
                     logger(f"... too long")
                     break
             return len(toprint) + len_toprint
@@ -454,18 +462,18 @@ def printv(var, logger = print, tab = 0,
             for key, item in var.items():
                 logger('    '*tab + f"{var_name}[{repr(key)}]: ", end = '')
                 len_toprint += printv(item, logger, tab = tab,
-                                      array_size_threshold = array_size_threshold,
-                                      string_length_threshold = string_length_threshold)
-                if len_toprint > string_length_threshold:
+                                      arr_size_max = arr_size_max,
+                                      str_len_max = str_len_max)
+                if len_toprint > str_len_max:
                     logger(f"... too long")
                     break
             return len(toprint) + len_toprint
             
     var_str = str(var)
-    if len(var_str) > string_length_threshold:
+    if len(var_str) > str_len_max:
         toprint += ', too long'
-        var_str = var_str[:int(string_length_threshold // 10)] + ' ...' + \
-            var_str[-int(string_length_threshold // 10):]
+        var_str = var_str[:int(str_len_max // 10)] + ' ...' + \
+            var_str[-int(str_len_max // 10):]
     toprint += ', ' + var_str
     logger(toprint)
     return len(toprint)

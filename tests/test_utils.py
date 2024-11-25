@@ -17,12 +17,12 @@ def test_is_builtin_collection():
     test_tuple = (1, 2, 3)
     test_array = np.array([1, 2, 3])
     
-    print(lognflow.is_builtin_collection(test_list))   # Expected: True
-    print(lognflow.is_builtin_collection(test_string)) # Expected: False
-    print(lognflow.is_builtin_collection(test_dict))   # Expected: True
-    print(lognflow.is_builtin_collection(test_set))    # Expected: True
-    print(lognflow.is_builtin_collection(test_tuple))  # Expected: True
-    print(lognflow.is_builtin_collection(test_array))  # Expected: False
+    assert (lognflow.is_builtin_collection(test_list))          # Expected: True
+    assert not (lognflow.is_builtin_collection(test_string))    # Expected: False
+    assert (lognflow.is_builtin_collection(test_dict))          # Expected: True
+    assert (lognflow.is_builtin_collection(test_set))           # Expected: True
+    assert (lognflow.is_builtin_collection(test_tuple))         # Expected: True
+    assert not (lognflow.is_builtin_collection(test_array))     # Expected: False
 
 def test_ssh_system():
     try:
@@ -31,7 +31,7 @@ def test_ssh_system():
         remote_dir = Path('/remote/folder/path')
         local_dir = Path('/local/folder/path')
         target_fname = 'intresting_file.log'
-        ssh.monitor_and_remove(remote_dir, local_dir, target_fname)
+        ssh.monitor_and_move(remote_dir, local_dir, target_fname)
         ssh.close_connection()
     except:
         print('SSH test not passed maybe because you did not set the credentials.')
@@ -55,6 +55,10 @@ def test_printv():
     lognflow.utils.printv(test6)
     test7 = 'asdf'*200000
     lognflow.utils.printv(test7)
+    test8 = ['34', '123']
+    lognflow.utils.printv(test8)
+    test9 = np.random.rand(3, 3)
+    lognflow.utils.printv(test9)
 
 def test_save_or_load_kernel_state():
     vec = np.random.rand(100)
@@ -78,7 +82,7 @@ def test_block_runner():
     block_runner(Path('./test_block_runner_code.py'))
 
 if __name__ == '__main__':
+    test_is_builtin_collection()
     test_printv()
     test_block_runner()
-    test_is_builtin_collection()
     test_ssh_system()

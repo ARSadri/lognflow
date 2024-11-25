@@ -15,6 +15,48 @@ matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
     's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
     '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
 
+def plt_colorbar(mappable, colorbar_aspect=3, 
+                 colorbar_pad_fraction=0.05, colorbar_invisible=False, 
+                 fontsize=10, tick_labels=None):
+    """
+    Add a colorbar to the current axis with consistent width.
+
+    Parameters:
+        mappable (AxesImage): The image to which the colorbar applies.
+        colorbar_aspect (int): The aspect ratio of the colorbar width relative 
+            to the axis width. Default is 3.
+        colorbar_pad_fraction (float): The fraction of padding between the 
+            axis and the colorbar. Default is 0.05.
+        colorbar_invisible (bool): Whether to make the colorbar invisible. Default is False.
+        fontsize (int): Font size for the colorbar tick labels. Default is 10.
+        tick_labels (list or None): Custom labels for the colorbar ticks. If None, default tick labels are used.
+
+    Returns:
+        Colorbar: The colorbar added to the axis.
+    """
+
+    ax = mappable.axes
+    fig = ax.figure
+    divider = make_axes_locatable(ax)
+    width = ax.get_position().width / colorbar_aspect
+    cax = divider.append_axes("right", size=width, pad=colorbar_pad_fraction)
+    cbar = fig.colorbar(mappable, cax=cax)
+
+    if colorbar_invisible:
+        cbar.ax.set_visible(False)
+    else:
+        cbar.ax.tick_params(labelsize=fontsize)
+
+        if tick_labels is not None:
+            ticks = cbar.get_ticks()
+            if len(tick_labels) == len(ticks):
+                ticks = np.linspace(
+                    mappable.get_clim()[0], mappable.get_clim()[1], len(tick_labels))
+                cbar.set_ticks(ticks)
+                cbar.set_ticklabels(tick_labels)
+
+    return cbar
+
 def complex2hsv(data_complex, vmin=None, vmax=None):
     """ complex2hsv
         Routine to visualise complex array as 2D image with color conveying
@@ -201,7 +243,8 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
     return fig, ax
 
 def plt_confusion_matrix(cm, 
-        target_names=None, title='Confusion Matrix', cmap=None, figsize=None):
+        target_names=None, title='Confusion Matrix', cmap=None,
+        figsize=None, fontsize = None):
     """
     This function plots a confusion matrix and returns the figure and axis.
     Parameters:
@@ -213,37 +256,67 @@ def plt_confusion_matrix(cm,
     Returns:
     - fig: Figure object
     - ax: Axis object
+    
+    
+    Example:
+    ---------
+    
+    import numpy as np
+    from sklearn.metrics import confusion_matrix
+    from lognflow.plt_utils import plt_confusion_matrix
+    
+    N, n_classes = 10000, 20
+    
+    vec1 = (np.random.rand(N)*n_classes).astype('int')
+    vec2 = (np.random.rand(N)*n_classes).astype('int')
+    target_names = np.arange(n_classes)
+
+    cm = confusion_matrix(vec1, vec2, normalize='all')
+
+    plt_confusion_matrix(cm, target_names = target_names)
+    plt.show()
+    
     """
     accuracy = np.trace(cm) / np.sum(cm).astype('float')
-    misclass = 1 - accuracy
+    recall_per_class = np.diag(cm) / np.sum(cm, axis=1)
+    average_recall = np.mean(recall_per_class)
 
+    figsize_was_None = False
     if figsize is None:
-        figsize = np.ceil(cm.shape[0]/3)
-
+        figsize = np.ceil(cm.shape[0]**0.5)
+        figsize_was_None = True
+    if fontsize is None:
+        fontsize = 15*(figsize / cm.shape[0])
+    if figsize_was_None:
+        figsize = np.maximum(figsize, 5)
+    
     if target_names is None:
         target_names = [chr(x + 65) for x in range(cm.shape[0])]
 
     if cmap is None:
         cmap = plt.get_cmap('Blues')
 
-    fig, ax = plt.subplots(figsize=(4*figsize, 4*figsize))
+    fig, ax = plt.subplots(figsize=(figsize, figsize))
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
-
+    
     tick_marks = np.arange(len(target_names))
     ax.set_xticks(tick_marks)
-    ax.set_xticklabels(target_names, rotation=45)
+    ax.set_xticklabels(target_names, rotation=45, fontsize = fontsize)
     ax.set_yticks(tick_marks)
-    ax.set_yticklabels(target_names)
+    ax.set_yticklabels(target_names, fontsize = fontsize)
     for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
         clr = np.array([1, 1, 1, 0]) * (cm[i, j] - cm.min()) / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
-        ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr)
+        ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr,
+                fontsize = fontsize)
 
-    ax.set_ylabel('True label')
-    ax.set_xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}')
-    ax.set_title(title)
-    fig.colorbar(im, fraction=0.046, pad=0.04)
+    ax.set_ylabel('True label', fontsize = fontsize)
+    ax.set_xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; recall={average_recall:0.4f}', fontsize = fontsize)
+    ax.set_title(title, fontsize = fontsize)
+    plt_colorbar(im, colorbar_invisible=False, colorbar_aspect = fontsize * 1.5, 
+                 fontsize = fontsize, tick_labels = target_names)
 
     return fig, ax
+
 
 def complex2hsv_colorbar(
         fig_and_ax=None, vmin=0, vmax=1, 
@@ -302,32 +375,6 @@ def complex2hsv_colorbar(
             ha='center', va='center', fontsize=fontsize, color=text_color)
 
     return fig, ax
-
-def plt_colorbar(mappable, colorbar_aspect=3, 
-                 colorbar_pad_fraction=0.05, colorbar_invisible = False):
-    """
-    Add a colorbar to the current axis with consistent width.
-
-    Parameters:
-        mappable (AxesImage): The image to which the colorbar applies.
-        colorbar_aspect (int): The aspect ratio of the colorbar width relative 
-            to the axis width. Default is 2.
-        colorbar_pad_fraction (float): The fraction of padding between the 
-            axis and the colorbar. Default is 0.05.
-
-    Returns:
-        Colorbar: The colorbar added to the axis.
-    """
-
-    ax = mappable.axes
-    fig = ax.figure
-    divider = make_axes_locatable(ax)
-    width = ax.get_position().width / colorbar_aspect
-    cax = divider.append_axes("right", size=width, pad=colorbar_pad_fraction)
-    cbar = fig.colorbar(mappable, cax=cax)
-    if colorbar_invisible:
-        cbar.ax.set_visible(False)
-    return cbar
 
 def plt_violinplot(
         dataset:list, positions, facecolor = None, edgecolor = None, 

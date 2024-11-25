@@ -9,7 +9,7 @@ import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
     transform3D_viewer, plt_mark, plt_contours, question_dialog,
-    plt_plot, plt_hist2)
+    plt_plot, plt_hist2, plt_confusion_matrix)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -278,8 +278,23 @@ def test_plt_hist2():
     
     plt.show()
 
+def test_plt_confusion_matrix():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    from sklearn.metrics import confusion_matrix
+    
+    n_classes = 20
+    vec1 = (np.random.rand(10000)*n_classes).astype('int')
+    vec2 = (np.random.rand(10000)*n_classes).astype('int')
+    target_names = np.arange(n_classes)
+    
+    cm = confusion_matrix(vec1, vec2, normalize='all')
+    plt_confusion_matrix(cm, target_names = target_names)
+
+    plt.show()
+
 if __name__ == '__main__':
-    test_plt_imshow_series(); exit()
+    test_plt_confusion_matrix()
+    test_plt_imshow_series()
     test_plt_plot()
     test_plt_hist2()
     test_plt_imshow_complex()

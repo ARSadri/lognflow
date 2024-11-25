@@ -392,6 +392,12 @@ History
 -------------------
 * added vmin and vmax to plt_imshow_series
 
-0.13.02 (2024-11-19)
+0.13.03 (2024-11-19)
 -------------------
 * plt_imshow_series updated heavily.
+
+0.13.04 (2024-11-21)
+-------------------
+* more sensible printv
+* added printv to getLogger
+* confusion_matrix fixed

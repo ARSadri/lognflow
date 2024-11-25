@@ -53,7 +53,8 @@ from   .utils            import (repr_raw,
                                  replace_all,
                                  select_directory,
                                  name_from_file,
-                                 text_to_collection)
+                                 text_to_collection,
+                                 printv)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -110,7 +111,7 @@ class lognflow:
         :type log_prefix: str
         
         :param exist_ok:
-            if False, if log_dir exists it raises an error
+            if False, if any logging directory exists, it raises an error.
         
         :param print_text: 
             If True, everything that is logged as text will be printed as well
@@ -151,6 +152,7 @@ class lognflow:
         self._init_time = time.time()
         self.log_dir_prefix = log_dir_prefix
         self.log_dir_suffix = log_dir_suffix
+        self.exist_ok = exist_ok
         
         self.time_tag = time_tag
         frame = inspect.currentframe()
@@ -178,11 +180,20 @@ class lognflow:
                     if log_dir_name[-1] != '_':
                         log_dir_name += '_'
                 if(log_dir_suffix is None):
-                    log_dir_name += f'{self._init_time}'
+                    log_dir_name_ = log_dir_name + f'{int(self._init_time)}'
+                    merging_log_dir = pathlib_Path(logs_root) / log_dir_name_
+                    decimal_places = 0
+                    while merging_log_dir.is_dir():
+                        decimal_places += 1
+                        if decimal_places > 3:
+                            decimal_places = 3
+                        self._init_time = time.time()
+                        log_dir_name_ = log_dir_name + f'{self._init_time:.{decimal_places}f}'
+                        merging_log_dir = pathlib_Path(logs_root) / log_dir_name_
                 else:
                     log_dir_name += f'{log_dir_suffix}'
-                self.log_dir = \
-                    pathlib_Path(logs_root) / log_dir_name
+                    merging_log_dir = pathlib_Path(logs_root) / log_dir_name
+                self.log_dir = merging_log_dir
                 if(not self.log_dir.is_dir()):
                     new_log_dir_found = True
                 else:
@@ -418,8 +429,6 @@ class lognflow:
         parameter_name = replace_all(parameter_name, '\\', '/')
         parameter_name = replace_all(parameter_name, '//', '/')
         
-        # param_dir = self.log_dir /  parameter_name
-        
         if(parameter_name[-1] == '/'):
             param_name = ''
             param_dir = parameter_name
@@ -482,15 +491,15 @@ class lognflow:
             index_tag = True
         
         _param_dir = self.log_dir / param_dir
+        if(not _param_dir.is_dir()):
+            _param_dir.mkdir(parents = True, exist_ok = self.exist_ok)
+
         time_stamp_str = f'{self.time_stamp:>6.6f}'
         if(index_tag):
             var_fullname = param_dir + '/' + param_name
             self.counted_vars[var_fullname] = self.counted_vars.get(
                 var_fullname, 0) + 1
             index_tag_str = str(self.counted_vars[var_fullname])
-        
-        if(not _param_dir.is_dir()):
-            _param_dir.mkdir(parents = True, exist_ok = True)
         
         self.param_name_set.add(param_name)
         
@@ -1001,6 +1010,11 @@ class lognflow:
             return fpath
         else:
             return fig, ax
+    
+    def printv(self, *args, **kwargs):
+        if 'logger' in kwargs:
+            kwargs.pop('logger')
+        printv(*args, logger = self, **kwargs)
     
     def hist(self, parameter_name: str, 
                    parameter_value_list,
