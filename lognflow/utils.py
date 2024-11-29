@@ -430,7 +430,9 @@ def printv(var, logger = print, tab = 0,
                 toprint += f', std={var.std():.6f}'
             except: pass
         if arr_size < arr_size_min:
-            toprint += '\n' + str(var) + ' <--' + var_name
+            var_str = str(var)
+            if var_str < str_len_min:
+                toprint += '\n' + var_str + ' <--' + var_name
             
         logger(toprint)
         return len(toprint)

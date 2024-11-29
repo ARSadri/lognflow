@@ -242,15 +242,66 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
     
     return fig, ax
 
+def _compute_tn_from_cm(cm):
+    """
+    Compute True Negatives (TN) directly from the confusion matrix (cm).
+    True Negatives are the elements that are not in the row or column of the class.
+    """
+    n_classes = cm.shape[0]
+    total_samples = np.sum(cm)
+    tn_total = 0
+    for i in range(n_classes):
+        cm_without_class_i = np.delete(np.delete(cm, i, axis=0), i, axis=1)
+        tn_class_i = np.sum(cm_without_class_i)
+        tn_total += tn_class_i
+    tn_normalized = tn_total / total_samples
+    return tn_normalized
+
+def compute_tp_tn_fp_fn(cm):
+    """
+    computes average tp, tn, fp and fn of a confusion matrix
+    Example:
+    ---------
+    
+    import numpy as np
+    from sklearn.metrics import confusion_matrix
+    from lognflow.plt_utils import plt_confusion_matrix
+    
+    N, n_classes = 10000, 20
+    
+    labels1 = (np.random.rand(N)*n_classes).astype('int')
+    labels2 = (np.random.rand(N)*n_classes).astype('int')
+    target_names = np.arange(n_classes)
+
+    cm = confusion_matrix(labels1, labels2, normalize='all')
+
+    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm)
+    print(TP, TN, FP, FN)
+    
+    """
+    
+    total_samples = np.sum(cm)
+    TP = np.sum(np.diag(cm)) / total_samples
+    FP = np.sum(np.sum(cm, axis=0) - np.diag(cm)) / total_samples
+    FN = np.sum(np.sum(cm, axis=1) - np.diag(cm)) / total_samples
+    TN = _compute_tn_from_cm(cm)
+    
+    return TP, TN, FP, FN
+
 def plt_confusion_matrix(cm, 
-        target_names=None, title='Confusion Matrix', cmap=None,
+        target_names=None, title=None, cmap=None,
         figsize=None, fontsize = None):
     """
     This function plots a confusion matrix and returns the figure and axis.
     Parameters:
     - cm: Confusion matrix
     - target_names: List of target names (default: None)
-    - title: Title of the plot (default: 'Confusion Matrix')
+    - title: have any of the following options you like to see in the title
+        title = YOUR_TITLE + '_truth' + '_accuracy' + '_recall' + '_precision' + '_f1_score' + '_specificity' + '_mcc'
+        YOUR_TITLE could be nothing like ''
+        eg. if I want to see the truth table and the f1_score I code:
+            title = 'My truth table' + '_truth_f1_score'
+        
     - cmap: Colormap (default: None)
     - figsize: Size of the figure (default: None)
     Returns:
@@ -277,26 +328,26 @@ def plt_confusion_matrix(cm,
     plt.show()
     
     """
-    accuracy = np.trace(cm) / np.sum(cm).astype('float')
-    recall_per_class = np.diag(cm) / np.sum(cm, axis=1)
-    average_recall = np.mean(recall_per_class)
+    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm)
 
     figsize_was_None = False
     if figsize is None:
         figsize = np.ceil(cm.shape[0]**0.5)
         figsize_was_None = True
-    if fontsize is None:
-        fontsize = 15*(figsize / cm.shape[0])
     if figsize_was_None:
         figsize = np.maximum(figsize, 5)
-    
+        figsize = (figsize + 1, figsize)
     if target_names is None:
         target_names = [chr(x + 65) for x in range(cm.shape[0])]
 
     if cmap is None:
         cmap = plt.get_cmap('Blues')
 
-    fig, ax = plt.subplots(figsize=(figsize, figsize))
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    if fontsize is None:
+        fontsize = 6*(np.minimum(*figsize) / cm.shape[0])**0.5
+
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     
     tick_marks = np.arange(len(target_names))
@@ -305,18 +356,61 @@ def plt_confusion_matrix(cm,
     ax.set_yticks(tick_marks)
     ax.set_yticklabels(target_names, fontsize = fontsize)
     for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
-        clr = np.array([1, 1, 1, 0]) * (cm[i, j] - cm.min()) / (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
+        clr = np.array([1, 1, 1, 0]) * (cm[i, j] - cm.min()) / \
+            (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
         ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr,
                 fontsize = fontsize)
 
+    for i in range(cm.shape[0]):
+        rect = plt.Rectangle((i - 0.5, i - 0.5), 1, 1, fill=False, 
+                             edgecolor='darkred', lw=1, linestyle='--')
+        ax.add_patch(rect)
+
     ax.set_ylabel('True label', fontsize = fontsize)
-    ax.set_xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; recall={average_recall:0.4f}', fontsize = fontsize)
-    ax.set_title(title, fontsize = fontsize)
-    plt_colorbar(im, colorbar_invisible=False, colorbar_aspect = fontsize * 1.5, 
+    ax.set_xlabel('Predicted label', fontsize = fontsize)
+    if title is None:
+        title_str = f'Average TP={TP:.02f}, TN={TN:.02f}, FP={FP:.02f}, FN={FN:.02f}'
+    else:
+        title_str = ''
+        if '_truth' in title.lower():
+            title_str += f'Average TP={TP:.02f}, TN={TN:.02f}, FP={FP:.02f}, FN={FN:.02f}\n'
+            title = title.replace('_truth', '')
+        if '_accuracy' in title.lower():
+            accuracy = (TP + TN) / (TP + TN + FP + FN)
+            title_str += f'Accuracy={accuracy:.04f}'
+            title = title.replace('_accuracy', '')
+        if '_recall' in title.lower():
+            recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+            title_str += f', Recall={recall:.04f}'
+            title = title.replace('_recall', '')
+        if '_precision' in title.lower():
+            precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+            title_str += f', Precision={precision:.04f}'
+            title = title.replace('_precision', '')
+        if '_f1_score' in title.lower():
+            f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+            title_str += f', F1-Score={f1_score:.04f}'
+            title = title.replace('_f1_score', '')
+        if '_specificity' in title.lower():
+            specificity = TN / (TN + FP) if (TN + FP) > 0 else 0
+            title_str += f', Specificity={specificity:.04f}'
+            title = title.replace('_specificity', '')
+        if '_mcc' in title.lower():
+            numerator = (TP * TN) - (FP * FN)
+            denominator = ((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)) ** 0.5
+            mcc = numerator / denominator if denominator > 0 else 0
+            title_str += f', MCC={mcc:.04f}'
+            title = title.replace('_mcc', '')
+            
+        if len(title) > 0:
+            if title[-1] != '\n':
+                title += '\n'
+        title_str = title + title_str
+        
+    ax.set_title(title_str, fontsize = fontsize)
+    plt_colorbar(im, colorbar_invisible=False, colorbar_aspect = fontsize**0.5 * 4, 
                  fontsize = fontsize, tick_labels = target_names)
-
     return fig, ax
-
 
 def complex2hsv_colorbar(
         fig_and_ax=None, vmin=0, vmax=1, 
@@ -811,7 +905,7 @@ def plt_imshow(img,
     return fig, ax
 
 def plt_hist(vectors_list, fig_ax = None,
-             n_bins = 10, alpha = 0.5, normalize = False, 
+             bins = 10, alpha = 0.5, normalize = False, 
              labels_list = None, **kwargs):
     
     if fig_ax is None:
@@ -820,21 +914,62 @@ def plt_hist(vectors_list, fig_ax = None,
     else:
         fig, ax = fig_ax
     
-    if not (type(vectors_list) is list):
-        vectors_list = [vectors_list]
     for vec_cnt, vec in enumerate(vectors_list):
-        bins, edges = np.histogram(vec, n_bins)
+        bins_, edges = np.histogram(vec, bins)
         if normalize:
-            bins = bins / bins.max()
-        ax.bar(edges[:-1], bins, 
+            bins_ = bins_ / bins_.max()
+        ax.bar(edges[:-1], bins_, 
                 width =np.diff(edges).mean(), alpha=alpha)
         if labels_list is None:
-            ax.plot(edges[:-1], bins, **kwargs)
+            ax.plot(edges[:-1], bins_, **kwargs)
         else:
             assert len(labels_list) == len(vectors_list)
-            ax.plot(edges[:-1], bins, 
+            ax.plot(edges[:-1], bins_, 
                      label = f'{labels_list[vec_cnt]}', **kwargs)
     return fig, ax
+
+def plt_hist_subplots(arrays, bins = 10, frame_shape=None, alpha=0.7, 
+                      kwargs_bar = {} , kwargs_plot = {}):
+    """
+    Function to plot histograms of multiple arrays in subplots.
+    
+    Parameters:
+    - arrays (list of np.ndarray): List of arrays to plot histograms for.
+    - bins (int or sequence of scalars): Bin specification for the histograms.
+    - frame_shape (tuple or None): If provided, specify the number of rows and columns for the subplots.
+    - alpha (float): The transparency of the bars.
+    - color (str): The color of the bars.
+    - **kwargs: Additional arguments passed to the plot.
+    """
+    
+    N = len(arrays)
+    if frame_shape is None:
+        cols = int(np.ceil(np.sqrt(N)))
+        rows = int(np.ceil(N / cols))
+    else:
+        rows, cols = frame_shape
+        N = min(N, rows * cols)
+        
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 5))
+    axes = axes.flatten()
+    
+    for cnt, data in enumerate(arrays):
+        ax = axes[cnt]
+        bins_data, edges = np.histogram(data, bins=bins)
+        
+        ax.bar(edges[:-1], bins_data, width=np.diff(edges).mean(), 
+               alpha=alpha, **kwargs_bar)
+        
+        ax.plot(edges[:-1], bins_data, **kwargs_plot)
+        
+        ax.set_title(f"Histogram {cnt + 1}")
+
+    # Hide unused axes if any
+    for ax in axes[N:]:
+        ax.set_visible(False)
+
+    plt.tight_layout()
+    
 
 def plt_scatter3(
         data_N_by_3, fig_ax = None, title = None, 

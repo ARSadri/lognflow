@@ -282,13 +282,15 @@ def test_plt_confusion_matrix():
     print('Testing function', inspect.currentframe().f_code.co_name)
     from sklearn.metrics import confusion_matrix
     
-    n_classes = 20
+    n_classes = 52
     vec1 = (np.random.rand(10000)*n_classes).astype('int')
     vec2 = (np.random.rand(10000)*n_classes).astype('int')
     target_names = np.arange(n_classes)
     
     cm = confusion_matrix(vec1, vec2, normalize='all')
     plt_confusion_matrix(cm, target_names = target_names)
+    plt_confusion_matrix(cm, target_names = target_names, 
+                         title = 'Test_truth_accuracy_recall_precision')
 
     plt.show()
 
