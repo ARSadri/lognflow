@@ -402,8 +402,13 @@ History
 * added printv to getLogger
 * confusion_matrix fixed
 
-0.13.05 (2024-12-01)
+0.13.05 (2024-11-29)
 -------------------
 * plt_confusion_matrix puts black rectangles around diagonal elements
 * confusion matrix is much more useful now
 * printvar avoids printing long massages
+
+0.13.06 (2024-11-29)
+-------------------
+* critical bug in plt_imshow for complex numbers
+* critical bug fixed in printv

@@ -197,11 +197,11 @@ def test_hist():
     
     logger.hist(parameter_name = 'var1', 
                     parameter_value_list = var1,
-                    n_bins = 100)
+                    bins = 100)
     
     logger.hist(parameter_name = 'vars', 
                     parameter_value_list = [var1, var2, var3],
-                    n_bins = 100)
+                    bins = 100)
     
 def test_scatter3():
     print('Testing function', inspect.currentframe().f_code.co_name)

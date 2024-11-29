@@ -295,6 +295,10 @@ def test_plt_confusion_matrix():
     plt.show()
 
 if __name__ == '__main__':
+    test_plt_imshow()
+    test_numbers_as_images()
+    test_plt_fig_to_numpy()
+    test_stack_to_frame()
     test_plt_confusion_matrix()
     test_plt_imshow_series()
     test_plt_plot()
@@ -308,7 +312,3 @@ if __name__ == '__main__':
     test_transform3D_viewer()
     test_plt_imshow_subplots()
     test_plt_imhist()
-    test_plt_imshow()
-    test_numbers_as_images()
-    test_plt_fig_to_numpy()
-    test_stack_to_frame()

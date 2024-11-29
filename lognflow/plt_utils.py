@@ -810,6 +810,8 @@ def plt_imshow(img,
             plt_colorbar(im)
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
+        if aspect is not None:
+            ax.set_aspect(aspect)
     else:
         if (cmap == 'complex'):
                 
@@ -841,7 +843,9 @@ def plt_imshow(img,
                     (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], 
                                         transform=ax.transAxes)),
                     vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
-                ax_inset.patch.set_alpha(0)  
+                ax_inset.patch.set_alpha(0)
+            if aspect is not None:
+                ax.set_aspect(aspect)
         else:
             
             if fig_ax is None:
@@ -894,14 +898,16 @@ def plt_imshow(img,
                 plt.setp(ax[1], xticks=[], yticks=[])
                 ax[1].xaxis.set_ticks_position('none')
                 ax[1].yaxis.set_ticks_position('none')
+            
+            if aspect is not None:
+                ax[0].set_aspect(aspect)
+                ax[1].set_aspect(aspect)
+    
     if title is not None:
         title = str(title)
         fig.suptitle(title)
         fig.canvas.manager.window.setWindowTitle(title)
-    
-    if aspect is not None:
-        ax.set_aspect(aspect)
-    
+        
     return fig, ax
 
 def plt_hist(vectors_list, fig_ax = None,
