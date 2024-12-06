@@ -374,11 +374,10 @@ def printv(var, logger = print, tab = 0,
     frame = inspect.currentframe().f_back
     var_name = [name for name, value in frame.f_locals.items() if value is var]
     
-    # Ensure that var_name is not empty
     if var_name:
         var_name = var_name[0]
     else:
-        var_name = 'variable'
+        var_name = repr(var)
 
     toprint = f'{var_name}: {type(var).__name__}'
     

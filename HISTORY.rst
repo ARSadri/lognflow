@@ -412,3 +412,10 @@ History
 -------------------
 * critical bug in plt_imshow for complex numbers
 * critical bug fixed in printv
+
+0.13.07 (2024-12-06)
+-------------------
+* using pyvista you can visualize 3D volumes easily by pv_volume
+* another fix for text color of confusion matrix
+* plt_plot xlim and ylim added
+* bug fixed in plt_imshow_series

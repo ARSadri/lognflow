@@ -29,7 +29,8 @@ def plt_colorbar(mappable, colorbar_aspect=3,
             axis and the colorbar. Default is 0.05.
         colorbar_invisible (bool): Whether to make the colorbar invisible. Default is False.
         fontsize (int): Font size for the colorbar tick labels. Default is 10.
-        tick_labels (list or None): Custom labels for the colorbar ticks. If None, default tick labels are used.
+        tick_labels (list or None): Custom labels for the colorbar ticks. 
+        If None, default tick labels are used.
 
     Returns:
         Colorbar: The colorbar added to the axis.
@@ -288,6 +289,16 @@ def compute_tp_tn_fp_fn(cm):
     
     return TP, TN, FP, FN
 
+from itertools import product as itertools_product
+
+def calculate_contrasting_color(value, cmap):
+    """Calculate a contrasting color for a given value in the colormap."""
+    r, g, b, _ = cmap(value)  # Get the RGBA values
+    # Calculate luminance using the sRGB luminance formula
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    # Return white for dark colors and black for light colors
+    return 'white' if luminance < 0.5 else 'black'
+
 def plt_confusion_matrix(cm, 
         target_names=None, title=None, cmap=None,
         figsize=None, fontsize = None):
@@ -356,8 +367,7 @@ def plt_confusion_matrix(cm,
     ax.set_yticks(tick_marks)
     ax.set_yticklabels(target_names, fontsize = fontsize)
     for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
-        clr = np.array([1, 1, 1, 0]) * (cm[i, j] - cm.min()) / \
-            (cm.max() - cm.min()) + np.array([0, 0, 0, 1])
+        clr = calculate_contrasting_color(cm[i, j] / cm.max(), cmap)
         ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr,
                 fontsize = fontsize)
 
@@ -706,6 +716,16 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
         ax = fig.add_subplot(111)
     else:
         fig, ax = fig_ax
+    
+    if 'xlim' in kwargs:
+        xlim = kwargs['xlim']
+        kwargs.pop('xlim')
+        ax.set_xlim(xlim)
+
+    if 'ylim' in kwargs:
+        ylim = kwargs['ylim']
+        kwargs.pop('ylim')
+        ax.set_ylim(ylim)
     
     for list_cnt, y_values in enumerate(y_values_list):
         if(x_values_list is None):
@@ -1416,8 +1436,12 @@ def plt_imshow_series(list_of_stacks,
                 ax.set_aspect(aspect)
             
             if colorbar | colorbar_last_only:
-                plt_colorbar(im, colorbar_invisible = img_cnt != n_imgs - 1)
-            
+                if colorbar_last_only:
+                    colorbar_invisible = img_cnt != n_imgs - 1
+                else:
+                    colorbar_invisible = 0
+                plt_colorbar(im, colorbar_invisible = colorbar_invisible)
+                            
             if(text_as_colorbar):
                 ax.text(data_canvas.shape[0]*0,
                          data_canvas.shape[1]*0.05,
@@ -1965,3 +1989,79 @@ def plt_contours(
         fig.canvas.manager.window.setWindowTitle(title)
     
     return fig, ax
+
+def pv_volume(volume, volume_xyz = None, 
+                   grid_size=None, grid_opacity=0.5, show_grid=True, 
+                   title="volume Visualization", show_ticks = True):
+    import pyvista as pv
+
+    if volume_xyz is None:
+        x, y, z = np.mgrid[:volume.shape[0],
+                           :volume.shape[1],
+                           :volume.shape[2]]
+    else:
+        x, y, z = volume_xyz
+    
+    x_min, x_max, y_min, y_max, z_min, z_max = (x.min(), x.max(), y.min(), y.max(), z.min(), z.max()) 
+    normed_values = (volume - volume.min()) / (volume.max() - volume.min())
+
+    points = np.column_stack((x.ravel(), y.ravel(), z.ravel()))
+    point_cloud = pv.PolyData(points)
+    point_cloud["volume"] = normed_values.ravel()
+
+    plotter = pv.Plotter()
+    plotter.add_title(title)
+
+    plotter.add_points(point_cloud, scalars="volume", cmap="viridis", opacity="sigmoid")
+    if show_ticks:
+        plotter.show_bounds(
+            grid='front',
+            location='outer',
+            all_edges=True,
+        )
+
+    return plotter
+
+def pv_surface(data_2d, plotter=None, show_edges=True, cmap=None, zscale = None):
+    """
+    Create a surface plot from a 2D array using PyVista and PolyData.
+
+    Parameters:
+        data_2d (numpy.ndarray): A 2D numpy array to plot.
+        plotter (pyvista.Plotter): Existing plotter instance (if any).
+        show_edges (bool): Whether to show edges of the surface.
+        cmap (str): Colormap to use for the surface.
+    """
+    import pyvista as pv
+    
+    if not isinstance(data_2d, np.ndarray) or len(data_2d.shape) != 2:
+        raise ValueError("Input must be a 2D numpy array.")
+    
+    nx, ny = data_2d.shape
+    x = np.arange(nx)
+    y = np.arange(ny)
+    yy, xx = np.meshgrid(y, x)
+    z = data_2d
+    points = np.c_[xx.ravel(), yy.ravel(), z.ravel()]
+    faces = []
+
+    for i in range(nx - 1):
+        for j in range(ny - 1):
+            idx = i * ny + j
+            faces.append([4, idx, idx + 1, idx + ny + 1, idx + ny])
+
+    faces = np.array(faces, dtype=np.int32).ravel()
+
+    mesh = pv.PolyData(points, faces)
+    mesh["scalars"] = z.ravel()
+    if plotter is None:
+        plotter = pv.Plotter()
+    plotter.add_mesh(mesh, show_edges=show_edges, cmap=cmap, scalars="scalars",
+                     scalar_bar_args={'title': "Intensity"})
+    if zscale is None:
+        zscale = (data_2d.shape[0] * data_2d.shape[1])**0.5 / (
+            data_2d.max() - data_2d.min())
+    plotter.set_scale(xscale = 1, yscale = 1, zscale = zscale)
+    plotter.add_axes()
+    
+    return plotter

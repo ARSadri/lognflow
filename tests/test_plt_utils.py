@@ -9,7 +9,7 @@ import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
     transform3D_viewer, plt_mark, plt_contours, question_dialog,
-    plt_plot, plt_hist2, plt_confusion_matrix)
+    plt_plot, plt_hist2, plt_confusion_matrix, pv_volume, pv_surface)
 import numpy as np
 
 def test_transform3D_viewer():
@@ -262,7 +262,8 @@ def test_plt_plot():
     plt_plot(y_values_list, '-*')
     
     x_values_list = [10, 12, 30]
-    plt_plot(y_values_list, '-*', x_values_list = x_values_list)
+    plt_plot(y_values_list, '-*', x_values_list = x_values_list, 
+             xlim = [0, 50], ylim = [0, 10], markersize = 10)
     
     plt.show()
 
@@ -283,8 +284,11 @@ def test_plt_confusion_matrix():
     from sklearn.metrics import confusion_matrix
     
     n_classes = 52
+    n_classes_std = 1.5
     vec1 = (np.random.rand(10000)*n_classes).astype('int')
-    vec2 = (np.random.rand(10000)*n_classes).astype('int')
+    vec2 = (vec1 + (np.random.randn(len(vec1))*n_classes_std)).astype('int')
+    vec2[vec2<0] = 0
+    vec2[vec2>=n_classes] = n_classes - 1
     target_names = np.arange(n_classes)
     
     cm = confusion_matrix(vec1, vec2, normalize='all')
@@ -294,14 +298,49 @@ def test_plt_confusion_matrix():
 
     plt.show()
 
+def test_pv_volume():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    N = 100
+    x_min, x_max = -2, 2
+    y_min, y_max = -2, 2
+    z_min, z_max = -2, 2
+    x, y, z = np.mgrid[x_min:x_max:N*1j,
+                       y_min:y_max:N*1j,
+                       z_min:z_max:N*1j]
+    
+    sigma = 1
+    gaussian = np.exp(-(x**2 + y**2 + z**2) / (2 * sigma**2))
+    gaussian += np.exp(-((x-1)**2 + (y-1)**2 + z**2) / (2 * (sigma/2)**2))
+    
+    print(f'gaussian: {gaussian.shape}')
+    plotter = pv_volume(
+        gaussian, grid_size=5, grid_opacity=0.1, title="3D Gaussian with Grid")
+    plotter.show()
+
+def test_pv_surface():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    
+    y, x = np.meshgrid(np.arange(-50, 50), np.arange(-50, 50))
+    
+    data1 = x**2 + y**2 + np.random.randn(100, 100)
+    data2 = x**2 - y**2 + np.random.randn(100, 100)
+    
+    plotter = pv_surface(data1, cmap="Blues")
+    
+    plotter = pv_surface(data2, plotter=plotter, cmap="Reds")
+    
+    plotter.show()
+
 if __name__ == '__main__':
+    test_pv_surface()
+    test_pv_volume()
+    test_plt_plot()
+    test_plt_confusion_matrix()
     test_plt_imshow()
     test_numbers_as_images()
     test_plt_fig_to_numpy()
     test_stack_to_frame()
-    test_plt_confusion_matrix()
     test_plt_imshow_series()
-    test_plt_plot()
     test_plt_hist2()
     test_plt_imshow_complex()
     test_question_dialog()
