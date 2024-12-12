@@ -419,3 +419,7 @@ History
 * another fix for text color of confusion matrix
 * plt_plot xlim and ylim added
 * bug fixed in plt_imshow_series
+
+0.13.08 (2024-12-13)
+-------------------
+* plt_plot takes grid keyword argument

@@ -259,11 +259,11 @@ def test_plt_plot():
     plt_plot(y_values_list, '-*', x_values_list = x_values_list)
 
     y_values_list = [1, 2, 3]
-    plt_plot(y_values_list, '-*')
+    plt_plot(y_values_list, '-*', grid = dict(visible = True, which='both', linestyle='--', linewidth=2))
     
     x_values_list = [10, 12, 30]
     plt_plot(y_values_list, '-*', x_values_list = x_values_list, 
-             xlim = [0, 50], ylim = [0, 10], markersize = 10)
+             xlim = [0, 50], ylim = [0, 10], markersize = 10, grid = True)
     
     plt.show()
 
@@ -283,7 +283,7 @@ def test_plt_confusion_matrix():
     print('Testing function', inspect.currentframe().f_code.co_name)
     from sklearn.metrics import confusion_matrix
     
-    n_classes = 52
+    n_classes = 11
     n_classes_std = 1.5
     vec1 = (np.random.rand(10000)*n_classes).astype('int')
     vec2 = (vec1 + (np.random.randn(len(vec1))*n_classes_std)).astype('int')
@@ -294,8 +294,8 @@ def test_plt_confusion_matrix():
     cm = confusion_matrix(vec1, vec2, normalize='all')
     plt_confusion_matrix(cm, target_names = target_names)
     plt_confusion_matrix(cm, target_names = target_names, 
-                         title = 'Test_truth_accuracy_recall_precision')
-
+                         title = 'Test_truth_accuracy_recall_precision',
+                         fontsize = 8)
     plt.show()
 
 def test_pv_volume():
@@ -332,16 +332,16 @@ def test_pv_surface():
     plotter.show()
 
 if __name__ == '__main__':
-    test_pv_surface()
-    test_pv_volume()
+    test_plt_hist2()
     test_plt_plot()
     test_plt_confusion_matrix()
+    test_pv_surface()
+    test_pv_volume()
     test_plt_imshow()
     test_numbers_as_images()
     test_plt_fig_to_numpy()
     test_stack_to_frame()
     test_plt_imshow_series()
-    test_plt_hist2()
     test_plt_imshow_complex()
     test_question_dialog()
     test_plt_contours()

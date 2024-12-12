@@ -1,13 +1,10 @@
 import numpy as np
-from   functools import partial
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from   matplotlib.colors import hsv_to_rgb
 from   matplotlib.widgets import RangeSlider, TextBox, Button
 from   mpl_toolkits.mplot3d import Axes3D
 from   mpl_toolkits.axes_grid1 import make_axes_locatable
-from   scipy.spatial.transform import Rotation as scipy_rotation
-from   .printprogress import printprogress
 from   itertools import cycle as itertools_cycle
 from   itertools import product as itertools_product
 
@@ -289,8 +286,6 @@ def compute_tp_tn_fp_fn(cm):
     
     return TP, TN, FP, FN
 
-from itertools import product as itertools_product
-
 def calculate_contrasting_color(value, cmap):
     """Calculate a contrasting color for a given value in the colormap."""
     r, g, b, _ = cmap(value)  # Get the RGBA values
@@ -542,7 +537,12 @@ class plt_imhist:
         cm = self.im.get_cmap()
         
         # Histogram
-        n, bins = np.histogram(in_image.ravel(), **kwargs_for_hist)
+        im_image_ravel = in_image.ravel().copy()
+        im_image_ravel = im_image_ravel[1 - np.isnan(im_image_ravel)]
+        im_image_ravel = im_image_ravel[1 - np.isinf(im_image_ravel)]
+        if len(im_image_ravel) == 0:
+            im_image_ravel = in_image.ravel().copy()
+        n, bins = np.histogram(im_image_ravel, **kwargs_for_hist)
         bin_centres = 0.5 * (bins[:-1] + bins[1:])
         axs[1].barh(
             bin_centres, n, height=(bins[1]-bins[0]),
@@ -727,6 +727,11 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
         kwargs.pop('ylim')
         ax.set_ylim(ylim)
     
+    use_grid = None
+    if 'grid' in kwargs:
+        use_grid = kwargs['grid']
+        kwargs.pop('grid')    
+    
     for list_cnt, y_values in enumerate(y_values_list):
         if(x_values_list is None):
             ax.plot(y_values, *plt_plot_args, **kwargs)
@@ -736,7 +741,13 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
             else:
                 x_values = x_values_list[0]
             ax.plot(x_values, y_values, *plt_plot_args, **kwargs)
-    
+
+    if use_grid:
+        if isinstance(use_grid, dict):
+            ax.grid(**use_grid)
+        else:
+            ax.grid(use_grid)
+
     if title is not None:
         title = str(title)
         ax.set_title(title)
@@ -1099,6 +1110,7 @@ def numbers_as_images_3D(data3D_shape: tuple,
     txt_width = int(np.log(n_x)/np.log(n_x)) + 1
     number_text_base = '{ind_x:0{width}}}'
     if(verbose):
+        from lognflow import printprogress
         pBar = printprogress(n_x)
     for ind_x in range(n_x):
         mat = np.ones((n_r, n_c))
@@ -1151,6 +1163,7 @@ def numbers_as_images_4D(data4D_shape: tuple,
                     / np.log(np.maximum(n_x, n_y))) + 1
     number_text_base = '{ind_x:0{width}}, {ind_y:0{width}}'
     if(verbose):
+        from lognflow import printprogress
         pBar = printprogress(n_x * n_y)
     for ind_x in range(n_x):
         for ind_y in range(n_y):
@@ -1536,7 +1549,7 @@ def plt_imshow_subplots(
     rights = (rights - min_left) / (max_right - min_left)
     tops = (tops - min_bottom) / (max_top - min_bottom)
 
-    fig = plt.figure()
+    fig = plt.figure(figsize = figsize)
     for cnt in range(N):
         gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
                                           top=tops[cnt], bottom=bottoms[cnt])
@@ -1607,6 +1620,8 @@ class transform3D_viewer:
             float(self.params["Rz_text_box"].text)])
 
     def figure(self):
+        from functools import partial
+
         self.Theta_init, self.Vt_init = self.get_Theta(self.PC[self.moving_inds])
         
         self.fig = plt.figure()
@@ -1697,7 +1712,7 @@ class transform3D_viewer:
         self.fig.canvas.draw()
 
     def get_Theta(self, PC):
-        # Calculate the initial SVD of the centered movable part
+        from   scipy.spatial.transform import Rotation as scipy_rotation
         Theta = {}
         mean_vec = PC.mean(0)
         Theta["Tx"], Theta["Ty"], Theta["Tz"] = mean_vec
@@ -1709,6 +1724,7 @@ class transform3D_viewer:
         return Theta, Vt[:3]
     
     def apply(self, PC):
+        from   scipy.spatial.transform import Rotation as scipy_rotation
         Theta_in, Vt_in = self.get_Theta(PC)
         Theta, _ = self.get_Theta(self.PC[self.moving_inds])
         
@@ -1755,6 +1771,7 @@ class transform3D_viewer:
             pass
 
     def update_from_text(self, text):
+        from   scipy.spatial.transform import Rotation as scipy_rotation
         try: # Read new transformation values
             self.textboxevalues = np.array([
                 float(self.params["Tx_text_box"].text),
