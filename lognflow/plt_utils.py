@@ -538,8 +538,8 @@ class plt_imhist:
         
         # Histogram
         im_image_ravel = in_image.ravel().copy()
-        im_image_ravel = im_image_ravel[1 - np.isnan(im_image_ravel)]
-        im_image_ravel = im_image_ravel[1 - np.isinf(im_image_ravel)]
+        im_image_ravel = im_image_ravel[np.isnan(im_image_ravel) == False]
+        im_image_ravel = im_image_ravel[np.isinf(im_image_ravel) == False]
         if len(im_image_ravel) == 0:
             im_image_ravel = in_image.ravel().copy()
         n, bins = np.histogram(im_image_ravel, **kwargs_for_hist)
@@ -884,9 +884,11 @@ def plt_imshow(img,
             else:
                 fig, _ = fig_ax
             
-            window = plt.get_current_fig_manager().window
-            if (window.height() > window.width()) & (portrait is None):
-                portrait = True
+            try:
+                window = plt.get_current_fig_manager().window
+                if (window.height() > window.width()) & (portrait is None):
+                    portrait = True
+            except: pass
             if portrait:
                 ax = [fig.add_subplot(2, 1, 1), fig.add_subplot(2, 1, 2)]
             else:

@@ -423,3 +423,7 @@ History
 0.13.08 (2024-12-13)
 -------------------
 * plt_plot takes grid keyword argument
+
+0.13.09 (2025-01-06)
+-------------------
+* window for plt_imshow went in a try 

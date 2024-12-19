@@ -64,6 +64,8 @@ class varinlog:
     suffix              : str
     log_counter_limit   : int
     savefig             : bool
+    plot_start_ago      : float
+    plot_win_length    : float
 
 @dataclass
 class textinlog:
@@ -707,7 +709,8 @@ class lognflow:
         return cnt_limit
 
     def record(self, parameter_name: str, parameter_value, flush = False,
-                suffix = None, log_size_limit: int = int(1e+7), savefig = False):
+                suffix = None, log_size_limit: int = int(1e+8), savefig = False,
+                plot_start_ago = None, plot_win_length = 10):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -729,7 +732,7 @@ class lognflow:
             :param suffix: str
                     can be 'npz' or 'txt' which will save it as text.
             :param log_size_limit: int
-                    log_size_limit in bytes, default: 1e+7.
+                    log_size_limit in bytes, default: 1e+8.
                     
         """
         if not self.enabled: return
@@ -760,11 +763,11 @@ class lognflow:
             curr_index = 0
 
         if(curr_index >= log_counter_limit):
-            self.record_flush(log_dirnamesuffix)
+            self.record_flush(log_dirnamesuffix, **flush_kwargs)
             file_start_time = self.time_stamp
             curr_index = 0
         elif flush:
-            self.record_flush(log_dirnamesuffix)
+            self.record_flush(log_dirnamesuffix, **flush_kwargs)
 
         if(curr_index == 0):
             data_array = np.zeros((log_counter_limit, ) + parameter_value.shape,
@@ -785,9 +788,12 @@ class lognflow:
                                                       file_start_time,
                                                       suffix,
                                                       log_counter_limit,
-                                                      savefig)
+                                                      savefig,
+                                                      plot_start_ago,
+                                                      plot_win_length)
 
-    def record_flush(self, parameter_name: str, suffix: str = None, savefig = None):
+    def record_flush(self, parameter_name: str, suffix: str = None, savefig = None,
+                     plot_start_ago = None, plot_win_length = 10):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
@@ -822,9 +828,35 @@ class lognflow:
             np.savetxt(fpath, _var_time_array)
             fpath = _param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
-        if savefig:
-            self.plot(parameter_name, [_var_data_array], '-*', 
-                      x_values_list = [_var_time_array])
+        _var_data_array = _var_data_array.squeeze()
+        if savefig & (len(_var_data_array.squeeze().shape) == 1):
+            if plot_start_ago is None:
+                plot_start_ago = _var.plot_start_ago
+            if plot_win_length is None:
+                plot_win_length = _var.plot_win_length
+
+            tmax = _var_time_array.max()
+
+            if plot_start_ago is None:
+                plot_start_ago = 0
+                
+            if plot_start_ago < len(_var_time_array):
+                _var_time_array = _var_time_array[plot_start_ago:]
+                _var_data_array = _var_data_array[plot_start_ago:]
+                
+                from .plt_utils import plt_plot
+                fig_ax = plt_plot(
+                    [_var_data_array], '*', x_values_list = [_var_time_array])
+                n_stamps = len(_var_time_array)
+                if (n_stamps > 4) & (plot_win_length is not None):
+                    n_wins = int(n_stamps // plot_win_length)
+                    ending = plot_win_length * n_wins
+                    v1 = _var_data_array[
+                        :ending].reshape(n_wins, plot_win_length).mean(1)
+                    t1 = _var_time_array[
+                        :ending].reshape(n_wins, plot_win_length).mean(1)
+                    self.plot(parameter_name, 
+                              [v1], '--x',fig_ax = fig_ax, x_values_list = [t1])
         return fpath
     
     def get_record(self, parameter_name: str, suffix: str = None) -> tuple:

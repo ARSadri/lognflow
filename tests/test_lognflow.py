@@ -126,9 +126,16 @@ def test_record_savefig():
     var = 0
     for _ in printprogress(range(1000)):
         time.sleep(0.001)
-        var += np.random.rand(1)
+        var += np.random.randn(1)*_/50
         logger.record('vars/vec/v.to.txt', var, savefig = True)
 
+    x = np.arange(-2, 2, 0.005)
+    var = 0
+    for _ in printprogress(range(len(x))):
+        time.sleep(0.001)
+        var = x[_]**2 + np.random.randn(1)
+        logger.record('v2', var, savefig = True, plot_win_length = 10)
+    
 def test_get_record():
     print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
@@ -607,6 +614,7 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #===========================#
+    test_record_savefig()
     test_copy()
     test_replace_time_with_index()
     test_variables_to_pdf()
@@ -620,7 +628,6 @@ if __name__ == '__main__':
     test_rename()
     test_logger()
     test_log_flush_period()
-    test_record_savefig()
     test_get_record()
     test_record()
     test_record_without_time_stamp()
@@ -635,7 +642,7 @@ if __name__ == '__main__':
     test_load_specific_fname()
     test_text_to_object()
     test_depricated_logviewer()
-    
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     test_imshow()
     test_imshow_series()
     test_imshow_complex()
