@@ -424,6 +424,11 @@ History
 -------------------
 * plt_plot takes grid keyword argument
 
-0.13.09 (2025-01-06)
+0.13.09 (2025-12-17)
 -------------------
 * window for plt_imshow went in a try 
+
+0.13.10 (2025-12-19)
+-------------------
+* plt_imshow_subplots takes complex images too
+* plt_record takes savefig and plot_time_window to plot the windowed average

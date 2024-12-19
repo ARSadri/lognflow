@@ -9,8 +9,17 @@ import lognflow
 from lognflow.plt_utils import (
     plt_imshow, complex2hsv_colorbar, plt_imhist,complex2hsv,
     transform3D_viewer, plt_mark, plt_contours, question_dialog,
-    plt_plot, plt_hist2, plt_confusion_matrix, pv_volume, pv_surface)
+    plt_plot, plt_hist2, plt_confusion_matrix, pv_volume, pv_surface,
+    plt_imshow_subplots)
 import numpy as np
+
+def test_plt_imshow_subplots_comples():
+    data = [np.random.rand(100, 100) + 1j * np.random.rand(100, 100),
+            np.random.rand(100, 100), np.random.rand(100, 100),
+            np.random.rand(100, 100)]
+    
+    plt_imshow_subplots(data, colorbar = True, vmin = 0.3, vmax = 0.4)
+    plt.show()
 
 def test_transform3D_viewer():
     print('Testing function', inspect.currentframe().f_code.co_name)
@@ -332,6 +341,7 @@ def test_pv_surface():
     plotter.show()
 
 if __name__ == '__main__':
+    test_plt_imshow_subplots_comples()
     test_plt_hist2()
     test_plt_plot()
     test_plt_confusion_matrix()

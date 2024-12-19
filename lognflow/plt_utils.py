@@ -1489,7 +1489,8 @@ def plt_imshow_series(list_of_stacks,
 
 def plt_imshow_subplots(
         images, grid_locations=None, frame_shape = None, title = None,
-        titles=[], cmaps=[], colorbar=True, margin = 0.025, inter_image_margin = 0.01,
+        titles=[], cmaps=[], colorbar=True, margin = 0.025,
+        inter_image_margin = 0.01,
         colorbar_aspect=2, colorbar_pad_fraction=0.05,
         figsize=None, remove_axis_ticks=True, **kwargs):
     """
@@ -1557,26 +1558,51 @@ def plt_imshow_subplots(
                                           top=tops[cnt], bottom=bottoms[cnt])
         ax = fig.add_subplot(gs[0])
         image = images[cnt]
+        
+        try:
+            image = image.detach().cpu().numpy()
+        except: pass
+        
         if image is not None:
-            if 'cmap' in kwargs:
-                cax = ax.imshow(image, **kwargs)
+            if np.iscomplexobj(image):
+                complex_image, data_abs, data_angle = complex2hsv(image)
+                try: min_angle = data_angle[data_abs > 0].min()
+                except: min_angle = 0
+                try: max_angle = data_angle[data_abs > 0].max()
+                except: max_angle = 0
+                cax = ax.imshow(complex_image)
+                
+                if(colorbar):
+                    vmin = kwargs.get('vmin', np.abs(image).min())
+                    vmax = kwargs.get('vmax', np.abs(image).max())
+                    
+                    fig, ax_inset = complex2hsv_colorbar(
+                        (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], 
+                                            transform=ax.transAxes)),
+                        vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
+                    ax_inset.patch.set_alpha(0)
+                
             else:
-                try:
-                    _cmap = cmaps[i]
-                except:
-                    _cmap = None
-                cax = ax.imshow(image, cmap=_cmap, **kwargs)
-
-            try:
-                ax.set_title(titles[cnt])
-            except:
-                pass
-
+                cmap = None
+                if cmaps:
+                    cmap = cmaps[i]
+                else:
+                    if 'cmap' in kwargs:
+                        cmap = kwargs['cmap']
+                if cmap:
+                    cax = ax.imshow(image, cmap=cmap, **kwargs)
+                else:
+                    cax = ax.imshow(image, **kwargs)
+                if colorbar:
+                    plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
+                                 colorbar_pad_fraction=colorbar_pad_fraction)
+            
+            try: ax.set_title(titles[cnt])
+            except: pass
+            
             if remove_axis_ticks:
                 ax.axis('off')    
-            if colorbar:
-                plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
-                             colorbar_pad_fraction=colorbar_pad_fraction)
+            
     if title is not None:
         title = str(title)
         fig.suptitle(title)
