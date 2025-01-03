@@ -424,11 +424,16 @@ History
 -------------------
 * plt_plot takes grid keyword argument
 
-0.13.09 (2025-12-17)
+0.13.09 (2024-12-17)
 -------------------
 * window for plt_imshow went in a try 
 
-0.13.10 (2025-12-19)
+0.13.10 (2024-12-19)
 -------------------
 * plt_imshow_subplots takes complex images too
 * plt_record takes savefig and plot_time_window to plot the windowed average
+
+0.13.11 (2025-01-03)
+-------------------
+* rrecord can take the arguments for plotting and not the record flush
+* changing window title will not raise error any more in ipynb

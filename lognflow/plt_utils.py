@@ -502,7 +502,9 @@ def plt_violinplot(
     if title is not None:
         title = str(title)
         fig.suptitle(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
 
     return fig, ax
 
@@ -939,13 +941,24 @@ def plt_imshow(img,
     if title is not None:
         title = str(title)
         fig.suptitle(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try: 
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
         
     return fig, ax
 
 def plt_hist(vectors_list, fig_ax = None,
              bins = 10, alpha = 0.5, normalize = False, 
              labels_list = None, **kwargs):
+    
+    try:
+        vectors_list_shape = vectors_list.shape
+        if len(vectors_list_shape == 1):
+            vectors_list = [vectors_list]
+    except: pass
+    
+    assert len(vectors_list) > 0, \
+        f'lognflow.plt_hist: input should be a list or an array or an array of arrays'
     
     if fig_ax is None:
         fig = plt.figure()
@@ -1028,7 +1041,9 @@ def plt_scatter3(
     if title is not None:
         title = str(title)
         ax.set_title(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
 
     try: elev_list = [int(elev_list)]
     except: pass
@@ -1484,7 +1499,9 @@ def plt_imshow_series(list_of_stacks,
     if title is not None:
         title = str(title)
         fig.suptitle(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
     return fig, None
 
 def plt_imshow_subplots(
@@ -1606,7 +1623,9 @@ def plt_imshow_subplots(
     if title is not None:
         title = str(title)
         fig.suptitle(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
@@ -2031,7 +2050,9 @@ def plt_contours(
     if title is not None:
         title = str(title)
         ax.set_title(title)
-        fig.canvas.manager.window.setWindowTitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
     
     return fig, ax
 

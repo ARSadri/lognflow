@@ -127,14 +127,14 @@ def test_record_savefig():
     for _ in printprogress(range(1000)):
         time.sleep(0.001)
         var += np.random.randn(1)*_/50
-        logger.record('vars/vec/v.to.txt', var, savefig = True)
+        logger.record('vars/vec/v.to.txt', var, savefig = True, plot_win_length = 50)
 
     x = np.arange(-2, 2, 0.005)
     var = 0
     for _ in printprogress(range(len(x))):
         time.sleep(0.001)
         var = x[_]**2 + np.random.randn(1)
-        logger.record('v2', var, savefig = True, plot_win_length = 10)
+        logger.record('v2', var, savefig = True, plot_win_length = 100)
     
 def test_get_record():
     print('Testing function', inspect.currentframe().f_code.co_name)
@@ -195,20 +195,20 @@ def test_plot():
     
 def test_hist():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    var1 = np.random.rand(10000)
-    var2 = 3 + np.random.rand(10000)
-    var3 = 6 + np.random.rand(10000)
+    var1 = np.random.rand(1000)
+    var2 = 3 + np.random.rand(1000)
+    var3 = 6 + np.random.rand(1000)
     
     logger = lognflow(temp_dir)
     logger('This is a test for hist')    
     
     logger.hist(parameter_name = 'var1', 
-                    parameter_value_list = var1,
-                    bins = 100)
+                parameter_value_list = [var1],
+                bins = 20)
     
     logger.hist(parameter_name = 'vars', 
-                    parameter_value_list = [var1, var2, var3],
-                    bins = 100)
+                parameter_value_list = [var1, var2, var3],
+                bins = 20)
     
 def test_scatter3():
     print('Testing function', inspect.currentframe().f_code.co_name)

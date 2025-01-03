@@ -792,8 +792,7 @@ class lognflow:
                                                       plot_start_ago,
                                                       plot_win_length)
 
-    def record_flush(self, parameter_name: str, suffix: str = None, savefig = None,
-                     plot_start_ago = None, plot_win_length = 10):
+    def record_flush(self, parameter_name: str, suffix: str = None):
         """ Flush the buffered numpy arrays
             If you have been using log_ver, this will flush all the buffered
             arrays. It is called using log_size_limit for a variable and als
@@ -814,11 +813,11 @@ class lognflow:
         _param_dir = self._get_fpath(param_dir)
         
         _var = self._vars_dict[log_dirnamesuffix]
-        savefig  = _var.savefig if savefig is None else savefig 
-        
+        savefig  = _var.savefig
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
-        if((_var.suffix == 'npz') | (_var.suffix == 'npy')):
+        
+        if _var.suffix == 'npz':
             fpath = _param_dir / f'{param_name}_{_var.file_start_time}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
@@ -828,12 +827,11 @@ class lognflow:
             np.savetxt(fpath, _var_time_array)
             fpath = _param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
             np.savetxt(fpath, _var_data_array)
+        
         _var_data_array = _var_data_array.squeeze()
         if savefig & (len(_var_data_array.squeeze().shape) == 1):
-            if plot_start_ago is None:
-                plot_start_ago = _var.plot_start_ago
-            if plot_win_length is None:
-                plot_win_length = _var.plot_win_length
+            plot_start_ago = _var.plot_start_ago
+            plot_win_length = _var.plot_win_length
 
             tmax = _var_time_array.max()
 
@@ -846,7 +844,7 @@ class lognflow:
                 
                 from .plt_utils import plt_plot
                 fig_ax = plt_plot(
-                    [_var_data_array], '*', x_values_list = [_var_time_array])
+                    [_var_data_array], '.', x_values_list = [_var_time_array])
                 n_stamps = len(_var_time_array)
                 if (n_stamps > 4) & (plot_win_length is not None):
                     n_wins = int(n_stamps // plot_win_length)
@@ -856,7 +854,7 @@ class lognflow:
                     t1 = _var_time_array[
                         :ending].reshape(n_wins, plot_win_length).mean(1)
                     self.plot(parameter_name, 
-                              [v1], '--x',fig_ax = fig_ax, x_values_list = [t1])
+                              [v1], '--',fig_ax = fig_ax, x_values_list = [t1])
         return fpath
     
     def get_record(self, parameter_name: str, suffix: str = None) -> tuple:
@@ -1050,12 +1048,14 @@ class lognflow:
     
     def hist(self, parameter_name: str, 
                    parameter_value_list,
-                   n_bins = 10,
+                   bins = 10,
                    alpha = 0.5,
                    labels_list = None,
                    normalize = False,
-                   image_format='jpg', dpi=1200, title = None,
-                   time_tag: bool = None, 
+                   image_format='jpg', 
+                   dpi=1200, 
+                   title = None,
+                   time_tag = None, 
                    return_figure = False,
                    **kwargs):
         """log a single histogram
@@ -1071,7 +1071,7 @@ class lognflow:
             :param parameter_value_list: np.array
                     An np array or a list of np arrays or indexable-by-0th-dim
                     np arrays
-            :param n_bins: number or np.array
+            :param bins: number or np.array
                     used to set the bins for making of the histogram
             :param alpha: float 
                     the opacity of histograms, a flot between 0 and 1. If you
@@ -1086,7 +1086,7 @@ class lognflow:
             
         from .plt_utils import plt_hist
         fig, ax = plt_hist(parameter_value_list, 
-                           n_bins = n_bins, alpha = alpha, 
+                           bins = bins, alpha = alpha, 
                            normalize = normalize, 
                            labels_list = labels_list, **kwargs)
         if title is not None:
