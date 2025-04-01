@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.13.11'
+__version__ = '0.13.12'
 
 from .lognflow import lognflow, getLogger
 from .printprogress import printprogress

@@ -437,3 +437,8 @@ History
 -------------------
 * rrecord can take the arguments for plotting and not the record flush
 * changing window title will not raise error any more in ipynb
+
+0.13.12 (2025-01-06)
+-------------------
+* text_to_collection returns pathlib WindowsPath if it was written to a text
+* log_dir Warning will be issued only once.

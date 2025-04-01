@@ -592,6 +592,19 @@ def test_log_list_dict_read_back():
     print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, time_tag = False)
     logger('testing the save for list and dict')
+
+    import pathlib
+    from lognflow import printv
+
+    CFG = dict(
+        fpath = pathlib.Path('.'),
+        length = 23)
+    logger.save('CFG.json', CFG)
+    CFG2 = logger.load('CFG.json', return_collection=True)
+    
+    printv(CFG)
+    printv(CFG2)
+
     try:
         import torch
         vec3 = torch.tensor([6,7,8])
@@ -604,7 +617,7 @@ def test_log_list_dict_read_back():
     
     for x, y in zip(input_list, var_readback): 
         print(f'{x} --> {y}')
-
+    
 def test_lognflow_here():
     print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(log_dir = './')
@@ -614,6 +627,7 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #===========================#
+    test_log_list_dict_read_back()
     test_record_savefig()
     test_copy()
     test_replace_time_with_index()
@@ -631,7 +645,6 @@ if __name__ == '__main__':
     test_get_record()
     test_record()
     test_record_without_time_stamp()
-    test_log_list_dict_read_back()
     test_save_matlab()
     test_save()
     test_names_with_slashes_and_backslashes()

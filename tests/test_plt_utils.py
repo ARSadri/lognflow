@@ -13,7 +13,7 @@ from lognflow.plt_utils import (
     plt_imshow_subplots)
 import numpy as np
 
-def test_plt_imshow_subplots_comples():
+def test_plt_imshow_subplots_complex():
     data = [np.random.rand(100, 100) + 1j * np.random.rand(100, 100),
             np.random.rand(100, 100), np.random.rand(100, 100),
             np.random.rand(100, 100)]
@@ -148,7 +148,7 @@ def test_plt_imshow_subplots():
 def test_plt_imshow():
     print('Testing function', inspect.currentframe().f_code.co_name)
     data = np.random.rand(100, 100) + 1j * np.random.rand(100, 100)
-    plt_imshow(data, cmap = 'complex')
+    plt_imshow(data, cmap = 'complex', title = 'test plt_imshow')
     plt.show()
     
 def test_complex2hsv_colorbar():
@@ -190,7 +190,6 @@ def test_plt_imshow_complex():
     
     fig, ax = plt_imshow(img, extent=(-7, 8, -7, 8), title = 'complex2hsv',
                          colorbar = False)
-    
     for i in range(0, comx.shape[0], 1):
         for j in range(0, comx.shape[1], 1):
             ax.text(j - 7+0.5, -i + 7+0.5, f'({comx[i, j]}, {comy[i, j]})', 
@@ -341,18 +340,18 @@ def test_pv_surface():
     plotter.show()
 
 if __name__ == '__main__':
-    test_plt_imshow_subplots_comples()
+    test_plt_imshow_complex(); exit()
+    test_plt_imshow()
+    test_plt_imshow_subplots_complex()
     test_plt_hist2()
     test_plt_plot()
     test_plt_confusion_matrix()
     test_pv_surface()
     test_pv_volume()
-    test_plt_imshow()
     test_numbers_as_images()
     test_plt_fig_to_numpy()
     test_stack_to_frame()
     test_plt_imshow_series()
-    test_plt_imshow_complex()
     test_question_dialog()
     test_plt_contours()
     test_complex2hsv_colorbar()

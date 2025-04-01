@@ -12,6 +12,15 @@ matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
     's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
     '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
 
+matplotlib_colors_list = [
+    'green', 'blue', 'cyan', 'red', 'magenta', 'yellow', 
+    'orange', 'purple', 'brown', 'pink', 'lime', 
+    'indigo', 'violet', 'turquoise', 'teal', 'gold', 
+    'silver', 'lavender', 'maroon', 'coral', 'navy', 
+    'beige', 'chocolate', 'olive', 'skyblue', 'rose', 
+    'crimson', 'plum', 'orchid', 'chartreuse', 'tan',
+]
+
 def plt_colorbar(mappable, colorbar_aspect=3, 
                  colorbar_pad_fraction=0.05, colorbar_invisible=False, 
                  fontsize=10, tick_labels=None):
@@ -760,11 +769,14 @@ def plt_imshow(img,
                fig_ax = None,
                colorbar = True, 
                remove_axis_ticks = False, 
+               remove_middle_axis_ticks = True,
                title = None, 
                cmap = None,
                angle_cmap = None,
                portrait = None,
                aspect = 'equal',
+               figsize = None,
+               title_ax_gap = 0.05,
                **kwargs):
     """
     Display an image or a complex-valued image using matplotlib's imshow.
@@ -810,6 +822,9 @@ def plt_imshow(img,
     
     aspect : str, optional
         by default I set the aspect ratio to equal
+        
+    figsize: 2-tuple, optional
+        figsize parameter of plt.figure
     
     **kwargs : keyword arguments
         Additional keyword arguments passed to `imshow`, such as `vmin`, `vmax`, 
@@ -825,19 +840,23 @@ def plt_imshow(img,
         complex and displayed as two separate plots, a list of axes will be returned.
     """
     
-    vmin = kwargs['vmin'] if 'vmin' in kwargs else None
-    vmax = kwargs['vmax'] if 'vmax' in kwargs else None
+    vmin = kwargs.get('vmin', None)
+    vmax = kwargs.get('vmax', None)
     
-    try:
-        img = img.detach().cpu().numpy()
-        print('plt_imshow warning: image converted from torch to numpy for plt!')
+    try: img = img.detach().cpu().numpy()
     except: pass
     
+    if ( (not np.iscomplexobj(img))
+         & ((cmap == 'complex') or (cmap == 'real_imag'))
+         & (len(img) == 2) & (len(img.shape) == 3) ):
+        img = img[0] + 1j * img[1]
+
     if(not np.iscomplexobj(img)):
         if fig_ax is None:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize = figsize)
         else:
             fig, ax = fig_ax
+        if title is not None: ax_top = ax.get_position().y1
         im = ax.imshow(img, cmap = cmap, **kwargs)
         if(colorbar):
             plt_colorbar(im)
@@ -847,7 +866,7 @@ def plt_imshow(img,
             ax.set_aspect(aspect)
     else:
         if (cmap == 'complex'):
-                
+
             complex_image, data_abs, data_angle = complex2hsv(
                 img, vmin = vmin, vmax = vmax)
         
@@ -864,9 +883,10 @@ def plt_imshow(img,
                 max_angle = 0
         
             if fig_ax is None:
-                fig, ax = plt.subplots()
+                fig, ax = plt.subplots(figsize = figsize)
             else:
                 fig, ax = fig_ax
+            if title is not None: ax_top = ax.get_position().y1
             im = ax.imshow(complex_image)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
@@ -882,7 +902,7 @@ def plt_imshow(img,
         else:
             
             if fig_ax is None:
-                fig = plt.figure()
+                fig = plt.figure(figsize = figsize)
             else:
                 fig, _ = fig_ax
             
@@ -895,6 +915,8 @@ def plt_imshow(img,
                 ax = [fig.add_subplot(2, 1, 1), fig.add_subplot(2, 1, 2)]
             else:
                 ax = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
+            
+            if title is not None: ax_top = ax[0].get_position().y1
             
             complex_real_imag = False
             if cmap is not None:
@@ -934,13 +956,22 @@ def plt_imshow(img,
                 ax[1].xaxis.set_ticks_position('none')
                 ax[1].yaxis.set_ticks_position('none')
             
+            if remove_middle_axis_ticks:
+                if portrait:
+                    plt.setp(ax[0], xticks=[])
+                    ax[0].xaxis.set_ticks_position('none')
+                else:
+                    plt.setp(ax[1], yticks=[])
+                    ax[1].yaxis.set_ticks_position('none')
+
+            
             if aspect is not None:
                 ax[0].set_aspect(aspect)
                 ax[1].set_aspect(aspect)
     
     if title is not None:
         title = str(title)
-        fig.suptitle(title)
+        fig.suptitle(title, y=ax_top + title_ax_gap)
         try: 
             fig.canvas.manager.window.setWindowTitle(title)
         except: pass
@@ -1440,6 +1471,9 @@ def plt_imshow_series(list_of_stacks,
             ax = plt.subplot(gs1[stack_cnt, img_cnt])
             
             data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
+            try: data_canvas = data_canvas.detach().cpu().numpy()
+            except: pass
+
             if(list_of_masks is not None):
                 mask = list_of_masks[stack_cnt]
                 if(mask is not None):
@@ -1528,12 +1562,6 @@ def plt_imshow_subplots(
     figsize (tuple): Size of the figure.
     remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
     """
-    try:
-        dims = images.shape
-        if len(dims) == 2:
-            dims = [dims]
-    except: pass
-    
     if colorbar:
         margin = np.maximum(margin, 0.4)
         inter_image_margin = np.maximum(margin, 0.4)
@@ -1570,10 +1598,12 @@ def plt_imshow_subplots(
     tops = (tops - min_bottom) / (max_top - min_bottom)
 
     fig = plt.figure(figsize = figsize)
+    axes = []
     for cnt in range(N):
         gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
                                           top=tops[cnt], bottom=bottoms[cnt])
         ax = fig.add_subplot(gs[0])
+        axes.append(axes)
         image = images[cnt]
         
         try:
@@ -1629,7 +1659,102 @@ def plt_imshow_subplots(
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
-    return fig, ax
+    return fig, axes
+
+def subplots_grid(plots_shape,
+    grid_locations=None, frame_shape = None, title = None,
+    titles=[], margin = 0.025, inter_image_margin = 0.01,
+    figsize=None, remove_axis_ticks=True, **kwargs):
+    
+    """
+        Create a grid of subplots within a single figure with customizable spacing and layout.
+    
+        Parameters:
+        -----------
+        plots_shape : tuple
+            A tuple (N, max_width, max_height) where:
+            - N is the number of subplots.
+            - max_width and max_height define the size of each subplot.
+        grid_locations : array-like, optional
+            An array specifying the locations of subplots. If None, 
+            locations are computed automatically.
+        frame_shape : tuple, optional
+            A tuple (rows, cols) specifying the layout of subplots in 
+            terms of rows and columns.
+            If None, a square-like layout is estimated.
+        title : str, optional
+            The title of the figure.
+        titles : list, optional
+            A list of titles for each subplot.
+        margin : float, default=0.025
+            The margin around the figure.
+        inter_image_margin : float, default=0.01
+            The spacing between subplots.
+        figsize : tuple, optional
+            The overall figure size in inches.
+        remove_axis_ticks : bool, default=True
+            Whether to remove axis ticks from subplots.
+        **kwargs : dict
+            Additional keyword arguments passed to `matplotlib` functions.
+    
+        Returns:
+        --------
+        fig : matplotlib.figure.Figure
+            The created figure.
+        axes : list of matplotlib.axes.Axes
+            A list containing the subplot axes.
+    """
+        
+    N, max_width, max_height = plots_shape
+    
+    if grid_locations is None:
+        if frame_shape is None:
+            cols = int(np.ceil(np.sqrt(N)))
+            rows = int(np.ceil(N / cols))
+        else:
+            rows, cols = frame_shape
+            N = np.minimum(N, rows * cols)
+        
+        spacing = max(max_width, max_height) * (1 + inter_image_margin)
+        grid_locations = np.array([
+            [col * spacing, 1 - row * spacing] for row in range(rows) for col in range(cols)])
+        grid_locations = grid_locations[:N]
+            
+    lefts = grid_locations[:, 0]
+    bottoms = grid_locations[:, 1]
+    rights = lefts + np.array([max_width] * N)
+    tops = bottoms + np.array([max_height] * N)
+    min_left = lefts.min() - margin * max_width
+    min_bottom = bottoms.min() - margin * max_height
+    max_right = rights.max() + margin * max_width
+    max_top = tops.max() + margin * max_height
+    lefts = (lefts - min_left) / (max_right - min_left)
+    bottoms = (bottoms - min_bottom) / (max_top - min_bottom)
+    rights = (rights - min_left) / (max_right - min_left)
+    tops = (tops - min_bottom) / (max_top - min_bottom)
+
+    fig = plt.figure(figsize = figsize)
+    axes = []
+    for cnt in range(N):
+        gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
+                                          top=tops[cnt], bottom=bottoms[cnt])
+        ax = fig.add_subplot(gs[0])
+        axes.append(ax)
+        try: ax.set_title(titles[cnt])
+        except: pass
+        if remove_axis_ticks:
+            ax.axis('off')    
+            
+    if title is not None:
+        title = str(title)
+        fig.suptitle(title)
+        try:
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
+    
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    plt.margins(margin)
+    return fig, axes
 
 class transform3D_viewer:
     """
@@ -1998,10 +2123,119 @@ def plt_mark(
         return fig, ax, markersize
     else:
         return fig, ax
-    
+
+def plt_graph_like(adj_mat, labels, figsize = (10, 8), gridspecs = (10, 10),
+                   grid_rows_divide_at = 4, grid_clms_divide_at = 9):
+    assert adj_mat.shape[0] == adj_mat.shape[1], \
+        'This function is for a complete graph adjacency matrix'
+    pt_inds = np.arange(len(adj_mat))
+    new_inds = []
+    for lblcnt, lbl in enumerate(np.unique(labels)):
+        points_selected = pt_inds[labels == lbl].copy()
+        adj_mat_selected = adj_mat[labels == lbl][:, labels == lbl].copy()
+        nodes_mean = adj_mat_selected.mean(0)
+        nodes_std = adj_mat_selected.std(0)
+        nodes_scores = nodes_mean.copy()
+        nodes_scores[nodes_std > 0] /= nodes_std[nodes_std > 0]
+        nodes_scores[nodes_std == 0] = 0
+        sort_inds_selected = np.argsort(nodes_scores)
+        points_selected_sorted = points_selected[sort_inds_selected]
+        new_inds.append(points_selected_sorted)
+    new_inds = np.concatenate(new_inds, axis = 0)
+
+    adj_mat = adj_mat[new_inds][:, new_inds].copy()
+    label = labels[new_inds].copy()
+
+    _, for_plotting_colorbars = np.unique(label, return_counts=True)
+    print(for_plotting_colorbars)
+    n_classes = len(for_plotting_colorbars)
+    # Parameters
+    rows, cols = adj_mat.shape
+    bar_shift = rows // 20  # Width of the color bars
+    value_color = 1  # Starting value for color bars
+    start_color = 0
+    end_color = 0
+
+    additional_matrix = np.ones((adj_mat.shape[0], bar_shift))
+
+    for i in range(n_classes):
+        end_color += for_plotting_colorbars[i]
+        additional_matrix[start_color:end_color, :] = value_color
+        value_color += 1
+        start_color += for_plotting_colorbars[i]
+
+    # Transpose the additional matrix for the top bar
+    transposed_matrix = additional_matrix.T
+
+    # Extend the original matrix with the side color bar
+    extended_matrix = np.hstack((adj_mat, additional_matrix))
+
+    # Pad the transposed matrix to match the width of the extended matrix
+    padding_width = extended_matrix.shape[1] - transposed_matrix.shape[1]
+    padding = np.zeros((transposed_matrix.shape[0], padding_width))
+    padded_transposed = np.hstack((transposed_matrix, padding))
+
+    # Stack the padded transposed matrix (top bar) and the extended matrix
+    final_matrix = np.vstack((padded_transposed, extended_matrix))
+
+    # Create a mask for the color bars
+    mask = np.zeros_like(final_matrix, dtype=bool)
+    mask[:bar_shift, :] = True  # Top bar
+    mask[:, -bar_shift:] = True  # Side bar
+
+    # Create a masked matrix for the overlay
+    overlay_matrix = np.ma.masked_where(~mask, final_matrix)
+
+    # Define a custom colormap for the color bars
+    colors = matplotlib_colors_list[:n_classes]
+    cmap_custom = ListedColormap(colors)
+
+    # Modify the overlay_matrix to include the corner region
+    corner_mask = np.zeros_like(final_matrix, dtype=bool)
+    corner_mask[:bar_shift, -bar_shift:] = True  # Corner region
+
+    # Assign a special value (e.g., -1) to the corner region in the overlay_matrix
+    overlay_matrix[corner_mask] = -1
+
+    # Extend the custom colormap to include white for the corner region
+    colors_with_white = ['white'] + colors  # Add white as the first color
+    cmap_custom_with_white = ListedColormap(colors_with_white)
+
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(*gridspecs, figure=fig)
+    # Left plot (span the full height of the left column)
+    ax1 = fig.add_subplot(gs[:, :grid_clms_divide_at])
+    # Top-right plot (top-right corner)
+    ax2 = fig.add_subplot(gs[:grid_rows_divide_at, grid_clms_divide_at:])
+    # Bottom-right plot (bottom-right corner)
+    ax3 = fig.add_subplot(gs[grid_rows_divide_at:, grid_clms_divide_at])
+
+    # Display the image
+    cax = ax1.imshow(final_matrix, aspect='auto', cmap='GnBu', vmin=0, vmax=1)
+    ax1.imshow(overlay_matrix, aspect='auto', cmap=cmap_custom_with_white, vmin=-1, vmax=value_color)
+    ax1.set_xticks(np.cumsum(for_plotting_colorbars))  # Adjust step size as needed
+    ax1.set_yticks(bar_shift + np.cumsum(for_plotting_colorbars))  # Adjust step size as needed
+    ax1.set_aspect('equal')
+
+    legend_labels = [f'Cluster {ii}' for ii in range(n_classes)]  # Replace with your actual labels
+    legend_colors = colors[:n_classes]  # Use the first 3 colors for the legend
+    legend_handles = [Patch(color=color, label=label) for color, label in zip(legend_colors, legend_labels)]
+
+    ax2.axis('off')  # Turn off the axis for legend plot
+    ax2.legend(loc='upper center', handles=legend_handles)
+
+    # Add colorbar in ax3
+    ax3.set_position([ax3.get_position().x0, ax3.get_position().y0, 0.03, ax3.get_position().height])
+    fig.colorbar(cax, cax=ax3, use_gridspec=True)
+
+    # plt.tight_layout()
+
+    return fig, [ax1, ax2, ax3]
+
 def plt_contours(
         Z_list, X_Y = None, fig_ax = None, levels = 10, colors_list = None, 
-        linestyles_list = None, linewidth = 0.5, fontsize = 3, title = None):
+        linestyles_list = None, linewidth = 0.5, fontsize = 3, title = None,
+        figsize = None):
     """
     Plot contours of multiple surfaces overlaid on the same plot.
     
@@ -2021,7 +2255,7 @@ def plt_contours(
     
     # Create figure and axes if not provided
     if fig_ax is None:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize = figsize)
     else:
         fig, ax = fig_ax
     
@@ -2032,6 +2266,12 @@ def plt_contours(
         linestyles_list = ['dashed', 'solid'] * (len(Z_list) // 2 + 1)
     
     # Plot contours for each surface in Z_list
+    try:
+        Z_list_shape = Z_list.shape
+        if len(Z_list_shape) == 2:
+            Z_list = [Z_list]
+    except: pass
+    
     for i, Z in enumerate(Z_list):
         if X_Y is None:
             Y, X = np.meshgrid(np.arange(Z.shape[1]), np.arange(Z.shape[0]))
@@ -2131,3 +2371,7 @@ def pv_surface(data_2d, plotter=None, show_edges=True, cmap=None, zscale = None)
     plotter.add_axes()
     
     return plotter
+
+if __name__ == '__main__':
+    plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100), portrait = True)
+    plt.show()

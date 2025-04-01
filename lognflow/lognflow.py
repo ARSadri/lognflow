@@ -65,7 +65,8 @@ class varinlog:
     log_counter_limit   : int
     savefig             : bool
     plot_start_ago      : float
-    plot_win_length    : float
+    plot_win_length     : float
+    time_tag            : bool
 
 @dataclass
 class textinlog:
@@ -221,6 +222,7 @@ class lognflow:
         self.counted_vars = {}
         self.param_name_set = set()
         self.close = self.flush_all
+        self.warning_log_dir = False
         
         #all depricated and will be removed in a few revisions
         self.log_text               = self.text
@@ -247,7 +249,8 @@ class lognflow:
         self.log_name = level
         
     def assert_log_dir(self):
-        if not self.log_dir.is_dir():
+        if (not self.log_dir.is_dir()) & (not self.warning_log_dir):
+            self.warning_log_dir = True
             print('~'*30, 'WARNING', '~'*30)
             if self.log_dir_provided:
                 print(f'lognflow.logdir: No such directory: ')
@@ -710,7 +713,7 @@ class lognflow:
 
     def record(self, parameter_name: str, parameter_value, flush = False,
                 suffix = None, log_size_limit: int = int(1e+8), savefig = False,
-                plot_start_ago = None, plot_win_length = 10):
+                plot_start_ago = None, plot_win_length = 10, time_tag = True):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -736,6 +739,7 @@ class lognflow:
                     
         """
         if not self.enabled: return
+        time_tag = self.time_tag if (time_tag is None) else time_tag
         try:
             _ = parameter_value.shape
         except:
@@ -755,7 +759,7 @@ class lognflow:
             _var = self._vars_dict[log_dirnamesuffix]
             data_array, time_array, curr_index, \
                 file_start_time, suffix, log_counter_limit = \
-                (_var.data_array, _var.time_array, _var.curr_index, \
+                    (_var.data_array, _var.time_array, _var.curr_index, \
                     _var.file_start_time, _var.suffix, _var.log_counter_limit)
             curr_index += 1
         else:
@@ -790,7 +794,8 @@ class lognflow:
                                                       log_counter_limit,
                                                       savefig,
                                                       plot_start_ago,
-                                                      plot_win_length)
+                                                      plot_win_length,
+                                                      time_tag)
 
     def record_flush(self, parameter_name: str, suffix: str = None):
         """ Flush the buffered numpy arrays
@@ -814,18 +819,19 @@ class lognflow:
         
         _var = self._vars_dict[log_dirnamesuffix]
         savefig  = _var.savefig
+        time_tag = _var.time_tag
         _var_data_array = _var.data_array[_var.time_array > 0]
         _var_time_array = _var.time_array[_var.time_array > 0]
         
         if _var.suffix == 'npz':
-            fpath = _param_dir / f'{param_name}_{_var.file_start_time}.npz'
+            fpath = _param_dir / f'{param_name}_{_var.file_start_time:.6f}.npz'
             np.savez(fpath,
                 time_array = _var_time_array,
                 data_array = _var_data_array)
         else:
-            fpath = _param_dir / f'{param_name}_time_{_var.file_start_time}.txt'
+            fpath = _param_dir / f'{param_name}_time_{_var.file_start_time:.6f}.txt'
             np.savetxt(fpath, _var_time_array)
-            fpath = _param_dir / f'{param_name}_data_{_var.file_start_time}.txt'
+            fpath = _param_dir / f'{param_name}_data_{_var.file_start_time:.6f}.txt'
             np.savetxt(fpath, _var_data_array)
         
         _var_data_array = _var_data_array.squeeze()
@@ -853,8 +859,10 @@ class lognflow:
                         :ending].reshape(n_wins, plot_win_length).mean(1)
                     t1 = _var_time_array[
                         :ending].reshape(n_wins, plot_win_length).mean(1)
-                    self.plot(parameter_name, 
-                              [v1], '--',fig_ax = fig_ax, x_values_list = [t1])
+                    fname = f'{param_dir}/{param_name}_{_var.file_start_time:.6f}'
+                    self.plot(fname, 
+                              [v1], '--',fig_ax = fig_ax, x_values_list = [t1],
+                              time_tag = time_tag)
         return fpath
     
     def get_record(self, parameter_name: str, suffix: str = None) -> tuple:
@@ -1236,7 +1244,7 @@ class lognflow:
                    remove_axis_ticks = True,
                    image_format='jpg', dpi=1200, cmap = 'viridis',
                    title = None, time_tag: bool = None, borders = 0, 
-                   return_figure = False, **kwargs):
+                   return_figure = False, figsize = None, **kwargs):
         """log an image
             The image is logged using plt.imshow
             Accepted shapes are:
@@ -1294,6 +1302,7 @@ class lognflow:
                        remove_axis_ticks = remove_axis_ticks, 
                        title = title,
                        cmap = cmap,
+                       figsize = figsize,
                        **kwargs)
                 
             if not return_figure:

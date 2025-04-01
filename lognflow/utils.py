@@ -4,8 +4,7 @@ def dummy_function(*args, **kwargs): ...
 
 class DummyClass:
     def __init__(self, *args, **kwargs):
-        print('warning: this is a dummy class! It returns '
-              'None to whatever you throw at it.')
+        pass
 
     def __getattr__(self, name):
         return self.dummy_function
@@ -149,6 +148,7 @@ def text_to_collection(text):
     
     """
     import ast
+
     def parse_node(node):
         if isinstance(node, ast.List):
             return [parse_node(elem) for elem in node.elts]
@@ -168,6 +168,9 @@ def text_to_collection(text):
             elif node.id == 'tensor':
                 import torch
                 return torch
+            elif node.id in {'Path', 'WindowsPath', 'PosixPath'}:
+                from pathlib import Path, WindowsPath, PosixPath
+                return eval(node.id)
         elif isinstance(node, ast.Call):
             func_name = node.func.id
             if func_name == 'array':
@@ -176,10 +179,15 @@ def text_to_collection(text):
             elif func_name == 'tensor':
                 import torch
                 return torch.tensor([parse_node(arg) for arg in node.args])
+            elif func_name in {'Path', 'WindowsPath', 'PosixPath'}:
+                # Create the appropriate Path object
+                from pathlib import Path, WindowsPath, PosixPath
+                return eval(func_name)(parse_node(node.args[0]))
         return None
 
     tree = ast.parse(text, mode='eval')
-    return parse_node(tree.body)
+    output = parse_node(tree.body)
+    return output
 
 class SSHSystem:
     """
