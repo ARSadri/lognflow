@@ -38,6 +38,7 @@ before storing into the directory using log_var(name, var).
 import time
 import atexit
 import inspect
+import copy
 from   pathlib     import Path       as pathlib_Path
 from   sys         import platform   as sys_platform
 from   sys         import argv       as sys_argv
@@ -49,12 +50,13 @@ from   typing      import Union
 import numpy             as np
 import matplotlib.pyplot as plt
 
-from   .utils            import (repr_raw,
-                                 replace_all,
-                                 select_directory,
-                                 name_from_file,
-                                 text_to_collection,
-                                 printv)
+from   .utils      import (repr_raw,
+                           replace_all,
+                           select_directory,
+                           name_from_file,
+                           text_to_collection,
+                           printv,
+                           deepstr)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -499,36 +501,53 @@ class lognflow:
         if(not _param_dir.is_dir()):
             _param_dir.mkdir(parents = True, exist_ok = self.exist_ok)
 
-        time_stamp_str = f'{self.time_stamp:>6.6f}'
-        if(index_tag):
-            var_fullname = param_dir + '/' + param_name
-            self.counted_vars[var_fullname] = self.counted_vars.get(
-                var_fullname, 0) + 1
-            index_tag_str = str(self.counted_vars[var_fullname])
-        
-        self.param_name_set.add(param_name)
-        
-        if(param_name is not None):
-            if(len(param_name) > 0):
-                if(index_tag):
-                    param_name += '_' + index_tag_str
-                if(time_tag):
-                    param_name += '_' + time_stamp_str
-            else:
-                if(index_tag):
-                    param_name = index_tag_str
-                else:
-                    param_name = time_stamp_str
+        if param_name is None:
+            return _param_dir
+        else:
+            self.param_name_set.add(param_name)
 
+            if index_tag:
+                var_fullname = param_dir + '/' + param_name
+                self.counted_vars[var_fullname] = self.counted_vars.get(
+                    var_fullname, 0) + 1
+                index_tag_str = str(self.counted_vars[var_fullname])
+
+                if(len(param_name) > 0):
+                    param_name += '_' + index_tag_str
+                else:
+                    param_name = index_tag_str
+            
+            if time_tag:
+                param_name_before_time_stamp = copy.copy(param_name)
+                time_stamp_str = f'{int(self.time_stamp)}'
+                if(len(param_name) > 0):
+                    param_name += '_' + time_stamp_str
+                else:
+                    param_name += time_stamp_str
+    
             if(suffix is None):
                 fpath = _param_dir / param_name
             else:
                 while suffix[0] == '.':
                     suffix = suffix[1:]
                 fpath = _param_dir / (param_name + '.' + suffix)
+
+            if time_tag:
+                while fpath.is_file():
+                    param_name = copy.copy(param_name_before_time_stamp)
+                    time_stamp_str = f'{self.time_stamp:.3f}'
+                    if(len(param_name) > 0):
+                        param_name += '_' + time_stamp_str
+                    else:
+                        param_name += time_stamp_str
+            
+                    if suffix is None:
+                        fpath = _param_dir / param_name
+                    else:
+                        while suffix[0] == '.': suffix = suffix[1:]
+                        fpath = _param_dir / (param_name + '.' + suffix)
+            
             return fpath
-        else:
-            return _param_dir
         
     def _get_dirnamesuffix(self, param_dir, param_name, suffix):
         log_dirnamesuffix = param_name
@@ -926,6 +945,11 @@ class lognflow:
         """
         if not self.enabled: return
         time_tag = self.time_tag if (time_tag is None) else time_tag
+        
+        if ((not '.' in parameter_name) 
+            & (suffix is None) 
+            & isinstance(parameter_value, np.ndarray) ):
+            suffix = 'npy'
 
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
@@ -958,6 +982,11 @@ class lognflow:
             elif(suffix == 'pth'):
                 from torch import save as torch_save
                 torch_save(parameter_value, fpath)
+            elif(suffix == 'json'):
+                import json
+                obj_str = deepstr(parameter_value)
+                with open(fpath,'a') as fdata: 
+                    json.dump(obj_str, fdata)
             else:
                 with open(fpath,'a') as fdata: 
                     fdata.write(str(parameter_value))
@@ -2160,11 +2189,24 @@ class lognflow:
             flist.sort()
             fcnt_width = len(str(len(flist)))
             for fcnt, fpath in enumerate(flist):
+                f_time_stamp = fpath.stem.split('_')[-1]
+                try:
+                    if int(f_time_stamp) == float(f_time_stamp):
+                        fname_old = fpath.name.split(f_time_stamp)
+                        f_time_stamp = float(f_time_stamp)
+                        fname_new = fname_old[0] + f'{f_time_stamp:0.1f}' + fname_old[1]
+                        fpath_new = flist[fcnt].parent / fname_new
+                        flist[fcnt].rename(fpath_new)
+                        flist[fcnt] = fpath_new
+                except: pass
+
+            for fcnt, fpath in enumerate(flist):
                 if verbose:
                     self.text(None, f'Changing {flist[fcnt].name}')
-                fname_new = fpath.name.split(fpath.stem.split('_')[-1])
+                f_time_stamp = fpath.stem.split('_')[-1]
+                fname_old = fpath.name.split(f_time_stamp)
                 fname_new = \
-                    fname_new[0] + f'{fcnt:0{fcnt_width}d}' + fname_new[1]
+                    fname_old[0] + f'{fcnt:0{fcnt_width}d}' + fname_old[1]
                 fpath_new = flist[fcnt].parent / fname_new
                 if verbose:
                     self.text(None, f'To {fpath_new.name}')

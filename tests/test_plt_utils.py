@@ -340,7 +340,7 @@ def test_pv_surface():
     plotter.show()
 
 if __name__ == '__main__':
-    test_plt_imshow_complex(); exit()
+    test_plt_imshow_complex()
     test_plt_imshow()
     test_plt_imshow_subplots_complex()
     test_plt_hist2()

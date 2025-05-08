@@ -588,7 +588,7 @@ def test_depricated_logviewer():
     logger.save('test', 1)
     print(logger.logged.load('test*'))
 
-def test_log_list_dict_read_back():
+def test_log_json():
     print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir, time_tag = False)
     logger('testing the save for list and dict')
@@ -627,10 +627,10 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #===========================#
-    test_log_list_dict_read_back()
+    test_replace_time_with_index()
+    test_log_json()
     test_record_savefig()
     test_copy()
-    test_replace_time_with_index()
     test_variables_to_pdf()
     test_copy_file()
     test_log_code()    

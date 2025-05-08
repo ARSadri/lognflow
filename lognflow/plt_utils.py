@@ -174,7 +174,7 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
                                     frame_shape = frame_shape, 
                                     borders = borders) for stack in stack_list])
 
-def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
+def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
               colorbar=True, fig_ax=None, colorbar_label=None,
               elev=None, azim=None):
@@ -211,7 +211,6 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = True,
 
     dx = dy = (x_edges[1] - x_edges[0])
     dz = counts.ravel()
-
     norm_dz = dz / dz.max() if dz.max() > 0 else dz
 
     colors = plt.cm.get_cmap(cmap)(norm_dz)
@@ -1599,11 +1598,14 @@ def plt_imshow_subplots(
 
     fig = plt.figure(figsize = figsize)
     axes = []
+    if cmaps:
+        assert len(cmaps) == N, \
+            'The length of cmaps should be equal to the number of images.'
     for cnt in range(N):
         gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
                                           top=tops[cnt], bottom=bottoms[cnt])
         ax = fig.add_subplot(gs[0])
-        axes.append(axes)
+        axes.append(ax)
         image = images[cnt]
         
         try:
@@ -1630,14 +1632,10 @@ def plt_imshow_subplots(
                     ax_inset.patch.set_alpha(0)
                 
             else:
-                cmap = None
                 if cmaps:
-                    cmap = cmaps[i]
-                else:
-                    if 'cmap' in kwargs:
-                        cmap = kwargs['cmap']
-                if cmap:
-                    cax = ax.imshow(image, cmap=cmap, **kwargs)
+                    assert not ('cmap' in kwargs), \
+                        'cmap should not be in kwargs if you want to provide cmaps list'
+                    cax = ax.imshow(image, cmap=cmaps[cnt], **kwargs)
                 else:
                     cax = ax.imshow(image, **kwargs)
                 if colorbar:
@@ -2283,7 +2281,8 @@ def plt_contours(
                              linestyles=linestyle, linewidths = linewidth)
         
         # Add labels to contours
-        ax.clabel(contour, inline=True, fontsize=fontsize, fmt='%.2f')
+        if fontsize is not None:
+            ax.clabel(contour, inline=True, fontsize=fontsize, fmt='%.2f')
         
     ax.set_aspect('equal')
 

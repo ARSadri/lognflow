@@ -15,6 +15,20 @@ class DummyClass:
     def dummy_function(self, *args, **kwargs):
         return None
 
+def deepstr(obj):
+    """Recursively convert objects to their string representations."""
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    elif isinstance(obj, dict):
+        return {k: deepstr(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [deepstr(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(deepstr(v) for v in obj)
+    else:
+        # For anything else that's not serializable, use str()
+        return str(obj)
+
 def is_builtin_collection(obj):
     """
     Determine if an object is a strictly built-in Python collection.
@@ -71,10 +85,11 @@ def name_from_file(log_dir, fpath):
         log_dir_str = log_dir
     if (log_dir + '/') in fpath_str:
         log_dir_str = log_dir + '/'
+    if (log_dir + '\\') in fpath_str:
+        log_dir_str = log_dir + '\\'
     if log_dir_str:
         fpath_name = fpath_str.split(log_dir_str)[-1]
-        fpath_split = fpath_name.split('.')
-        return '.'.join(fpath_split[:-1])
+        return fpath_name
     
 def repr_raw(text):
     """ Raw text representation
