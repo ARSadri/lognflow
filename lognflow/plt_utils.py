@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
@@ -844,11 +845,16 @@ def plt_imshow(img,
     
     try: img = img.detach().cpu().numpy()
     except: pass
+    try: img = np.array(img)
+    except: raise TypeError('plt_imshow accepts numpy or torch images only')
     
     if ( (not np.iscomplexobj(img))
          & ((cmap == 'complex') or (cmap == 'real_imag'))
          & (len(img) == 2) & (len(img.shape) == 3) ):
         img = img[0] + 1j * img[1]
+        
+    assert len(img.shape) == 2, 'plt_imshow accepts images only' + \
+        f'TypeError: Invalid shape {img.shape} for image data.'
 
     if(not np.iscomplexobj(img)):
         if fig_ax is None:
@@ -1417,9 +1423,9 @@ def plt_imshow_series(list_of_stacks,
             If the input lists do not meet the expected shapes or lengths.
     """
     
-    if colorbar_last_only:
-        colorbar = False
-    
+    if colorbar:
+        colorbar_last_only = False
+        
     n_stacks = len(list_of_stacks)
     if(list_of_masks is not None):
         assert len(list_of_masks) == n_stacks, \
@@ -1465,33 +1471,34 @@ def plt_imshow_series(list_of_stacks,
     if grid_width_space:
         gs1.update(wspace=grid_width_space, hspace=0)
     
-    for img_cnt in range(n_imgs):
-        for stack_cnt in range(n_stacks):
+    for stack_cnt in range(n_stacks):
+        
+        if(list_of_masks is not None): mask = list_of_masks[stack_cnt]
+        else: mask = None
+
+        for img_cnt in range(n_imgs):
             ax = plt.subplot(gs1[stack_cnt, img_cnt])
             
-            data_canvas = list_of_stacks[stack_cnt][img_cnt].copy()
+            data_canvas = list_of_stacks[stack_cnt][img_cnt]
             try: data_canvas = data_canvas.detach().cpu().numpy()
-            except: pass
+            except: data_canvas = data_canvas.copy()
 
-            if(list_of_masks is not None):
-                mask = list_of_masks[stack_cnt]
-                if(mask is not None):
-                    if(data_canvas.shape == mask.shape):
-                        data_canvas[mask==0] = 0
-                        data_canvas_stat = data_canvas[mask>0]
+            if(mask is not None):
+                if(data_canvas.shape == mask.shape):
+                    data_canvas[mask==0] = 0
+                    data_canvas_stat = data_canvas[mask>0].copy()
             else:
                 data_canvas_stat = data_canvas.copy()
             data_canvas_stat = data_canvas_stat[
-                np.isnan(data_canvas_stat) == 0]
-            data_canvas_stat = data_canvas_stat[
-                np.isinf(data_canvas_stat) == 0]
-            if vmin is None:
-                vmin = data_canvas_stat.min()
-            if vmax is None:
-                vmax = data_canvas_stat.max()
+                (np.isnan(data_canvas_stat) + np.isinf(data_canvas_stat) == 0)]
+            
+            if vmin is None: vmin_ = data_canvas_stat.min()
+            else: vmin_ = copy.copy(vmin)
+            if vmax is None: vmax_ = data_canvas_stat.max()
+            else: vmax_ = copy.copy(vmax)
 
             im = ax.imshow(data_canvas, 
-                           cmap = cmap, vmin = vmin, vmax = vmax, **kwargs)
+                           cmap = cmap, vmin = vmin_, vmax = vmax_, **kwargs)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
             
@@ -1504,7 +1511,7 @@ def plt_imshow_series(list_of_stacks,
                 else:
                     colorbar_invisible = 0
                 plt_colorbar(im, colorbar_invisible = colorbar_invisible)
-                            
+                                            
             if(text_as_colorbar):
                 ax.text(data_canvas.shape[0]*0,
                          data_canvas.shape[1]*0.05,
@@ -2370,6 +2377,31 @@ def pv_surface(data_2d, plotter=None, show_edges=True, cmap=None, zscale = None)
     plotter.add_axes()
     
     return plotter
+
+def interpolate_mse_surface(grid_locations, mse, resolution=None, method='cubic'):
+    from scipy.interpolate import griddata
+
+    x = grid_locations[:, 0]
+    y = grid_locations[:, 1]
+
+    if resolution is None:
+        dx = np.diff(np.sort(np.unique(x)))
+        dy = np.diff(np.sort(np.unique(y)))
+        min_dx = dx[dx > 0].min() if np.any(dx > 0) else 1.0
+        min_dy = dy[dy > 0].min() if np.any(dy > 0) else 1.0
+        resolution = 0.1 * min(min_dx, min_dy)
+
+    x_min, x_max = x.min(), x.max()
+    y_min, y_max = y.min(), y.max()
+
+    grid_x, grid_y = np.meshgrid(
+        np.arange(x_min, x_max + resolution, resolution),
+        np.arange(y_min, y_max + resolution, resolution)
+    )
+
+    grid_z = griddata(grid_locations, mse, (grid_x, grid_y), method=method)
+    extent = (x_min, x_max, y_min, y_max)
+    return grid_z, extent
 
 if __name__ == '__main__':
     plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100), portrait = True)

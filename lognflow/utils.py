@@ -352,8 +352,8 @@ class SSHSystem:
             self.ssh_client.close()
 
 def printv(var, logger = print, tab = 0,
-           arr_size_max = 1e6, arr_size_min = 50,
-           str_len_max = 1e4, str_len_min = 50):
+           arr_size_max = 1e6, arr_size_min = 1000,
+           str_len_max = 1e4, str_len_min = 1000):
     """printv
     Provides a detailed description of a variable, including its type, size, and basic statistics,
     and logs the output using a specified logger. This function is particularly useful for inspecting
@@ -437,7 +437,7 @@ def printv(var, logger = print, tab = 0,
             toprint += f', device={var.device}'
         except: pass
         
-        arr_size = np.prod(array_shape)
+        arr_size = int(np.prod(array_shape))
         if arr_size < arr_size_max:
             try:
                 toprint += f', min={var.min():.6f}'
@@ -717,3 +717,30 @@ class block_runner:
         globals_[self.block_identifier] = show_and_ask_result
         return globals_
 
+
+
+def exponential_offset(t, A, tau, L_inf):
+    return L_inf + A * np.exp(-t / tau)
+
+def fit_loss_exponential_offset(loss_vals, settling_factor = 5):
+    n = len(loss_vals)
+    t = np.arange(n)
+
+    L0 = loss_vals[0]
+    L_inf_guess = loss_vals[-1]
+    A_guess = L0 - L_inf_guess
+    tau_guess = n / 2
+    from scipy.optimize import curve_fit
+
+    popt, _ = curve_fit(
+        exponential_offset, t, loss_vals,
+        p0=[A_guess, tau_guess, L_inf_guess]
+    )
+    A, tau, L_inf = popt
+
+    epochs_settle = int(np.ceil(settling_factor * tau))
+    epochs_remaining = max(0, epochs_settle - n)
+    full_t = np.arange(epochs_settle)
+    fitted_vals = exponential_offset(full_t, A, tau, L_inf)
+
+    return tau, epochs_remaining, A, L_inf, full_t, fitted_vals

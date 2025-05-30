@@ -319,12 +319,23 @@ class lognflow:
         arg_err_msg = 'when using copy, the first argument is the final name '\
                       ' after copy is finished. The second argument is ' \
                       ' the absolute path of source file, str(fpath.absolute())'
-        if parameter_name is not None:
+        if parameter_name is None:
+            parameter_name = ''
+        else:
             assert parameter_name == str(parameter_name), arg_err_msg
+
         flist = []
         try:
             source_as_fpath = pathlib_Path(source)
-            if source_as_fpath.is_file():
+            if source_as_fpath.is_dir():
+                fpath_dest = self.log_dir / (parameter_name + source_as_fpath.stem)
+                if sys_platform in ["linux", "linux2", "darwin"]:
+                    os_system(f'cp -r {source_as_fpath} {fpath_dest}')
+                elif sys_platform == "win32":
+                    os_system(f'xcopy {source_as_fpath} {fpath_dest} /E /I /Y')
+                return fpath_dest
+            
+            elif source_as_fpath.is_file():
                 flist = [source_as_fpath]
             else:
                 raise ValueError
@@ -336,8 +347,6 @@ class lognflow:
         assert flist, \
             'source could not be found to copy. \n' + arg_err_msg
 
-        if parameter_name is None:
-            parameter_name = ''
             
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             parameter_name, suffix)
@@ -732,7 +741,7 @@ class lognflow:
 
     def record(self, parameter_name: str, parameter_value, flush = False,
                 suffix = None, log_size_limit: int = int(1e+8), savefig = False,
-                plot_start_ago = None, plot_win_length = 10, time_tag = True):
+                plot_start_ago = None, plot_win_length = 10, time_tag = False):
         """log a numpy array in buffer then dump
             It can be the case that we need to take snapshots of a numpy array
             over time. The size of the array would not change and this is hoing
@@ -2001,18 +2010,20 @@ class lognflow:
                 if (var_path.suffix == '.pth'):
                     from torch import load as torch_load 
                     return(torch_load(var_path), var_path)
-                try:    #png
+                try:    #png, jpg, ...
                     from matplotlib.pyplot import imread
                     img = imread(var_path)
                     return(img, var_path)
                 except: pass
                 try:
                     txt = var_path.read_text(errors = 'ignore')
+                    if (var_path.suffix == '.json'):
+                        return_collection = True
                     if return_collection:
                         txt = text_to_collection(txt)
                     return(txt, var_path)
-                except:
-                    var_path = None
+                except: pass
+                var_path = None
             else:
                 var_path = None
                 

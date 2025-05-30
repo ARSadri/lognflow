@@ -445,4 +445,9 @@ History
 
 0.13.13 (2025-06-01)
 -------------------
-* 
+* fixed many bugs in plt_utils
+
+0.13.14 (2025-06-01)
+-------------------
+* fixed plt_imshow_series color bars
+* read json automatically
