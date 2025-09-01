@@ -56,7 +56,8 @@ from   .utils      import (repr_raw,
                            name_from_file,
                            text_to_collection,
                            printv,
-                           deepstr)
+                           deepstr,
+                           prepare_for_np_savez)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -347,11 +348,13 @@ class lognflow:
         assert flist, \
             'source could not be found to copy. \n' + arg_err_msg
 
-            
-        param_dir, param_name, suffix = self._param_dir_name_suffix(
-            parameter_name, suffix)
-        
         for fpath in flist:
+            if len(parameter_name) == 0:
+                parameter_name = fpath.name
+            
+            param_dir, param_name, suffix = self._param_dir_name_suffix(
+                parameter_name, suffix)
+
             if len(param_name) == 0:
                 new_param_name = fpath.stem
             else:
@@ -975,7 +978,8 @@ class lognflow:
             if(suffix == 'npy'):
                 np.save(fpath, parameter_value)
             elif(suffix == 'npz'):
-                np.savez(fpath, **parameter_value)
+                parameter_value_dict = prepare_for_np_savez(parameter_value)
+                np.savez(fpath, **parameter_value_dict)
             elif((suffix == 'tif') | (suffix == 'tiff')):
                 from tifffile import imwrite
                 imwrite(fpath, parameter_value)
@@ -1425,31 +1429,31 @@ class lognflow:
             return fig, ax
     
     def imshow_series(self, 
-                          parameter_name: str,
-                          list_of_stacks, 
-                          list_of_masks = None,
-                          figsize = None,
-                          text_as_colorbar = False,
-                          colorbar = False,
-                          cmap = 'viridis',
-                          list_of_titles_columns = None,
-                          list_of_titles_rows = None,
-                          fontsize = None,
-                          vmin = None,
-                          vmax = None,
-                          title = None,
-                          colorbar_last_only = True,
-                          colorbar_fraction = 0.046,
-                          colorbar_pad = 0.04,
-                          colorbar_labelsize = 1,
-                          grid_width_space = 0.0,
-                          remove_axis_ticks = True,
-                          aspect = 'equal',
-                          image_format='jpg', 
-                          dpi=1200,
-                          time_tag: bool = None,
-                          return_figure = False,
-                          **kwargs):
+                      parameter_name: str,
+                      list_of_stacks, 
+                      list_of_masks = None,
+                      figsize = None,
+                      text_as_colorbar = False,
+                      colorbar = False,
+                      cmap = 'viridis',
+                      list_of_titles_columns = None,
+                      list_of_titles_rows = None,
+                      fontsize = None,
+                      vmin = None,
+                      vmax = None,
+                      title = None,
+                      colorbar_last_only = True,
+                      colorbar_fraction = 0.046,
+                      colorbar_pad = 0.04,
+                      colorbar_labelsize = 1,
+                      grid_width_space = 0.0,
+                      remove_axis_ticks = True,
+                      aspect = 'equal',
+                      image_format='jpg', 
+                      dpi=1200,
+                      time_tag: bool = None,
+                      return_figure = False,
+                      **kwargs):
                           
         """log a cavas of stacks of images
             One way to show many images and how they change is to make
@@ -1600,7 +1604,7 @@ class lognflow:
         
         try:
             from PIL import Image
-        except Eception as e:
+        except Exception as e:
             print('install PIL by: --> pip install Pillow')
             raise e
         images = [Image.fromarray(_) for _ in parameter_value]
@@ -1829,7 +1833,12 @@ class lognflow:
                 search_patt = replace_all(search_patt, '**', '*')
                 flist = list(_var_dir.glob(search_patt))
         if(flist):
-            flist.sort()
+            try:
+                flist_tags = np.array([float(fpath_v.stem.split('_')[-1]) for fpath_v in flist])
+                sortinds = np.argsort(flist_tags)
+                flist = [flist[_] for _ in sortinds]
+            except:
+                flist.sort()
         else:
             var_dir = self.log_dir / var_name
             if(var_dir.is_dir()):
@@ -1930,6 +1939,49 @@ class lognflow:
                 txt = txt[0]
             return txt
 
+    def is_file(self, var_name, file_index = None, suffix = None, verbose = False):
+        """ check if a single variable file exists
+            returns True is available else returns False
+
+            Parameters
+            ----------
+            :param var_name:
+                variable name
+            :param file_index:
+                If there are many snapshots of a variable, this input can
+                limit the returned to a set of indices.
+            :param suffix:
+                If there are different suffixes availble for a variable
+                this input needs to be set. npy, npz, mat, and torch are
+                supported.
+        """
+        self.assert_log_dir()
+        assert file_index == int(file_index), \
+                    f'file_index {file_index} must be an integer'
+        flist = self.get_flist(var_name, suffix)
+        if flist:
+            if len(flist) == 1:
+                var_path = flist[0]
+            else:
+                if file_index is not None:
+                    if verbose:
+                        self.text(None, 
+                            f'There are {len(flist)} files, logged with'
+                            + f' name {var_name}.'
+                            + f' The given index is {file_index}.')
+                    var_path = flist[file_index]
+                else:
+                    self.text(None, '-'*60)
+                    self.text(None, 
+                        f'There are {len(flist)} files, logged with'
+                        + f' name {var_name} but the index is not given.')
+                    self.text(None, '-'*60)
+                    return None
+            try:
+                if var_path.is_file(): return True
+            except: pass
+        return False
+
     def _load(self, var_name, file_index = None, 
                    suffix = None, read_func = None, verbose = False,
                    return_collection = False):
@@ -1997,19 +2049,28 @@ class lognflow:
                     except:
                         return(buf, var_path)
                 if(var_path.suffix == '.npy'):
-                    return(np.load(var_path), var_path)
+                    try: return(np.load(var_path), var_path)
+                    except: pass
                 if(var_path.suffix == '.mat'):
-                    from scipy.io import loadmat
-                    return(loadmat(var_path), var_path)
+                    try: 
+                        from scipy.io import loadmat
+                        return(loadmat(var_path), var_path)
+                    except: pass
                 if(var_path.suffix == '.dm4'):
-                    from hyperspy.api import load as hyperspy_api_load
-                    return (hyperspy_api_load(var_path).data, var_path)
+                    try:
+                        from hyperspy.api import load as hyperspy_api_load
+                        return (hyperspy_api_load(var_path).data, var_path)
+                    except: pass
                 if((var_path.suffix == '.tif') | (var_path.suffix == '.tiff')):
-                    from tifffile import imread as tifffile_imread
-                    return(tifffile_imread(var_path), var_path)
+                    try:
+                        from tifffile import imread as tifffile_imread
+                        return(tifffile_imread(var_path), var_path)
+                    except: pass
                 if (var_path.suffix == '.pth'):
-                    from torch import load as torch_load 
-                    return(torch_load(var_path), var_path)
+                    try:
+                        from torch import load as torch_load 
+                        return(torch_load(var_path), var_path)
+                    except: pass
                 try:    #png, jpg, ...
                     from matplotlib.pyplot import imread
                     img = imread(var_path)

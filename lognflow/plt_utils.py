@@ -305,7 +305,7 @@ def calculate_contrasting_color(value, cmap):
 
 def plt_confusion_matrix(cm, 
         target_names=None, title=None, cmap=None,
-        figsize=None, fontsize = None):
+        figsize=None, fontsize = None, fontsize_title = None, show_zeros = False):
     """
     This function plots a confusion matrix and returns the figure and axis.
     Parameters:
@@ -362,6 +362,8 @@ def plt_confusion_matrix(cm,
     
     if fontsize is None:
         fontsize = 6*(np.minimum(*figsize) / cm.shape[0])**0.5
+    if fontsize_title is None:
+        fontsize_title = 4 * fontsize
 
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     
@@ -372,6 +374,9 @@ def plt_confusion_matrix(cm,
     ax.set_yticklabels(target_names, fontsize = fontsize)
     for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
         clr = calculate_contrasting_color(cm[i, j] / cm.max(), cmap)
+        if not show_zeros:
+            if cm[i, j] == 0:
+                continue
         ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr,
                 fontsize = fontsize)
 
@@ -421,7 +426,7 @@ def plt_confusion_matrix(cm,
                 title += '\n'
         title_str = title + title_str
         
-    ax.set_title(title_str, fontsize = fontsize)
+    ax.set_title(title_str, fontsize = fontsize_title)
     plt_colorbar(im, colorbar_invisible=False, colorbar_aspect = fontsize**0.5 * 4, 
                  fontsize = fontsize, tick_labels = target_names)
     return fig, ax
@@ -777,6 +782,8 @@ def plt_imshow(img,
                aspect = 'equal',
                figsize = None,
                title_ax_gap = 0.05,
+               show_values = False,
+               values_fontsize = 6,
                **kwargs):
     """
     Display an image or a complex-valued image using matplotlib's imshow.
@@ -863,6 +870,12 @@ def plt_imshow(img,
             fig, ax = fig_ax
         if title is not None: ax_top = ax.get_position().y1
         im = ax.imshow(img, cmap = cmap, **kwargs)
+        if show_values:
+            for i in range(img.shape[0]):
+                for j in range(img.shape[1]):
+                    text = f"{img[i, j]}"
+                    color = 'white' if (i + j) % 2 == 0 else (0.8, 0.8, 0.8)
+                    ax.text(j, i, text, ha='center', va='center', color=color, fontsize=values_fontsize)
         if(colorbar):
             plt_colorbar(im)
         if(remove_axis_ticks):
@@ -1531,10 +1544,10 @@ def plt_imshow_series(list_of_stacks,
             
             if (list_of_titles_rows is not None):
                 if img_cnt == 0:
-                    ax.set_ylabel(list_of_titles_rows[stack_cnt])
+                    ax.set_ylabel(list_of_titles_rows[stack_cnt], fontsize = fontsize)
             if (list_of_titles_columns is not None):
                 if stack_cnt == 0:
-                    ax.set_title(list_of_titles_columns[img_cnt])
+                    ax.set_title(list_of_titles_columns[img_cnt], fontsize = fontsize)
             
     if title is not None:
         title = str(title)
@@ -1548,7 +1561,7 @@ def plt_imshow_subplots(
         images, grid_locations=None, frame_shape = None, title = None,
         titles=[], cmaps=[], colorbar=True, margin = 0.025,
         inter_image_margin = 0.01,
-        colorbar_aspect=2, colorbar_pad_fraction=0.05,
+        colorbar_aspect=2, colorbar_pad_fraction=0.05, title_ax_gap = 0.05,
         figsize=None, remove_axis_ticks=True, **kwargs):
     """
     Plots a list of 2D images at specified 2D grid_locations with titles 
@@ -1657,7 +1670,7 @@ def plt_imshow_subplots(
             
     if title is not None:
         title = str(title)
-        fig.suptitle(title)
+        fig.suptitle(title, y=tops.max() + title_ax_gap)
         try:
             fig.canvas.manager.window.setWindowTitle(title)
         except: pass

@@ -4,7 +4,7 @@
 
 import pytest
 import inspect
-from lognflow import lognflow, select_directory, logviewer, printprogress
+from lognflow import lognflow, select_directory, printprogress
 
 import numpy as np
 import time
@@ -19,6 +19,33 @@ def test_printprogress():
         for _ in range(N):
             time.sleep(0.01)
             pprog()
+
+def test_singles():
+    print('Testing single cases', inspect.currentframe().f_code.co_name)
+    print('trying with [1, 2, 3]....')
+    for _ in printprogress([1, 2, 3]):
+        print('trying with [1, 2, 3]')
+        time.sleep(0.01)
+    print('trying with [1, 2]....')
+    for _ in printprogress([1, 2]):
+        print('trying with [1, 2]')
+        time.sleep(0.01)
+    print('trying with [1]....')
+    for _ in printprogress([1]):
+        print('trying with [1]')
+        time.sleep(0.01)
+    print('trying with 11....')
+    for _ in printprogress(11):
+        print('trying with 1?????')
+        time.sleep(0.01)
+    print('Going through an empty set...')
+    for _ in []:
+        print('Going through an empty set')
+        time.sleep(0.01)
+    print('trying with []...')
+    for _ in printprogress([]):
+        print('trying with []')
+        time.sleep(0.01)
 
 def test_printprogress_with_logger():
     print('Testing function', inspect.currentframe().f_code.co_name)
@@ -70,6 +97,7 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_singles()
     test_printprogress()
     test_generator_type()
     test_printprogress_ETA()

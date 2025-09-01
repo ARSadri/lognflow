@@ -451,3 +451,7 @@ History
 -------------------
 * fixed plt_imshow_series color bars
 * read json automatically
+
+0.13.15 (2025-09-01)
+-------------------
+* added is_file

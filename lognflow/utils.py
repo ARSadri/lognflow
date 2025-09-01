@@ -1,4 +1,5 @@
 from pathlib import Path as pathlib_Path
+import numpy as np
 
 def dummy_function(*args, **kwargs): ...
 
@@ -28,6 +29,50 @@ def deepstr(obj):
     else:
         # For anything else that's not serializable, use str()
         return str(obj)
+
+# def deepstr(obj):
+#     """Recursively convert objects to their string representations, preserving bools and None."""
+#     if isinstance(obj, bool):
+#         return 'True' if obj else 'False'
+#     elif obj is None:
+#         return 'None'
+#     elif isinstance(obj, (str, int, float)):
+#         return obj
+#     elif isinstance(obj, dict):
+#         return {deepstr(k): deepstr(v) for k, v in obj.items()}
+#     elif isinstance(obj, list):
+#         return [deepstr(v) for v in obj]
+#     elif isinstance(obj, tuple):
+#         return tuple(deepstr(v) for v in obj)
+#     else:
+#         # For anything else that's not serializable, use str()
+#         return str(obj)
+
+def prepare_for_np_savez(input_dict):
+    """
+    Prepare a dictionary for saving with np.savez by converting all elements
+    into NumPy-compatible formats.
+
+    - If an object supports `.detach().cpu().numpy()`, it is converted.
+    - NumPy scalars are converted to Python scalars.
+    - Strings, booleans, Python numbers, None, and NumPy arrays are passed through.
+    """
+    
+    output_dict = {}
+    for key, value in input_dict.items():
+        # Try PyTorch-style conversion if possible
+        try:
+            value = value.detach().cpu().numpy()
+        except Exception:
+            pass
+
+        if isinstance(value, np.generic):
+            output_dict[key] = value.item()
+        elif isinstance(value, (np.ndarray, str, int, float, bool, type(None))):
+            output_dict[key] = value
+        else:
+            raise TypeError(f"Unsupported type for key '{key}': {type(value)}")
+    return output_dict
 
 def is_builtin_collection(obj):
     """

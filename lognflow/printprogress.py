@@ -1,6 +1,9 @@
 from math import ceil
 from time import time
 
+def needs_s(number):
+    return 's' if not ( (number == 1) or (number == -1) ) else ''
+
 class printprogress:
     """
     While there are packages that use \r to show a progress bar, 
@@ -13,16 +16,15 @@ class printprogress:
     to go faster, call it with give number of steps that have passed.
     """
     def __init__(self, 
-                 it, 
+                 int_or_iterable, 
                  numTicks = 78,
                  title = None,
                  desc = None,
-                 disable = False,
                  method = 'linear',
                  print_function = print,
                  **print_function_kwargs):
         """
-            it: int or iterable
+            int_or_iterable: int or iterable
                 Number of iterations in the for loop or iterable
                 n_steps = int(it) or n_steps = len(it)
             numTicks: int
@@ -52,26 +54,30 @@ class printprogress:
             if title is not None:
                 assert desc == title, 'either give me title or desc' 
             title = desc
-        if disable:
-            print_function = None
+        self.yielding_data = False
         try:
-            n_steps = int(it)
-            self.yielding_data = False
+            n_steps = int(int_or_iterable)
         except:
-            n_steps = len(it)
-            self.it = it
-            self.yielding_data = True
-            self.yielding_data_call_warning = False
+            n_steps = len(int_or_iterable)
+            self.iterable = int_or_iterable
+            if n_steps > 0:
+                self.yielding_data = True
+                self.yielding_data_call_warning = False
+
+        if(n_steps<2):
+            print_function = None
+
         self.FLAG_first_tick = True
         
         self.print_function_kwargs = print_function_kwargs
         self.method = method
-        self.in_print_function = print_function
+        self.print_function = print_function
         
-        if(n_steps<2):
-            n_steps = 2
+         ############################################################################### what happens in case of [1] as input
+        
         if (title is None):
-            title = f'Progress for {n_steps} steps'
+            needs_s(n_steps)
+            title = f'Progress for {n_steps} step{needs_s(n_steps)}'
         self.FLAG_ended = False
         self.FLAG_warning = False
         self.startTime = time()
@@ -99,11 +105,11 @@ class printprogress:
         self.average_filter_coeff = 0
     
     def _print_func(self, text, end='\n'):
-        if (self.in_print_function is not None):
-            if (self.in_print_function == print):
+        if (self.print_function is not None):
+            if (self.print_function == print):
                 print(text, end = end, flush = True)
             else:
-                self.in_print_function(text, end = end,
+                self.print_function(text, end = end,
                                        **self.print_function_kwargs)
         
     def _calc_ETA(self):
@@ -132,7 +138,8 @@ class printprogress:
             self.ck += ck
             if(self.ck <= self.n_steps):
                 remTimeS = self._calc_ETA() # useful when print_function is None
-                cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)
+                try: cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)
+                except: cProg = int(self.numTicks/3)
                 #3: because 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
@@ -200,11 +207,28 @@ class printprogress:
                     self._make_progress()
                 if self.iter_ck == self.n_steps - 1:
                     self.FLAG_iter_ended = True
-                toret = self.it[self.iter_ck]
+                toret = self.iterable[self.iter_ck]
                 self.iter_ck += 1
                 return toret
             else:
+                self.FLAG_iter_ended = True
+                self.FLAG_ended = True
                 raise StopIteration
+        else:
+            if self.n_steps:
+                print('printprogress is used as a Generator, e.g. to a for loop'
+                      ' but the first argument does not have length via __len__'
+                      ' perhaps you gave it a number or the length of a list as'
+                      ' the first argument. To use it in a for loop '
+                      ' (specifically as a generator), provide the list itself.'
+                      ' If you wish to give a number of steps, define the pbar'
+                      ' before the for loop via pbar = printprogress(n_steps)'
+                      ' then call the pbar() inside the for loop when a step is'
+                      ' carried out.'
+                      )
+            self.FLAG_iter_ended = True
+            self.FLAG_ended = True
+            raise StopIteration
     
     def _end(self):
         if(not self.FLAG_ended):
