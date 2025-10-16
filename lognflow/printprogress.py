@@ -216,15 +216,15 @@ class printprogress:
                 raise StopIteration
         else:
             if self.n_steps:
-                print('printprogress is used as a Generator, e.g. to a for loop'
+                print('printprogress is used as a Generator, e.g. in a for loop'
                       ' but the first argument does not have length via __len__'
                       ' perhaps you gave it a number or the length of a list as'
                       ' the first argument. To use it in a for loop '
-                      ' (specifically as a generator), provide the list itself.'
+                      ' (as a generator), provide the list itself or a generator.'
                       ' If you wish to give a number of steps, define the pbar'
                       ' before the for loop via pbar = printprogress(n_steps)'
                       ' then call the pbar() inside the for loop when a step is'
-                      ' carried out.'
+                      ' finished.'
                       )
             self.FLAG_iter_ended = True
             self.FLAG_ended = True
@@ -232,7 +232,10 @@ class printprogress:
     
     def _end(self):
         if(not self.FLAG_ended):
-            self._print_func('')
+            if (self.print_function is not None):
+                self._print_func(f' --> {time() - self.startTime:.2f}s')
+            else:
+                self._print_func('')
             self.FLAG_ended = True
 
     def __del__(self):

@@ -455,3 +455,9 @@ History
 0.13.15 (2025-09-01)
 -------------------
 * added is_file
+
+
+0.13.16 (2025-10-16)
+-------------------
+* fixed the quesiton dialog figsize
+* fixed the logger.printv bug

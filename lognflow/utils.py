@@ -396,9 +396,9 @@ class SSHSystem:
         if self.ssh_client:
             self.ssh_client.close()
 
-def printv(var, logger = print, tab = 0,
+def printv(var, logger = print, var_name = None, tab = 0,
            arr_size_max = 1e6, arr_size_min = 1000,
-           str_len_max = 1e4, str_len_min = 1000):
+           str_len_max = 1e4, str_len_min = 1000, **kwargs_logger):
     """printv
     Provides a detailed description of a variable, including its type, size, and basic statistics,
     and logs the output using a specified logger. This function is particularly useful for inspecting
@@ -437,21 +437,23 @@ def printv(var, logger = print, tab = 0,
       inspects each element up to `str_len_max`.
     - For strings and other data types, it truncates and displays the string if it's too long.
     """
-    
-    import inspect
-    frame = inspect.currentframe().f_back
-    var_name = [name for name, value in frame.f_locals.items() if value is var]
-    
-    if var_name:
-        var_name = var_name[0]
-    else:
-        var_name = repr(var)
+    if var_name is None:
+        import inspect
+        frame = inspect.currentframe().f_back
+        var_name = [name for name, value in frame.f_locals.items() if value is var]
+        
+        if var_name:
+            var_name = var_name[0]
+        else:
+            var_name = repr(var)
+            if len(var_name) > 20: var_name = type(var)
+            
 
     toprint = f'{var_name}: {type(var).__name__}'
     
     if (isinstance(var, int)) | (isinstance(var, float)) | (isinstance(var, bool)):
         toprint += ', ' + str(var)
-        logger(toprint)
+        logger(toprint, **kwargs_logger)
         return len(toprint)
     
     has_element_0 = False
@@ -464,7 +466,7 @@ def printv(var, logger = print, tab = 0,
             var[1]
         except:
             toprint += ', ' + str(var_)
-            logger(toprint)
+            logger(toprint, **kwargs_logger)
             return len(toprint)
     try:
         array_shape = var.shape
@@ -501,7 +503,7 @@ def printv(var, logger = print, tab = 0,
             if len(var_str) < str_len_min:
                 toprint += '\n' + var_str + ' <--' + var_name
             
-        logger(toprint)
+        logger(toprint, **kwargs_logger)
         return len(toprint)
 
     if is_builtin_collection(var):
@@ -509,32 +511,32 @@ def printv(var, logger = print, tab = 0,
         var_str = str(var)
         if len(var_str) < str_len_min:
             toprint += ', ' + var_str
-            logger(toprint)
+            logger(toprint, **kwargs_logger)
             return len(toprint)
         if isinstance(var, (list, tuple)):
-            logger(toprint)
+            logger(toprint, **kwargs_logger)
             len_toprint = 0
             tab += 1
             for idx, item in enumerate(var):
-                logger('    ' * tab + f"{var_name}[{idx}]: ", end = '')
+                logger('    ' * tab + f"{var_name}[{idx}]: ", end = '', **kwargs_logger)
                 len_toprint += printv(item, logger, tab = tab,
                                       arr_size_max = arr_size_max,
-                                      str_len_max = str_len_max)
+                                      str_len_max = str_len_max, **kwargs_logger)
                 if len_toprint > str_len_max:
-                    logger(f"... too long")
+                    logger(f"... too long", **kwargs_logger)
                     break
             return len(toprint) + len_toprint
         elif isinstance(var, dict):
-            logger(toprint)
+            logger(toprint, **kwargs_logger)
             len_toprint = 0
             tab += 1
             for key, item in var.items():
-                logger('    '*tab + f"{var_name}[{repr(key)}]: ", end = '')
+                logger('    '*tab + f"{var_name}[{repr(key)}]: ", end = '', **kwargs_logger)
                 len_toprint += printv(item, logger, tab = tab,
                                       arr_size_max = arr_size_max,
-                                      str_len_max = str_len_max)
+                                      str_len_max = str_len_max, **kwargs_logger)
                 if len_toprint > str_len_max:
-                    logger(f"... too long")
+                    logger(f"... too long", **kwargs_logger)
                     break
             return len(toprint) + len_toprint
             
@@ -544,7 +546,7 @@ def printv(var, logger = print, tab = 0,
         var_str = var_str[:int(str_len_max // 10)] + ' ...' + \
             var_str[-int(str_len_max // 10):]
     toprint += ', ' + var_str
-    logger(toprint)
+    logger(toprint, **kwargs_logger)
     return len(toprint)
 
 def find_duplicates(a_list):
@@ -706,7 +708,7 @@ class block_runner:
             block_identifiers.append(_item)
         for blk in block_identifiers:
             if isinstance(blk, str):
-                if ('load' in blk) | ('save' in blk) | ('exit' in blk):
+                if ('load_state' in blk) | ('save_state' in blk) | ('exit' in blk):
                     self.logger(
                         f'block identifier {blk} is using a preserved word.'
                         ' Please do not use load, save and exit to name your'
@@ -719,10 +721,11 @@ class block_runner:
             
         # Add options for saved states
         for key in self.saved_state:
-            buttons[f'load_{key}'] = f'load_{key}'
-            buttons[f'del_{key}'] = f'del_{key}'
+            buttons[f'load_state_{key}'] = f'load_state_{key}'
+            buttons[f'del_state_{key}'] = f'del_state_{key}'
 
-        buttons[f'save_{self.n_saves + 1}'] = f'save_{self.n_saves + 1}'
+        buttons[f'save_state_{self.n_saves + 1}'] = f'save_state_{self.n_saves + 1}'
+        buttons['reload'] = 'reload'
         buttons['exit'] = 'exit'
 
         # Display dialog for user interaction
@@ -740,20 +743,23 @@ class block_runner:
                 self.exit = True
                 return
 
-            elif 'save' in show_and_ask_result:
-                key = show_and_ask_result.split('save_')[1]
+            if show_and_ask_result == 'reload':
+                return
+
+            elif 'save_state_' in show_and_ask_result:
+                key = show_and_ask_result.split('save_state_')[1]
                 self.saved_state[key] = self.save_or_load_kernel_state(globals_)
                 self.logger(f'Saved state: {key}')
                 return
 
-            elif 'load' in show_and_ask_result:
-                key = show_and_ask_result.split('load_')[1]
+            elif 'load_state_' in show_and_ask_result:
+                key = show_and_ask_result.split('load_state_')[1]
                 self.save_or_load_kernel_state(globals_, self.saved_state[key])
                 self.logger(f'Loaded state: {key}')
                 return
 
-            elif 'del' in show_and_ask_result:
-                key = show_and_ask_result.split('del_')[1]
+            elif 'del_state_' in show_and_ask_result:
+                key = show_and_ask_result.split('del_state_')[1]
                 self.saved_state.pop(key)
                 self.logger(f'Deleted state: {key}')
                 return
@@ -762,30 +768,166 @@ class block_runner:
         globals_[self.block_identifier] = show_and_ask_result
         return globals_
 
+def fit_loss_exponential_offset(loss_vals, settling_factor=5):
+    """
+    Fit an exponential decay model with offset to a training loss curve.
 
+    The model assumes the loss decays as:
+        L(t) = L_inf + A * exp(-t / tau)
 
-def exponential_offset(t, A, tau, L_inf):
-    return L_inf + A * np.exp(-t / tau)
+    where:
+        - L_inf : steady-state loss (final asymptotic value)
+        - A     : initial amplitude above the steady-state
+        - tau   : exponential decay time constant
 
-def fit_loss_exponential_offset(loss_vals, settling_factor = 5):
+    After fitting, this function estimates how many epochs it would take
+    for the loss to effectively "settle" (settling_factor × tau).
+
+    Parameters
+    ----------
+    loss_vals : array-like of float
+        Sequence of loss values (e.g., per epoch or iteration).
+    settling_factor : float, optional
+        Multiple of the fitted time constant τ used to define when the loss
+        is considered settled. Default is 5.
+
+    Returns
+    -------
+    tau : float
+        Estimated exponential decay time constant.
+    epochs_remaining : int
+        Number of epochs remaining until the loss is considered settled
+        (if the sequence has not yet reached settling_factor × tau).
+    A : float
+        Amplitude of the exponential decay.
+    L_inf : float
+        Asymptotic (steady-state) loss value.
+    full_t : ndarray of int
+        Time indices up to the predicted settling time.
+    fitted_vals : ndarray of float
+        Exponential fit values evaluated over `full_t`.
+
+    Notes
+    -----
+    - Useful for estimating convergence speed of training.
+    - If the loss does not follow a smooth exponential trend, the fit may
+      not converge or may produce unreliable parameters.
+    - The settling time (≈ 5 × tau) corresponds to when the loss is within
+      about 0.7% of its final value (since exp(-5) ≈ 0.007).
+
+    Examples
+    --------
+    >>> losses = [5.0, 3.2, 2.1, 1.5, 1.1, 0.95, 0.9]
+    >>> tau, remaining, A, L_inf, t_fit, y_fit = fit_loss_exponential_offset(losses)
+    >>> tau
+    2.3
+    >>> remaining
+    8
+    """
+    def exponential_offset(t, A, tau, L_inf):
+        return L_inf + A * np.exp(-t / tau)
+    
+    from scipy.optimize import curve_fit
+
     n = len(loss_vals)
     t = np.arange(n)
 
+    # Initial parameter guesses
     L0 = loss_vals[0]
     L_inf_guess = loss_vals[-1]
     A_guess = L0 - L_inf_guess
     tau_guess = n / 2
-    from scipy.optimize import curve_fit
 
     popt, _ = curve_fit(
         exponential_offset, t, loss_vals,
         p0=[A_guess, tau_guess, L_inf_guess]
     )
+
     A, tau, L_inf = popt
 
+    # Predict settling time and extrapolate fit
     epochs_settle = int(np.ceil(settling_factor * tau))
     epochs_remaining = max(0, epochs_settle - n)
     full_t = np.arange(epochs_settle)
     fitted_vals = exponential_offset(full_t, A, tau, L_inf)
 
     return tau, epochs_remaining, A, L_inf, full_t, fitted_vals
+
+
+def trim_losses(steps_avg_losses, steps_std_losses,
+                ref_percentage=0.1, factor=10,
+                autozoom=True, tolerance=0.2, min_stable=5):
+    """
+    Trim the initial high-loss region from training curves.
+
+    You have to collect losses over a step(e.g.epoch) and record 
+    the avg and std over steps(e.g. all epochs) in the input lists.
+
+    By default, this function automatically detects the point where the loss
+    has stabilized near its final value ("autozoom" mode). If autozoom is
+    disabled, it instead trims early points where the loss is greater than
+    a fixed multiple of the final average.
+
+    Parameters
+    ----------
+    steps_avg_losses : list or array-like of float
+        Sequence of average losses (e.g., per epoch or step).
+    steps_std_losses : list or array-like of float
+        Sequence of standard deviations corresponding to `steps_avg_losses`.
+    ref_percentage : float, optional
+        Fraction (0–1) of the tail of `steps_avg_losses` used to compute a reference
+        average. Default is 0.1 (last 10%).
+    factor : float, optional
+        Multiplier applied to the reference average to set a threshold
+        for trimming (used only if autozoom=False). Default is 10.
+    autozoom : bool, optional
+        If True (default), automatically find where the loss stabilizes near
+        its final mean using tolerance-based detection.
+    tolerance : float, optional
+        Relative tolerance around the reference average for autozoom mode.
+        Default is 0.2 (±20%).
+    min_stable : int, optional
+        Number of consecutive points required to confirm stabilization.
+        Default is 5.
+
+    Returns
+    -------
+    tuple of (trimmed_losses_avg, trimmed_losses_std)
+        The input sequences after removing the initial high-loss region.
+
+    Notes
+    -----
+    - Use `autozoom=True` to focus plots or analysis on the converged region
+      of training without being dominated by early high losses.
+    - Use `autozoom=False` to apply a fixed threshold rule.
+    """
+    if len(steps_avg_losses) < 2:
+        return steps_avg_losses, steps_std_losses
+
+    ref_len = max(1, int(len(steps_avg_losses) * ref_percentage))
+    reference_losses_avg = steps_avg_losses[-ref_len:]
+    ref_avg = sum(reference_losses_avg) / len(reference_losses_avg)
+
+    # --- Autozoom mode ---
+    if autozoom:
+        lower_bound = (1 - tolerance) * ref_avg
+        upper_bound = (1 + tolerance) * ref_avg
+
+        trim_index = 0
+        for i in range(len(steps_avg_losses) - min_stable):
+            window = steps_avg_losses[i:i + min_stable]
+            if all(lower_bound <= v <= upper_bound for v in window):
+                trim_index = i
+                break
+
+    # --- Fixed threshold mode ---
+    else:
+        threshold = factor * ref_avg
+        trim_index = 0
+        for i in range(len(steps_avg_losses) - ref_len):
+            if steps_avg_losses[i] > threshold:
+                trim_index += 1
+            else:
+                break
+
+    return steps_avg_losses[trim_index:], steps_std_losses[trim_index:]

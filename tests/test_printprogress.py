@@ -55,15 +55,6 @@ def test_printprogress_with_logger():
     for _ in range(N):
         pprog()
         
-def test_printprogress_ETA():
-    print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
-    N = 500000
-    pprog = printprogress(N, print_function = None)
-    for _ in range(N):
-        ETA = pprog()
-        print(f'ETA: {ETA:.2f}')
-    
 def test_specific_timing():
     print('Testing function', inspect.currentframe().f_code.co_name)
     logger = lognflow(temp_dir)
@@ -93,14 +84,26 @@ def test_varying_periods():
         time.sleep(np.random.rand())
     print(f'sum: {sum}')
 
+def test_printprogress_ETA():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    logger = lognflow(temp_dir)
+    N = 5000000
+    pprog = printprogress(N, print_function = None)
+    perv_print = 0
+    for _ in range(N):
+        ETA = pprog()
+        if time.time() - perv_print > 0.1:
+            perv_print = time.time()
+            print(f'ETA: {ETA:.2f}')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
+    test_printprogress_ETA(); exit()
     test_singles()
     test_printprogress()
     test_generator_type()
-    test_printprogress_ETA()
     test_specific_timing()
     test_printprogress_with_logger()
     test_varying_periods()

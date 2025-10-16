@@ -254,7 +254,6 @@ class lognflow:
     def assert_log_dir(self):
         if (not self.log_dir.is_dir()) & (not self.warning_log_dir):
             self.warning_log_dir = True
-            print('~'*30, 'WARNING', '~'*30)
             if self.log_dir_provided:
                 print(f'lognflow.logdir: No such directory: ')
                 print({self.log_dir})
@@ -266,10 +265,9 @@ class lognflow:
                 print(f'logger = lognflow(log_dir = {self.log_dir}')
                 print('I will assume that this logs_root is log_dir from now on')
             else:
-                print('You should provide log_dir when initializing lognflow '
-                      'if you wish to read the stored data first as follows:')
-                print(f'logger = lognflow(log_dir = LOG_DIR_PATH')
-            print('~'*67)
+                print('Provide log_dir when initializing lognflow '
+                      'if you wish to read the stored data first, e.g. as follows:')
+                print(f'logger = lognflow(log_dir = LOG_DIR_PATH)')
             return False
 
     def disable(self):
@@ -1091,10 +1089,24 @@ class lognflow:
         else:
             return fig, ax
     
-    def printv(self, *args, **kwargs):
+    def printv(self, var, **kwargs):
         if 'logger' in kwargs:
             kwargs.pop('logger')
-        printv(*args, logger = self, **kwargs)
+        if 'var_name' in kwargs:
+            kwargs.pop('var_name')
+        import inspect
+        frame = inspect.currentframe().f_back
+        var_name = [name for name, value in frame.f_locals.items() if value is var]
+        if var_name:
+            var_name = var_name[0]
+        else:
+            var_name = repr(var)
+            if len(var_name) > 20: var_name = type(var)
+
+        kwargs['log_time_stamp'] = False
+        _ = self.text(None, var_name + ':')
+        printv(var, logger = self, var_name = var_name, **kwargs)
+        _ = self.text(None, '-'*20, log_time_stamp = False)
     
     def hist(self, parameter_name: str, 
                    parameter_value_list,
@@ -2047,6 +2059,8 @@ class lognflow:
                         time_array = time_array[time_array > 0]
                         return((time_array, data_array), var_path)
                     except:
+                        if return_collection:
+                            buf = dict(buf)
                         return(buf, var_path)
                 if(var_path.suffix == '.npy'):
                     try: return(np.load(var_path), var_path)

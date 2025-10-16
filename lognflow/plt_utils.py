@@ -22,7 +22,7 @@ matplotlib_colors_list = [
     'crimson', 'plum', 'orchid', 'chartreuse', 'tan',
 ]
 
-def plt_colorbar(mappable, colorbar_aspect=3, 
+def plt_colorbar(mappable, colorbar_aspect=None, 
                  colorbar_pad_fraction=0.05, colorbar_invisible=False, 
                  fontsize=10, tick_labels=None):
     """
@@ -44,6 +44,11 @@ def plt_colorbar(mappable, colorbar_aspect=3,
     """
 
     ax = mappable.axes
+
+    if colorbar_aspect is None:
+        asprat = np.squeeze(np.diff(np.array(ax.get_position()).T))
+        colorbar_aspect = (10 * asprat[0]/asprat[1])**0.5
+
     fig = ax.figure
     divider = make_axes_locatable(ax)
     width = ax.get_position().width / colorbar_aspect
@@ -178,7 +183,7 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
 def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
               colorbar=True, fig_ax=None, colorbar_label=None,
-              elev=None, azim=None):
+              elev=None, azim=None, figsize = (6, 6), bar3d_alpha = 1):
     """
     Plot a 3D histogram with a colormap based on the height of the bars.
 
@@ -217,7 +222,7 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
     colors = plt.cm.get_cmap(cmap)(norm_dz)
 
     if fig_ax is None:
-        fig = plt.figure()
+        fig = plt.figure(figsize = figsize)
         if use_bars:
             ax = fig.add_subplot(111, projection='3d')
         else:
@@ -226,8 +231,8 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
         fig, ax = fig_ax
     
     if use_bars:
-        bars = ax.bar3d(x_pos, y_pos, z_pos, dx, dy, dz, 
-                         color=colors, edgecolor=colors, alpha=1)
+        ax.bar3d(x_pos, y_pos, z_pos, dx, dy, dz, 
+                 color=colors, edgecolor=colors, alpha=bar3d_alpha)
         ax.view_init(elev=elev, azim=azim)
         if colorbar:
             mappable = plt.cm.ScalarMappable(cmap=cmap)
@@ -466,11 +471,12 @@ def complex2hsv_colorbar(
     diff = np.abs(max_angle - min_angle)
     # Draw lines at min and max angles if they are not too close
     if np.minimum(diff, 2 * np.pi - diff) > angle_threshold:
-        for angle in [min_angle, max_angle]:
-            x_end = 500 + np.cos(angle) * 500
-            y_end = 500 - np.sin(angle) * 500
-            ax.plot([500, x_end], [500, y_end], '--', color='gray')
-
+        x_end = 500 + np.cos(min_angle) * 500
+        y_end = 500 - np.sin(min_angle) * 500
+        ax.plot([500, x_end], [500, y_end], color='gray')
+        x_end = 500 + np.cos(max_angle) * 500
+        y_end = 500 - np.sin(max_angle) * 500
+        ax.plot([500, x_end], [500, y_end], '--', color='gray')
     # Add text annotations for min and max values
     if int(vmin*100)/100 > 0:   #because we are going to show .2f
         ax.text(500, 500, f'{vmin:.2f}', 
@@ -491,11 +497,11 @@ def complex2hsv_colorbar(
 
 def plt_violinplot(
         dataset:list, positions, facecolor = None, edgecolor = None, 
-        alpha = 0.5, label = None, fig_and_ax : tuple = None, 
+        alpha = 0.5, label = None, fig_and_ax : tuple = None, figsize = (6, 6),
         title = None, plt_violinplot_kwargs = {}):
     
     if(fig_and_ax is None):
-        fig, ax = plt.subplots(1)
+        fig, ax = plt.subplots(figsize = figsize)
     else:
         fig, ax = fig_and_ax
     violin_parts = ax.violinplot(dataset, positions, **plt_violinplot_kwargs)
@@ -652,7 +658,7 @@ def _listify_1d_list(list_of_obj):
     return list_of_obj
 
 def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, 
-             fig_ax = None, title = None, **kwargs):
+             fig_ax = None, title = None, labels = [], **kwargs):
     """
         Plots multiple sets of y-values against x-values using Matplotlib, 
         with options to customize the plot.
@@ -748,15 +754,20 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
         use_grid = kwargs['grid']
         kwargs.pop('grid')    
     
+    plt_legend = True
+    if len(labels) == 0:
+        plt_legend = False
+        labels = [None] * len(y_values_list)
+
     for list_cnt, y_values in enumerate(y_values_list):
         if(x_values_list is None):
-            ax.plot(y_values, *plt_plot_args, **kwargs)
+            ax.plot(y_values, *plt_plot_args, label = labels[list_cnt], **kwargs)
         else:
             if(len(x_values_list) == len(y_values)):
                 x_values = x_values_list[list_cnt]
             else:
                 x_values = x_values_list[0]
-            ax.plot(x_values, y_values, *plt_plot_args, **kwargs)
+            ax.plot(x_values, y_values, *plt_plot_args, label = labels[list_cnt], **kwargs)
 
     if use_grid:
         if isinstance(use_grid, dict):
@@ -767,6 +778,9 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
     if title is not None:
         title = str(title)
         ax.set_title(title)
+    
+    if plt_legend:
+        fig.legend()
         
     return (fig, ax)
 
@@ -781,7 +795,7 @@ def plt_imshow(img,
                portrait = None,
                aspect = 'equal',
                figsize = None,
-               title_ax_gap = 0.05,
+               title_y = None,
                show_values = False,
                values_fontsize = 6,
                **kwargs):
@@ -868,7 +882,6 @@ def plt_imshow(img,
             fig, ax = plt.subplots(figsize = figsize)
         else:
             fig, ax = fig_ax
-        if title is not None: ax_top = ax.get_position().y1
         im = ax.imshow(img, cmap = cmap, **kwargs)
         if show_values:
             for i in range(img.shape[0]):
@@ -876,12 +889,14 @@ def plt_imshow(img,
                     text = f"{img[i, j]}"
                     color = 'white' if (i + j) % 2 == 0 else (0.8, 0.8, 0.8)
                     ax.text(j, i, text, ha='center', va='center', color=color, fontsize=values_fontsize)
-        if(colorbar):
-            plt_colorbar(im)
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
         if aspect is not None:
             ax.set_aspect(aspect)
+
+        ax_top = ax.get_position().y1
+        if(colorbar): plt_colorbar(im)
+
     else:
         if (cmap == 'complex'):
 
@@ -904,19 +919,18 @@ def plt_imshow(img,
                 fig, ax = plt.subplots(figsize = figsize)
             else:
                 fig, ax = fig_ax
-            if title is not None: ax_top = ax.get_position().y1
             im = ax.imshow(complex_image)
             if(remove_axis_ticks):
                 plt.setp(ax, xticks=[], yticks=[])
-
+            if aspect is not None:
+                ax.set_aspect(aspect)
+            ax_top = ax.get_position().y1
             if(colorbar):
                 fig, ax_inset = complex2hsv_colorbar(
                     (fig, ax.inset_axes([0.79, 0.03, 0.18, 0.18], 
                                         transform=ax.transAxes)),
                     vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
                 ax_inset.patch.set_alpha(0)
-            if aspect is not None:
-                ax.set_aspect(aspect)
         else:
             
             if fig_ax is None:
@@ -933,8 +947,6 @@ def plt_imshow(img,
                 ax = [fig.add_subplot(2, 1, 1), fig.add_subplot(2, 1, 2)]
             else:
                 ax = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
-            
-            if title is not None: ax_top = ax[0].get_position().y1
             
             complex_real_imag = False
             if cmap is not None:
@@ -961,7 +973,7 @@ def plt_imshow(img,
                 ax[0].set_title('abs')    
                 if angle_cmap is None:
                     angle_cmap = 'twilight_shifted'
-                im = ax[1].imshow(np.angle(img), cmap = angle_cmap, **kwargs)
+                im = ax[1].imshow(np.angle(img) * (np.abs(img) != 0), cmap = angle_cmap, **kwargs)
                 if(colorbar):
                     plt_colorbar(im)
                 ax[1].set_title('angle')
@@ -982,23 +994,27 @@ def plt_imshow(img,
                     plt.setp(ax[1], yticks=[])
                     ax[1].yaxis.set_ticks_position('none')
 
-            
             if aspect is not None:
                 ax[0].set_aspect(aspect)
                 ax[1].set_aspect(aspect)
+
+            ax_top = ax[0].get_position().y1
     
     if title is not None:
         title = str(title)
-        fig.suptitle(title, y=ax_top + title_ax_gap)
+        if title_y is None:
+            try: title_y = ax_top + 0.05
+            except Exception as e: print(e)
+        fig.suptitle(title, y = title_y)
         try: 
             fig.canvas.manager.window.setWindowTitle(title)
         except: pass
         
     return fig, ax
 
-def plt_hist(vectors_list, fig_ax = None,
-             bins = 10, alpha = 0.5, normalize = False, 
-             labels_list = None, **kwargs):
+def plt_hist(vectors_list, bins = 10, fig_ax = None, width = None,
+             alpha = 0.5, normalize = False, title = None,
+             labels_list = None, figsize = (6, 6), **kwargs):
     
     try:
         vectors_list_shape = vectors_list.shape
@@ -1010,23 +1026,32 @@ def plt_hist(vectors_list, fig_ax = None,
         f'lognflow.plt_hist: input should be a list or an array or an array of arrays'
     
     if fig_ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        fig, ax = plt.subplots(figsize = figsize)
     else:
         fig, ax = fig_ax
     
     for vec_cnt, vec in enumerate(vectors_list):
         bins_, edges = np.histogram(vec, bins)
         if normalize:
-            bins_ = bins_ / bins_.max()
-        ax.bar(edges[:-1], bins_, 
-                width =np.diff(edges).mean(), alpha=alpha)
+            bins_ = bins_ / bins_.sum()
+        if width is None:
+            width = np.diff(edges).min()
+        ax.bar(edges[:-1], bins_, width = width, alpha=alpha)
         if labels_list is None:
             ax.plot(edges[:-1], bins_, **kwargs)
         else:
             assert len(labels_list) == len(vectors_list)
-            ax.plot(edges[:-1], bins_, 
-                     label = f'{labels_list[vec_cnt]}', **kwargs)
+            ax.plot(edges[:-1], bins_, label = f'{labels_list[vec_cnt]}', **kwargs)
+
+    if title is not None:
+        title = str(title)
+        fig.suptitle(title)
+        try: 
+            fig.canvas.manager.window.setWindowTitle(title)
+        except: pass
+    if labels_list is not None:
+        ax.legend()
+
     return fig, ax
 
 def plt_hist_subplots(arrays, bins = 10, frame_shape=None, alpha=0.7, 
@@ -1075,7 +1100,7 @@ def plt_hist_subplots(arrays, bins = 10, frame_shape=None, alpha=0.7,
 def plt_scatter3(
         data_N_by_3, fig_ax = None, title = None, 
         elev_list = [20, 70], azim_list = np.arange(0, 360, 20),
-        make_animation = False, **kwargs):
+        make_animation = False, xlabel = None, ylabel = None, **kwargs):
     assert (len(data_N_by_3.shape)==2) & (data_N_by_3.shape[1] == 3), \
         'The first argument must be N x 3'
     if fig_ax is None:
@@ -1087,6 +1112,9 @@ def plt_scatter3(
                data_N_by_3[:, 1], 
                data_N_by_3[:, 2], **kwargs)
     
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
     if title is not None:
         title = str(title)
         ax.set_title(title)
@@ -1560,8 +1588,8 @@ def plt_imshow_series(list_of_stacks,
 def plt_imshow_subplots(
         images, grid_locations=None, frame_shape = None, title = None,
         titles=[], cmaps=[], colorbar=True, margin = 0.025,
-        inter_image_margin = 0.01,
-        colorbar_aspect=2, colorbar_pad_fraction=0.05, title_ax_gap = 0.05,
+        inter_image_margin = 0.01, title_y = None,
+        colorbar_aspect=None, colorbar_pad_fraction=0.05, title_ax_gap = None,
         figsize=None, remove_axis_ticks=True, **kwargs):
     """
     Plots a list of 2D images at specified 2D grid_locations with titles 
@@ -1582,8 +1610,8 @@ def plt_imshow_subplots(
     remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
     """
     if colorbar:
-        margin = np.maximum(margin, 0.4)
-        inter_image_margin = np.maximum(margin, 0.4)
+        margin = np.maximum(margin, 0.2)
+        inter_image_margin = np.maximum(margin, 0.2)
     
     N = len(images)
     # Determine the maximum image size
@@ -1596,12 +1624,17 @@ def plt_imshow_subplots(
             rows = int(np.ceil(N / cols))
         else:
             rows, cols = frame_shape
-            N = np.minimum(N, rows * cols)
-        
-        # Generate grid locations with dynamic spacing
-        spacing = max(max_width, max_height) * (1 + inter_image_margin)
-        grid_locations = np.array([[col * spacing, 1 - row * spacing] for row in range(rows) for col in range(cols)])
-        grid_locations = grid_locations[:N]  # Trim to number of images
+
+        N = np.minimum(N, rows * cols)
+        spacing = np.array([max_height, max_width]) * (1 + inter_image_margin)
+        grid_locations = []
+        for col in range(cols):
+            for row in range(rows):
+                loc_x = col * spacing[1]
+                loc_y =  max_height*rows - row * spacing[0]
+                grid_locations.append([loc_x, loc_y])
+        # grid_locations = np.array([[col * spacing[1], max_height*rows - row * spacing[0]] for row in range(rows) for col in range(cols)])
+        grid_locations = np.array(grid_locations)[:N]  # Trim to number of images
             
     lefts = grid_locations[:, 0]
     bottoms = grid_locations[:, 1]
@@ -1670,7 +1703,15 @@ def plt_imshow_subplots(
             
     if title is not None:
         title = str(title)
-        fig.suptitle(title, y=tops.max() + title_ax_gap)
+        if title_y is None:
+            if titles is not None:
+                title_ax_gap = 0.1
+            else:
+                title_ax_gap = 0.05
+            fig.suptitle(title, y=tops.max() + title_ax_gap)
+        else:
+            fig.suptitle(title, y=title_y)
+        
         try:
             fig.canvas.manager.window.setWindowTitle(title)
         except: pass
@@ -2021,9 +2062,9 @@ class _questdiag:
         
         if figsize is None:
             if isinstance(question, np.ndarray):
-                figsize = (7.5, 7.5)
+                figsize = (2 * n_rows, 3 + n_cols)
             else:
-                figsize = (5, 2.5)
+                figsize = (2 * n_rows, 1 + n_cols)
             
         # Create the figure and GridSpec layout
         fig = plt.figure(figsize=figsize)
