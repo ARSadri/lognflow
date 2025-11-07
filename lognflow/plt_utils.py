@@ -22,6 +22,85 @@ matplotlib_colors_list = [
     'crimson', 'plum', 'orchid', 'chartreuse', 'tan',
 ]
 
+def label_connected_same_values(image, ignore_value=None):
+    """
+    Label all connected regions in an image where pixels have the same value.
+
+    Parameters
+    ----------
+    image : ndarray
+        2D array (integer or binary image) where regions of identical values
+        form connected components.
+    ignore_value : int, optional
+        Pixel value to ignore (e.g., background = 0).
+
+    Returns
+    -------
+    labeled : ndarray of int
+        Image of same shape as input, where each connected region has a unique label.
+    centers : list of tuple of int
+        (row, col) integer coordinates for the approximate center pixel of each region.
+    values : list of int
+        Original pixel values corresponding to each labeled region.
+    sizes : list of int
+        Number of pixels (area) in each connected region.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> img = np.array([
+    ...     [1, 1, 0, 2, 2],
+    ...     [1, 0, 0, 2, 0],
+    ...     [3, 3, 3, 0, 0]
+    ... ])
+    >>> labeled, centers, values, sizes = label_connected_same_values(img, ignore_value=0)
+    >>> print("Centers:", centers)
+    Centers: [(0, 0), (0, 3), (2, 1)]
+    >>> print("Sizes:", sizes)
+    Sizes: [3, 3, 3]
+    """
+    import scipy.ndimage
+    
+    labeled = np.zeros_like(image, dtype=int)
+    centers = []
+    values = []
+    sizes = []
+    label_counter = 1
+    unique_vals = np.unique(image)
+    if len(unique_vals) < 0.5 * image.size:
+        for val in unique_vals:
+            if ignore_value is not None:
+                if val == ignore_value:
+                    continue
+    
+            mask = image == val
+            labels, n = scipy.ndimage.label(mask)
+            if n == 0:
+                continue
+    
+            labeled[mask] = labels[mask] + label_counter - 1
+    
+            for k in range(1, n + 1):
+                # Compute centroid in (row, col) coordinates
+                center = scipy.ndimage.center_of_mass(mask, labels, k)
+                center_int = tuple(map(int, np.round(center)))  # nearest pixel
+    
+                # Compute region size (number of pixels)
+                size = np.sum(labels == k)
+    
+                centers.append(center_int)
+                values.append(val)
+                sizes.append(size)
+    
+            label_counter += n
+    else:
+        labeled = np.arange(1, 1 + image.size, dtype=int).reshape(image.shape)
+        centers = np.stack(np.indices(image.shape), axis=-1).reshape(-1, 2)
+        values = image.ravel()
+        sizes = np.ones(image.size)
+
+    return labeled, centers, values, sizes
+
 def plt_colorbar(mappable, colorbar_aspect=None, 
                  colorbar_pad_fraction=0.05, colorbar_invisible=False, 
                  fontsize=10, tick_labels=None):
@@ -180,9 +259,9 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
                                     frame_shape = frame_shape, 
                                     borders = borders) for stack in stack_list])
 
-def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
+def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = None,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
-              colorbar=True, fig_ax=None, colorbar_label=None,
+              colorbar=True, fig_ax=None, colorbar_label=None, aspect = 'equal',
               elev=None, azim=None, figsize = (6, 6), bar3d_alpha = 1):
     """
     Plot a 3D histogram with a colormap based on the height of the bars.
@@ -217,6 +296,8 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
 
     dx = dy = (x_edges[1] - x_edges[0])
     dz = counts.ravel()
+    if function_on_z is not None:
+        dz = function_on_z(dz)
     norm_dz = dz / dz.max() if dz.max() > 0 else dz
 
     colors = plt.cm.get_cmap(cmap)(norm_dz)
@@ -244,6 +325,9 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False,
         im = ax.imshow(
             counts.T, cmap=cmap, origin='lower', aspect='auto',
             extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]])
+        
+        ax.set_aspect(aspect)
+
         if colorbar:
             plt_colorbar(im)
 
@@ -529,10 +613,11 @@ def plt_violinplot(
     return fig, ax
 
 class plt_imhist:
-    def __init__(self, in_image, figsize=(12, 6), title=None, bins=None,
-                 kwargs_for_imshow={}, kwargs_for_hist={}):
+    def __init__(self, in_image, in_mask = None, figsize=(12, 6), title=None, 
+                 bins=None, remove_axis_ticks = False,
+                 cmap = None, kwargs_for_imshow={}, kwargs_for_hist={}):
         if bins is not None:
-            if not (bins in kwargs_for_hist):
+            if not ('bins' in kwargs_for_hist):
                 kwargs_for_hist['bins'] = bins
         
         try:
@@ -549,17 +634,25 @@ class plt_imhist:
         
         self.fig_ax = self.fig, axs[0]
         
+        if cmap is not None:
+            if 'cmap' in kwargs_for_imshow:
+                kwargs_for_imshow.pop('cmap')
+
         # Display the image
         self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
         if title is not None:
             title = str(title)
             axs[0].set_title(title)
-        axs[0].axis('off')
+        if remove_axis_ticks:
+            axs[0].axis('off')
         
         cm = self.im.get_cmap()
         
         # Histogram
-        im_image_ravel = in_image.ravel().copy()
+        if in_mask is None:
+            im_image_ravel = in_image.ravel().copy()
+        else:
+            im_image_ravel = in_image[in_mask]
         im_image_ravel = im_image_ravel[np.isnan(im_image_ravel) == False]
         im_image_ravel = im_image_ravel[np.isinf(im_image_ravel) == False]
         if len(im_image_ravel) == 0:
@@ -657,7 +750,7 @@ def _listify_1d_list(list_of_obj):
                 list_of_obj = [np.array(list_of_obj).squeeze()]
     return list_of_obj
 
-def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, 
+def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, figsize = None,
              fig_ax = None, title = None, labels = [], **kwargs):
     """
         Plots multiple sets of y-values against x-values using Matplotlib, 
@@ -734,7 +827,7 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None,
                 f'{len(y_values_list)}.'
     
     if fig_ax is None:
-        fig = plt.figure()
+        fig = plt.figure(figsize = figsize)
         ax = fig.add_subplot(111)
     else:
         fig, ax = fig_ax
@@ -797,7 +890,10 @@ def plt_imshow(img,
                figsize = None,
                title_y = None,
                show_values = False,
-               values_fontsize = 6,
+               values_levels = None,
+               values_filter_size = None,
+               values_fontsize = 8,
+               show_values_n_pix = 4096,
                **kwargs):
     """
     Display an image or a complex-valued image using matplotlib's imshow.
@@ -860,7 +956,9 @@ def plt_imshow(img,
         The axes object(s) containing the displayed image(s). If the image is 
         complex and displayed as two separate plots, a list of axes will be returned.
     """
-    
+    if cmap is None:
+        cmap = plt.get_cmap('viridis')
+        
     vmin = kwargs.get('vmin', None)
     vmax = kwargs.get('vmax', None)
     
@@ -884,11 +982,43 @@ def plt_imshow(img,
             fig, ax = fig_ax
         im = ax.imshow(img, cmap = cmap, **kwargs)
         if show_values:
-            for i in range(img.shape[0]):
-                for j in range(img.shape[1]):
-                    text = f"{img[i, j]}"
-                    color = 'white' if (i + j) % 2 == 0 else (0.8, 0.8, 0.8)
-                    ax.text(j, i, text, ha='center', va='center', color=color, fontsize=values_fontsize)
+            img_min = img.min()
+            img_max = img.max()
+            if values_levels is None:
+                labeled, centers, values, sizes = label_connected_same_values(img)
+                if len(sizes) > show_values_n_pix:
+                    values_levels = 20
+            if values_levels is not None:
+                try: 
+                    if values_levels == int(values_levels):
+                        values_levels = np.arange(img_min, img_max, values_levels)
+                except: pass
+                
+                from scipy.ndimage import median_filter
+                if values_filter_size is None:
+                    values_filter_size = int(np.maximum(np.ceil(np.minimum(*img.shape)//20), 1))
+                img_ = median_filter(img.copy(), size=values_filter_size)
+                img_ = np.digitize(img_, values_levels)
+                labeled, centers, values, sizes = label_connected_same_values(img_)
+            sizes = np.array(sizes)
+            sizes = np.log(np.e - 1 + (sizes + 1 - sizes.min()) / (sizes.max() + 1 - sizes.min()))
+            print(sizes.min())
+            print(sizes.max())
+            pixels_id_showval_list = np.arange(len(sizes))
+            for cnt in pixels_id_showval_list:
+                cent, siz = centers[cnt], sizes[cnt]
+                i, j = cent
+                val = img[i, j]
+                rgba = cmap((val - img_min) / (img_max - img_min))
+                gray = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+                color, color_adjacent = (1, 1, 1), (0.8, 0.8, 0.8)
+                if gray > 0.5:
+                    color, color_adjacent = (0, 0, 0), (0.2, 0.2, 0.2)
+
+                color_ = color if (i + j) % 2 == 0 else color_adjacent
+                ax.text(j, i, str(val), ha='center', va='center', color=color_, 
+                        fontsize=values_fontsize * siz)
+
         if(remove_axis_ticks):
             plt.setp(ax, xticks=[], yticks=[])
         if aspect is not None:
@@ -1030,6 +1160,20 @@ def plt_hist(vectors_list, bins = 10, fig_ax = None, width = None,
     else:
         fig, ax = fig_ax
     
+    if len(vectors_list) > 1:
+        try:
+            if bins == int(bins):
+                edges_all = []
+                for vec_cnt, vec in enumerate(vectors_list):
+                    _, _edges = np.histogram(vec, bins)
+                    edges_all.append([_edges.min(), _edges.max(), (_edges.max() - _edges.min())/bins])
+                edges_all = np.array(edges_all)
+                edges_min = edges_all[:, 0].min()
+                edges_max = edges_all[:, 1].max()
+                edges_width = edges_all[:, 2].mean()
+                bins = np.arange(edges_min, edges_max + edges_width, edges_width)
+        except: pass
+
     for vec_cnt, vec in enumerate(vectors_list):
         bins_, edges = np.histogram(vec, bins)
         if normalize:
@@ -1098,20 +1242,48 @@ def plt_hist_subplots(arrays, bins = 10, frame_shape=None, alpha=0.7,
     
 
 def plt_scatter3(
-        data_N_by_3, fig_ax = None, title = None, 
-        elev_list = [20, 70], azim_list = np.arange(0, 360, 20),
-        make_animation = False, xlabel = None, ylabel = None, **kwargs):
-    assert (len(data_N_by_3.shape)==2) & (data_N_by_3.shape[1] == 3), \
+        data_N_by_3, fig_ax=None, title=None, 
+        elev_list=[20, 70], azim_list=np.arange(0, 360, 20),
+        make_animation=False, xlabel=None, ylabel=None,
+        cmap='viridis', **kwargs):
+    """
+    3D scatter plot where color corresponds to the Z coordinate.
+
+    Args:
+        data_N_by_3: ndarray of shape (N, 3)
+        fig_ax: optional (fig, ax) tuple
+        title: optional title string
+        elev_list: list of elevation angles for animation
+        azim_list: list of azimuth angles for animation
+        make_animation: if True, returns frames for animation
+        xlabel, ylabel: axis labels
+        cmap: name of matplotlib colormap (default 'viridis')
+        **kwargs: passed to ax.scatter
+    """
+    assert (len(data_N_by_3.shape) == 2) and (data_N_by_3.shape[1] == 3), \
         'The first argument must be N x 3'
+
+    # Prepare figure and axes
     if fig_ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig, ax = fig_ax
-    ax.scatter(data_N_by_3[:, 0], 
-               data_N_by_3[:, 1], 
-               data_N_by_3[:, 2], **kwargs)
-    
+
+    # Normalize Z values to [0, 1] for the colormap
+    z = data_N_by_3[:, 2]
+    norm = (z - z.min()) / (z.max() - z.min() + 1e-12)
+    colors = plt.cm.get_cmap(cmap)(norm)
+
+    # Scatter with color based on Z
+    sc = ax.scatter(
+        data_N_by_3[:, 0],
+        data_N_by_3[:, 1],
+        data_N_by_3[:, 2],
+        c=colors,
+        **kwargs
+    )
+
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
 
@@ -1120,12 +1292,17 @@ def plt_scatter3(
         ax.set_title(title)
         try:
             fig.canvas.manager.window.setWindowTitle(title)
-        except: pass
+        except Exception:
+            pass
 
-    try: elev_list = [int(elev_list)]
-    except: pass
-    try: azim_list = [int(azim_list)]
-    except: pass
+    try:
+        elev_list = [int(elev_list)]
+    except Exception:
+        pass
+    try:
+        azim_list = [int(azim_list)]
+    except Exception:
+        pass
 
     if make_animation:
         stack = []
@@ -1138,8 +1315,14 @@ def plt_scatter3(
     else:
         elev = None if elev_list is None else elev_list[0]
         azim = None if azim_list is None else azim_list[0]
-        if (elev is not None) | (azim is not None):
+        if (elev is not None) or (azim is not None):
             ax.view_init(elev=elev, azim=azim)
+
+        # Optional colorbar for clarity
+        mappable = plt.cm.ScalarMappable(cmap=cmap)
+        mappable.set_array(z)
+        fig.colorbar(mappable, ax=ax, label='Z value')
+
         return fig, ax
 
 def plt_surface(stack, fig_ax = None, **kwargs):
@@ -1618,6 +1801,10 @@ def plt_imshow_subplots(
     max_width = max(img.shape[1] for img in images)
     max_height = max(img.shape[0] for img in images)
     
+    if frame_shape is None:
+        if (N == 2) | (N == 3):
+            frame_shape = (N, 1) if max_width > max_height else (1, N)
+
     if grid_locations is None:
         if frame_shape is None:
             cols = int(np.ceil(np.sqrt(N)))
@@ -2294,7 +2481,7 @@ def plt_graph_like(adj_mat, labels, figsize = (10, 8), gridspecs = (10, 10),
 def plt_contours(
         Z_list, X_Y = None, fig_ax = None, levels = 10, colors_list = None, 
         linestyles_list = None, linewidth = 0.5, fontsize = 3, title = None,
-        figsize = None):
+        labels_list = [], figsize = None):
     """
     Plot contours of multiple surfaces overlaid on the same plot.
     
@@ -2341,7 +2528,9 @@ def plt_contours(
         contour = ax.contour(X, Y, Z, levels=levels, colors=[color],
                              linestyles=linestyle, linewidths = linewidth)
         
-        # Add labels to contours
+        if labels_list:
+            contour.collections[0].set_label(labels_list[i])
+
         if fontsize is not None:
             ax.clabel(contour, inline=True, fontsize=fontsize, fmt='%.2f')
         

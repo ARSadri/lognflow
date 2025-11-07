@@ -397,8 +397,8 @@ class SSHSystem:
             self.ssh_client.close()
 
 def printv(var, logger = print, var_name = None, tab = 0,
-           arr_size_max = 1e6, arr_size_min = 1000,
-           str_len_max = 1e4, str_len_min = 1000, **kwargs_logger):
+           arr_size_max = 1e7, arr_size_min = 1e3,
+           str_len_max = 2e3, str_len_min = 1e3, **kwargs_logger):
     """printv
     Provides a detailed description of a variable, including its type, size, and basic statistics,
     and logs the output using a specified logger. This function is particularly useful for inspecting

@@ -461,3 +461,7 @@ History
 -------------------
 * fixed the quesiton dialog figsize
 * fixed the logger.printv bug
+
+0.13.17 (2025-11-7)
+-------------------
+* mainly the plt_imshow
