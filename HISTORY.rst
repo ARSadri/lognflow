@@ -469,3 +469,7 @@ History
 0.13.18 (2025-12-12)
 -------------------
 * fixed many bugs in plt_utils
+
+0.13.19 (2025-12-12)
+-------------------
+* critical bug removed in utils

@@ -700,7 +700,7 @@ def printv(var, logger = print, var_name = None, tab = 0,
             if len(var_name) > 20: var_name = type(var)
     
     if shared_name:
-        toprint = f'printv: shared {[vname for vname in var_names if not('__' in vname)]}: {type(var).__name__}'
+        toprint = f'printv: shared {[vname for vname in var_names if not("__" in vname)]}: {type(var).__name__}'
     else:
         toprint = f'{var_name}: {type(var).__name__}'
     
