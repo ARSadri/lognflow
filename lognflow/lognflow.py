@@ -889,9 +889,12 @@ class lognflow:
                     t1 = _var_time_array[
                         :ending].reshape(n_wins, plot_win_length).mean(1)
                     fname = f'{param_dir}/{param_name}_{_var.file_start_time:.6f}'
-                    self.plot(fname, 
-                              [v1], '--',fig_ax = fig_ax, x_values_list = [t1],
-                              time_tag = time_tag)
+                    try:
+                        self.plot(fname, 
+                                  [v1], '--',fig_ax = fig_ax, x_values_list = [t1],
+                                  time_tag = time_tag)
+                    except:
+                        print(f'Cannot plot the average for record {parameter_name}')
         return fpath
     
     def get_record(self, parameter_name: str, suffix: str = None) -> tuple:
@@ -1090,23 +1093,30 @@ class lognflow:
             return fig, ax
     
     def printv(self, var, **kwargs):
-        if 'logger' in kwargs:
-            kwargs.pop('logger')
-        if 'var_name' in kwargs:
-            kwargs.pop('var_name')
         import inspect
         frame = inspect.currentframe().f_back
-        var_name = [name for name, value in frame.f_locals.items() if value is var]
-        if var_name:
-            var_name = var_name[0]
+        var_names = [name for name, value in frame.f_locals.items() if value is var]
+        var_name = None
+        if var_names:
+            if len(var_names) == 1:
+                var_name = var_names[0]
         else:
             var_name = repr(var)
             if len(var_name) > 20: var_name = type(var)
 
         kwargs['log_time_stamp'] = False
-        _ = self.text(None, var_name + ':')
-        printv(var, logger = self, var_name = var_name, **kwargs)
-        _ = self.text(None, '-'*20, log_time_stamp = False)
+        if var_name:
+            if 'logger' in kwargs:
+                kwargs.pop('logger')
+            if 'var_name' in kwargs:
+                kwargs.pop('var_name')
+            printv(var, logger = self, var_name = var_name, **kwargs)
+        else:
+            if 'var_name' in kwargs:
+                var_name = kwargs['var_name'] + ': '
+            else:
+                var_name = ''
+            self.text(None, f'{var_name}{var}', **kwargs)
     
     def hist(self, parameter_name: str, 
                    parameter_value_list,

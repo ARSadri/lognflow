@@ -16,6 +16,252 @@ class DummyClass:
     def dummy_function(self, *args, **kwargs):
         return None
 
+def _has_len_recursive(obj):
+    try:
+        if len(obj) == 0:
+            return False
+        for x in obj:
+            if _has_len_recursive(x):
+                return True
+        return True
+    except Exception:
+        return False
+    
+def has_len(obj):
+    """
+    checks if an object has a non-empty length, recursively.
+
+    Returns True if:
+    - The object has a length > 0, or
+    - Any nested element with a length is non-empty (recursively).
+
+    Returns False if:
+    - The object has no length, or
+    - Its length is 0, or
+    - All nested elements are as above recursively.
+
+    Parameters
+    ----------
+    obj : any
+        The object to check for non-empty length.
+
+    Returns
+    -------
+    bool
+        True if the object or any nested element with length is non-empty, False otherwise.
+    """
+    return _has_len_recursive(obj)
+
+class _Richprint:
+    def __init__(self):
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+
+        self.console = Console()
+        self.Table = Table
+        self.Panel = Panel
+        
+        self.force_ansi = False
+
+    def richprint(
+        self,
+        *args,
+        line=False,
+        box=False,
+        table=None,
+        style="cyan",
+        title=None,
+        width=80,
+        sep=" ",
+        end="\n",
+    ):
+        console = self.console
+        Table = self.Table
+        Panel = self.Panel
+
+        # --- Combine all positional args ---
+        text = ''
+        if args:
+            text = sep.join(str(a) for a in args)
+
+        # --- LINE ---
+        if line:
+            if text:
+                console.rule(text, style=style)
+            else:
+                console.rule(style = style)
+            console.print(end=end)
+            return
+
+        # --- BOX ---
+        if box:
+            panel = Panel.fit(text, border_style=style, title=title)
+            console.print(panel, end=end)
+            return
+
+        # --- TABLE ---
+        if table is not None:
+            header = table.get("header", [])
+            rows = table.get("rows", [])
+
+            t = Table(title=title, style=style)
+            for h in header:
+                t.add_column(str(h))
+            for row in rows:
+                t.add_row(*map(str, row))
+            console.print(t, end=end)
+            return
+
+        # --- DEFAULT TEXT ---
+        if text is not None:
+            console.print(f"[{style}]{text}[/{style}]", end=end)
+            return
+
+        console.print("[dim]Nothing to print.[/dim]", end=end)
+
+def richprint(
+    *args,
+    line=False,
+    box=False,
+    table=None,
+    style="cyan",
+    title=None,
+    width=80,
+    sep=" ",
+    end="\n",
+):
+    """
+    Convenience wrapper for rich-styled terminal output.
+    Behaves like print() but supports rich formatting, tables, and boxes.
+
+    Parameters
+    ----------
+    *args : str
+        One or more text segments to print (joined with `sep`).
+    line : bool, default=False
+        Prints a horizontal rule with optional centered text.
+    box : bool, default=False
+        Prints text inside a box.
+    table : dict, optional
+        {'header': [...], 'rows': [[...], ...]} — prints as a table.
+    style : str, default='cyan'
+        Style can be:
+            - Color name: "red", "green", "magenta"
+            - Attribute: "bold", "italic", "dim"
+            - Combo: "bold yellow", "italic cyan on black"
+    title : str, optional
+        Title for box or table.
+    width : int, default=80
+        Width for rule lines.
+    sep : str, default=' '
+        Separator between multiple arguments.
+    end : str, default='\\n'
+        String appended after the last value.
+
+    Examples
+    --------
+    # Like normal print
+    richprint("A", "B", 123)
+
+    # Line
+    richprint(line=True, "Section Start", style="bold yellow")
+
+    # Box
+    richprint(box=True, "Hello world!", style="green", title="Greeting")
+
+    # Table
+    richprint(table={'header': ['a', 'b'], 'rows': [[1, 2], [3, 4]]})
+
+    # Mixed styles
+    richprint("Warning!", style="bold red on yellow")
+    richprint(box=True, "Italic text inside", style="italic blue")
+    
+    More examples
+    -------------
+    richprint("Hello", "world", 123, style="bold green")
+    richprint(line=True, "Header", style="yellow")
+    richprint(box=True, "Message inside a box", style="bold cyan")
+    richprint(table=dict(header=["a", "b"], rows=np.random.rand(10, 2)))
+    """
+    _Richprint().richprint(
+        *args,
+        line=line,
+        box=box,
+        table=table,
+        style=style,
+        title=title,
+        width=width,
+        sep=sep,
+        end=end,
+    )
+
+def print_line(
+    *args,
+    style="cyan",
+    width=80,
+    sep=" ",
+    end="\n",
+):
+    """
+    Print a horizontal rule with optional centered text.
+    Usage:
+        print_line("Section Title", style="bold yellow")
+        print_line()
+    """
+    _Richprint().richprint(
+        *args,
+        line=True,
+        style=style,
+        width=width,
+        sep=sep,
+        end=end,
+    )
+
+
+def print_box(
+    *args,
+    style="cyan",
+    title=None,
+    sep=" ",
+    end="\n",
+):
+    """
+    Print text inside a rich-styled box.
+    Usage:
+        print_box("Hello!", style="green", title="Greeting")
+    """
+    _Richprint().richprint(
+        *args,
+        box=True,
+        style=style,
+        title=title,
+        sep=sep,
+        end=end,
+    )
+
+
+def print_table(
+    header:list,
+    rows:list,
+    style="cyan",
+    title=None,
+    end="\n",
+):
+    """
+    Print a table using rich.
+    Usage:
+        print_table(["A","B"], [[1,2],[3,4]])
+    """
+    tbl = dict(header=header, rows=rows)
+
+    _Richprint().richprint(
+        table=tbl,
+        style=style,
+        title=title,
+        end=end,
+    )
+
 def deepstr(obj):
     """Recursively convert objects to their string representations."""
     if isinstance(obj, (str, int, float, bool)) or obj is None:
@@ -47,6 +293,7 @@ def deepstr(obj):
 #     else:
 #         # For anything else that's not serializable, use str()
 #         return str(obj)
+
 
 def prepare_for_np_savez(input_dict):
     """
@@ -437,19 +684,25 @@ def printv(var, logger = print, var_name = None, tab = 0,
       inspects each element up to `str_len_max`.
     - For strings and other data types, it truncates and displays the string if it's too long.
     """
+    shared_name = False
     if var_name is None:
         import inspect
         frame = inspect.currentframe().f_back
-        var_name = [name for name, value in frame.f_locals.items() if value is var]
-        
-        if var_name:
-            var_name = var_name[0]
+        var_names = [name for name, value in frame.f_locals.items() if value is var]
+        if var_names:
+            if len(var_names) > 1:
+                shared_name = True
+                var_name = ''
+            else:
+                var_name = var_names[0]
         else:
             var_name = repr(var)
             if len(var_name) > 20: var_name = type(var)
-            
-
-    toprint = f'{var_name}: {type(var).__name__}'
+    
+    if shared_name:
+        toprint = f'printv: shared {[vname for vname in var_names if not('__' in vname)]}: {type(var).__name__}'
+    else:
+        toprint = f'{var_name}: {type(var).__name__}'
     
     if (isinstance(var, int)) | (isinstance(var, float)) | (isinstance(var, bool)):
         toprint += ', ' + str(var)
@@ -931,3 +1184,11 @@ def trim_losses(steps_avg_losses, steps_std_losses,
                 break
 
     return steps_avg_losses[trim_index:], steps_std_losses[trim_index:]
+
+def is_notebook():
+    try:
+        from IPython import get_ipython
+        shell = get_ipython().__class__.__name__
+        return shell == 'ZMQInteractiveShell'   # Jupyter notebook or JupyterLab
+    except:
+        return False

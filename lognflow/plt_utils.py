@@ -8,9 +8,10 @@ from   mpl_toolkits.mplot3d import Axes3D
 from   mpl_toolkits.axes_grid1 import make_axes_locatable
 from   itertools import cycle as itertools_cycle
 from   itertools import product as itertools_product
+from lognflow.utils import has_len
 
 matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
-    's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<','^',  '8','p',  
+    's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<', '^', '8', 'p',  
     '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
 
 matplotlib_colors_list = [
@@ -262,7 +263,7 @@ def stacks_to_frames(stack_list, frame_shape : tuple = None, borders = 0):
 def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = None,
               xlabel=None, ylabel=None, zlabel=None, title=None, 
               colorbar=True, fig_ax=None, colorbar_label=None, aspect = 'equal',
-              elev=None, azim=None, figsize = (6, 6), bar3d_alpha = 1):
+              elev=None, azim=None, figsize = (6, 6), bar3d_alpha = 1, return_bins = False):
     """
     Plot a 3D histogram with a colormap based on the height of the bars.
 
@@ -282,6 +283,7 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = N
 
     Returns:
     tuple: (fig, ax) - The figure and axis objects.
+    if return_bins, returns fig, ax, x_edges, y_edges
     """
     
     assert data.shape[1] == 2, "Data must have shape (N, 2)"
@@ -336,6 +338,9 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = N
     if zlabel is not None: ax.set_zlabel(zlabel)
     if title  is not None: ax.set_title(title)
     
+    if return_bins:
+        return fig, ax, x_edges, y_edges
+
     return fig, ax
 
 def _compute_tn_from_cm(cm):
@@ -615,10 +620,10 @@ def plt_violinplot(
 class plt_imhist:
     def __init__(self, in_image, in_mask = None, figsize=(12, 6), title=None, 
                  bins=None, remove_axis_ticks = False,
-                 cmap = None, kwargs_for_imshow={}, kwargs_for_hist={}):
-        if bins is not None:
-            if not ('bins' in kwargs_for_hist):
-                kwargs_for_hist['bins'] = bins
+                 cmap = None, kwargs_for_hist={}, **kwargs_for_imshow):
+
+        if bins is not None: kwargs_for_hist['bins'] = bins
+        if cmap is not None: kwargs_for_imshow['cmap'] = cmap
         
         try:
             in_image = in_image.detach().cpu().numpy()
@@ -626,28 +631,6 @@ class plt_imhist:
                   'image converted from torch to numpy for plt!')
         except: pass
 
-        # Adjust figsize to provide more space if needed
-        self.fig, axs = plt.subplots(
-            1, 2, figsize=figsize,
-            gridspec_kw={'width_ratios': [5, 1], 'wspace': 0.1})
-        self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)
-        
-        self.fig_ax = self.fig, axs[0]
-        
-        if cmap is not None:
-            if 'cmap' in kwargs_for_imshow:
-                kwargs_for_imshow.pop('cmap')
-
-        # Display the image
-        self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
-        if title is not None:
-            title = str(title)
-            axs[0].set_title(title)
-        if remove_axis_ticks:
-            axs[0].axis('off')
-        
-        cm = self.im.get_cmap()
-        
         # Histogram
         if in_mask is None:
             im_image_ravel = in_image.ravel().copy()
@@ -657,10 +640,31 @@ class plt_imhist:
         im_image_ravel = im_image_ravel[np.isinf(im_image_ravel) == False]
         if len(im_image_ravel) == 0:
             im_image_ravel = in_image.ravel().copy()
-        n, bins = np.histogram(im_image_ravel, **kwargs_for_hist)
-        bin_centres = 0.5 * (bins[:-1] + bins[1:])
+        n, bins_ = np.histogram(im_image_ravel, **kwargs_for_hist)
+        bin_centres = 0.5 * (bins_[:-1] + bins_[1:])
+
+        # Adjust figsize to provide more space if needed
+        self.fig, axs = plt.subplots(
+            1, 2, figsize=figsize,
+            gridspec_kw={'width_ratios': [5, 1], 'wspace': 0.1})
+        self.fig.subplots_adjust(left=0.05, right=0.85, bottom=0.1, top=0.9)
+        
+        self.fig_ax = self.fig, axs[0]
+
+        kwargs_for_imshow['vmin'] = bin_centres.min()
+        kwargs_for_imshow['vmax'] = bin_centres.max()
+        # Display the image
+        self.im = axs[0].imshow(in_image, **kwargs_for_imshow)
+        if title is not None:
+            axs[0].set_title(str(title))
+
+        if remove_axis_ticks:
+            axs[0].axis('off')
+        
+        cm = self.im.get_cmap()
+        
         axs[1].barh(
-            bin_centres, n, height=(bins[1]-bins[0]),
+            bin_centres, n, height=(bins_[1]-bins_[0]),
             color=cm((bin_centres - bin_centres.min()) /
                          (bin_centres.max() - bin_centres.min())))
         axs[1].invert_xaxis()
@@ -673,9 +677,9 @@ class plt_imhist:
         lower_text_ax = self.fig.add_axes([0.88, 0.1, 0.05, 0.05])
         
         self.upper_text_box = TextBox(
-            upper_text_ax, 'Max', initial=f'{in_image.max():.6f}')
+            upper_text_ax, 'Max', initial=f'{bin_centres.max():.6f}')
         self.lower_text_box = TextBox(
-            lower_text_ax, 'Min', initial=f'{in_image.min():.6f}')
+            lower_text_ax, 'Min', initial=f'{bin_centres.min():.6f}')
         
         # Calculate the position for the slider
         slider_top = 0.85 - 0.02  # Bottom of the upper text box
@@ -687,8 +691,8 @@ class plt_imhist:
             [0.895, slider_bottom, 0.02, slider_height], 
             facecolor='lightgoldenrodyellow')
         self.slider = RangeSlider(
-            slider_ax, '', in_image.min(), in_image.max(),
-            valinit=[in_image.min(), in_image.max()], orientation='vertical')
+            slider_ax, '', bin_centres.min(), bin_centres.max(),
+            valinit=[bin_centres.min(), bin_centres.max()], orientation='vertical')
         self.slider.label.set_visible(False)
         self.slider.valtext.set_visible(False)
         
@@ -736,18 +740,16 @@ class plt_imhist:
                 self.slider.set_val([lower_val, upper_val])
         except ValueError:
             pass
-
+        
 def _listify_1d_list(list_of_obj):
-    if list_of_obj is not None:
-        if len(list_of_obj) > 1:
-            it_is_1d = True
-            for _ in list_of_obj:
-                try:
-                    if len(_) > 1:
-                        it_is_1d = False
-                except: pass
-            if it_is_1d:
-                list_of_obj = [np.array(list_of_obj).squeeze()]
+    if has_len(list_of_obj):
+        it_is_1d = True
+        for _ in list_of_obj:
+            if has_len(_): 
+                it_is_1d = False
+                break
+        if it_is_1d:
+            list_of_obj = [np.array(list_of_obj)]
     return list_of_obj
 
 def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, figsize = None,
@@ -877,6 +879,94 @@ def plt_plot(y_values_list, *plt_plot_args, x_values_list = None, figsize = None
         
     return (fig, ax)
 
+def plt_bar(
+        y_values_list,
+        x_values_list=None,
+        figsize=None,
+        fig_ax=None,
+        title=None,
+        labels=None,
+        width=0.8,
+        stack=False,
+        **kwargs
+    ):
+    """
+    Plot multiple sets of 1D y-values as bars, side-by-side or stacked.
+
+    Parameters
+    ----------
+    y_values_list : list of 1D arrays
+        List of datasets to plot.
+    x_values_list : list of 1D arrays or one 1D array or None
+        x-values. If None: x = np.arange(len(y)).
+        If length=1: reused for all y-values.
+        If same length as y_values_list: match elementwise.
+    labels : list of str
+        Legend labels. If None: no labels.
+    width : float
+        Total width allocated per group. Defaults to 0.8.
+    stack : bool
+        If True, bars are stacked. Otherwise side-by-side.
+    """
+
+    y_values_list = _listify_1d_list(y_values_list)
+    x_values_list = _listify_1d_list(x_values_list)
+
+    n_series = len(y_values_list)
+
+    # Check x-values consistency
+    if x_values_list is None:
+        # Implicit x: use index
+        x_values_list = [np.arange(len(y_values_list[0]))]
+    else:
+        assert (len(x_values_list) == 1) or (len(x_values_list) == n_series), \
+            f"x_values_list must have length 1 or equal to y_values_list length ({n_series})"
+
+    # Check matching lengths
+    for i, y in enumerate(y_values_list):
+        x = x_values_list[i] if len(x_values_list) > 1 else x_values_list[0]
+        assert len(x) == len(y), (
+            f"Length mismatch at index {i}: x has {len(x)}, y has {len(y)}"
+        )
+
+    # Figure and axis
+    if fig_ax is None:
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111)
+    else:
+        fig, ax = fig_ax
+
+    # Labels
+    if labels is None or len(labels) == 0:
+        labels = [None] * n_series
+
+    # Plotting
+    if not stack:
+        # side-by-side bars
+        group_width = width
+        bar_width = group_width / n_series
+
+        for i, y in enumerate(y_values_list):
+            x = x_values_list[i] if len(x_values_list) > 1 else x_values_list[0]
+            x_shifted = x + (i - (n_series - 1) / 2) * bar_width
+            ax.bar(x_shifted, y, width=bar_width, label=labels[i], **kwargs)
+
+    else:
+        # stacked bars
+        bottom = np.zeros_like(y_values_list[0], dtype=float)
+        for i, y in enumerate(y_values_list):
+            x = x_values_list[i] if len(x_values_list) > 1 else x_values_list[0]
+            ax.bar(x, y, width=width, bottom=bottom, label=str(labels[i]), **kwargs)
+            bottom = bottom + y
+
+    if title is not None:
+        ax.set_title(str(title))
+
+    if any(labels):
+        ax.legend()
+
+    return fig, ax
+
 def plt_imshow(img, 
                fig_ax = None,
                colorbar = True, 
@@ -956,9 +1046,6 @@ def plt_imshow(img,
         The axes object(s) containing the displayed image(s). If the image is 
         complex and displayed as two separate plots, a list of axes will be returned.
     """
-    if cmap is None:
-        cmap = plt.get_cmap('viridis')
-        
     vmin = kwargs.get('vmin', None)
     vmax = kwargs.get('vmax', None)
     
@@ -966,16 +1053,14 @@ def plt_imshow(img,
     except: pass
     try: img = np.array(img)
     except: raise TypeError('plt_imshow accepts numpy or torch images only')
-    
-    if ( (not np.iscomplexobj(img))
-         & ((cmap == 'complex') or (cmap == 'real_imag'))
-         & (len(img) == 2) & (len(img.shape) == 3) ):
-        img = img[0] + 1j * img[1]
-        
-    assert len(img.shape) == 2, 'plt_imshow accepts images only' + \
-        f'TypeError: Invalid shape {img.shape} for image data.'
+       
+    assert (len(img.shape) == 2) | ((len(img.shape) == 3) & (img.shape[-1] == 3)), \
+        f'plt_imshow accepts images only TypeError: Invalid shape {img.shape} for image data.'
 
     if(not np.iscomplexobj(img)):
+        if cmap is None:
+            cmap = plt.get_cmap('viridis')
+
         if fig_ax is None:
             fig, ax = plt.subplots(figsize = figsize)
         else:
@@ -2481,22 +2566,71 @@ def plt_graph_like(adj_mat, labels, figsize = (10, 8), gridspecs = (10, 10),
 def plt_contours(
         Z_list, X_Y = None, fig_ax = None, levels = 10, colors_list = None, 
         linestyles_list = None, linewidth = 0.5, fontsize = 3, title = None,
-        labels_list = [], figsize = None):
+        labels_list = [], figsize = None, aspect = 'equal'):
     """
-    Plot contours of multiple surfaces overlaid on the same plot.
-    
-    Parameters:
-    - Z_list: List of 2D arrays representing the surface heights at each 
-              grid point.
-    - X_Y: tuple where the (X, Y) describe the meshgrid over which Z is defined
-    - fig_ax: Tuple (fig, ax) where fig is the figure and ax is the axes.
-              If None, creates a new figure and axes.
-    - levels: Number of contour levels for all surfaces.
-    - colors_list: List of colors for the contours of each surface. 
-                   If None, defaults to a colormap.
-    - linestyles_list: List of line styles for the contours of each surface. 
-                       If None, defaults to a pattern.
-    - title: Optional title for the plot.
+    Plot multiple 2D contour maps overlaid on a single Matplotlib axis.
+
+    This function accepts one or several 2D arrays and draws their contour
+    lines on the same axes, optionally with different colors, linestyles,
+    and labels. If no figure/axes are provided, a new one is created.
+
+    Parameters
+    ----------
+    Z_list : array-like or list of array-like
+        A single 2D array or a list of 2D arrays. Each array represents
+        a surface whose contours will be plotted.
+
+    X_Y : tuple of (X, Y), optional
+        Meshgrid arrays describing the coordinates corresponding to each
+        Z array. If None, a default meshgrid based on array indices is used.
+
+    fig_ax : tuple (fig, ax), optional
+        Existing Matplotlib figure and axes to draw on. If None, a new
+        figure and axes are created.
+
+    levels : int or array-like, default=10
+        Number of contour levels, or explicit contour levels.
+
+    colors_list : list, optional
+        Colors used for the contours of each surface. If None, a colormap
+        (jet) is sampled.
+
+    linestyles_list : list, optional
+        Linestyles for each surface. If None, a repeating pattern
+        ['dashed', 'solid'] is used.
+
+    linewidth : float, default=0.5
+        Width of contour lines.
+
+    fontsize : int or None, default=3
+        Font size for contour labels. If None, labels are not drawn.
+
+    title : str, optional
+        Figure title and window title.
+
+    labels_list : list of str, optional
+        Labels for each Z surface. If provided, a legend is created.
+
+    figsize : tuple, optional
+        Figure size passed to `plt.subplots()` if a new figure is created.
+
+    aspect : str or float, default='equal'
+        Aspect ratio for the axes (e.g., 'equal', 'auto', numeric).
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure containing the plot.
+
+    ax : matplotlib.axes.Axes
+        The axes on which contours were drawn.
+
+    Notes
+    -----
+    - If a single 2D array is given as `Z_list`, it is automatically wrapped
+      into a list for consistency.
+    - Legend entries use the first contour level line from each surface.
+
     """
     
     # Create figure and axes if not provided
@@ -2517,7 +2651,7 @@ def plt_contours(
         if len(Z_list_shape) == 2:
             Z_list = [Z_list]
     except: pass
-    
+    if labels_list: lines = []
     for i, Z in enumerate(Z_list):
         if X_Y is None:
             Y, X = np.meshgrid(np.arange(Z.shape[1]), np.arange(Z.shape[0]))
@@ -2527,21 +2661,24 @@ def plt_contours(
         linestyle = linestyles_list[i % len(linestyles_list)]
         contour = ax.contour(X, Y, Z, levels=levels, colors=[color],
                              linestyles=linestyle, linewidths = linewidth)
-        
+    
         if labels_list:
-            contour.collections[0].set_label(labels_list[i])
-
+            lines.append(contour.legend_elements()[0][0])
+            
         if fontsize is not None:
             ax.clabel(contour, inline=True, fontsize=fontsize, fmt='%.2f')
-        
-    ax.set_aspect('equal')
-
+    
+    ax.set_aspect(aspect)
+    
     if title is not None:
         title = str(title)
         ax.set_title(title)
         try:
             fig.canvas.manager.window.setWindowTitle(title)
         except: pass
+    
+    if labels_list:
+        ax.legend(lines, labels_list)
     
     return fig, ax
 

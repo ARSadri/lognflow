@@ -7,22 +7,24 @@ import matplotlib.pyplot as plt
 import lognflow
 import numpy as np
 import inspect
+from sympy.core.tests import test_truediv
+
 def test_is_builtin_collection():
 
     # Test the function with various types
-    test_list = [1, 2, 3]
+    test_list   = [1, 2, 3]
     test_string = "hello"
-    test_dict = {'a': 1, 'b': 2}
-    test_set = {1, 2, 3}
-    test_tuple = (1, 2, 3)
-    test_array = np.array([1, 2, 3])
+    test_dict   = {'a': 1, 'b': 2}
+    test_set    = {1, 2, 3}
+    test_tuple  = (1, 2, 3)
+    test_array  = np.array([1, 2, 3])
     
-    assert (lognflow.is_builtin_collection(test_list))          # Expected: True
-    assert not (lognflow.is_builtin_collection(test_string))    # Expected: False
-    assert (lognflow.is_builtin_collection(test_dict))          # Expected: True
-    assert (lognflow.is_builtin_collection(test_set))           # Expected: True
-    assert (lognflow.is_builtin_collection(test_tuple))         # Expected: True
-    assert not (lognflow.is_builtin_collection(test_array))     # Expected: False
+    assert     lognflow.utils.is_builtin_collection(test_list  ) 
+    assert not lognflow.utils.is_builtin_collection(test_string)
+    assert     lognflow.utils.is_builtin_collection(test_dict  ) 
+    assert     lognflow.utils.is_builtin_collection(test_set   )  
+    assert     lognflow.utils.is_builtin_collection(test_tuple )
+    assert not lognflow.utils.is_builtin_collection(test_array )
 
 def test_ssh_system():
     try:
@@ -37,6 +39,12 @@ def test_ssh_system():
         print('SSH test not passed maybe because you did not set the credentials.')
     
 def test_printv():
+    
+    test_True1 = True
+    test_True2 = True
+    
+    lognflow.printv(test_True2)
+
     test0 = np.random.rand(10).max()
     lognflow.utils.printv(test0)
     test1 = 123
@@ -81,8 +89,40 @@ def test_block_runner():
     from lognflow.utils import block_runner
     block_runner(Path('./test_block_runner_code.py'))
 
+def test_richprint():
+    
+    from lognflow.utils import richprint
+    # Examples
+    # --------
+    # a line
+    richprint(line = True)
+    
+    # Like normal print
+    richprint("A", "B", 123, style = 'red')
+    
+    # Line
+    richprint("Section Start", line=True, style="bold yellow")
+    
+    # Box
+    richprint("Hello world!", box=True, style="green", title="Greeting")
+    
+    # Table
+    richprint(table={'header': ['a', 'b'], 'rows': [[1, 2], [3, 4]]})
+    
+    # Mixed styles
+    richprint("Warning!", style="bold red on yellow")
+    richprint("Italic text inside", box=True, style="italic blue")
+    
+    # More examples
+    # -------------
+    richprint("Hello", "world", 123, style="bold green")
+    richprint("Header", line=True, style="yellow")
+    richprint("Message inside a box", box=True, style="bold cyan")
+    richprint(table=dict(header=["a", "b"], rows=np.random.rand(10, 2)))
+
 if __name__ == '__main__':
-    test_is_builtin_collection()
     test_printv()
+    test_richprint()
+    test_is_builtin_collection()
     test_block_runner()
     test_ssh_system()

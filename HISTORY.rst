@@ -465,3 +465,7 @@ History
 0.13.17 (2025-11-7)
 -------------------
 * mainly the plt_imshow
+
+0.13.18 (2025-12-12)
+-------------------
+* fixed many bugs in plt_utils
