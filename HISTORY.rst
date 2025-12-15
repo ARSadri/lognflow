@@ -473,3 +473,9 @@ History
 0.13.19 (2025-12-12)
 -------------------
 * critical bug removed in utils
+
+0.14.00 (2025-12-15)
+-------------------
+* getting a name from pathlib location is fixed
+* lognflow is removed from imports and the name is now getLogger forever
+* deprecated log_.... are all removed hence the revision.

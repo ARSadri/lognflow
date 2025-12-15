@@ -6,14 +6,14 @@ import inspect
 import time
 import numpy as np
 
-from lognflow import lognflow, printprogress, select_directory
+from lognflow import getLogger, printprogress, select_directory
 
 import tempfile
 temp_dir = tempfile.gettempdir()
 
 def test_log_index():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for putting index instead of time_stamp')
     logger.save('testa', 'testa', time_tag = False)
     logger.save('testb', 'testb', time_tag = True)
@@ -27,16 +27,16 @@ def test_log_index():
     
 def test_lognflow_conflict_in_names():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for conflict in names')
-    logger1 = lognflow(logger.log_dir)
-    logger2 = lognflow(logger.log_dir)
+    logger1 = getLogger(logger.log_dir)
+    logger2 = getLogger(logger.log_dir)
     logger1(logger1.log_dir)
     logger2(logger2.log_dir)
 
 def test_text():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir, print_text = False)
+    logger = getLogger(temp_dir, print_text = False)
     logger('This is a test for text')    
     for _ in range(10000):
         logger(f'{_}')
@@ -68,7 +68,7 @@ def test_logger():
         the funciton save will be called with that while the first input
         string is going to be considered as the name of a variable.
     '''
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for lognflow and logger call')
 
     a = 20
@@ -86,7 +86,7 @@ def test_logger():
 
 def test_log_flush_period():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir, log_flush_period = 30)
+    logger = getLogger(temp_dir, log_flush_period = 30)
     logger('This is a test for lognflow and record')    
     
     time_time = time.time()
@@ -104,7 +104,7 @@ def test_log_flush_period():
 
 def test_record():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for lognflow and record')    
 
     for _ in range(1000):
@@ -112,7 +112,7 @@ def test_record():
         
 def test_record_without_time_stamp():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for lognflow and record')    
 
     for _ in range(10):
@@ -120,7 +120,7 @@ def test_record_without_time_stamp():
 
 def test_record_savefig():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for lognflow and record')    
 
     var = 0
@@ -138,7 +138,7 @@ def test_record_savefig():
     
 def test_get_record():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for lognflow and record')    
 
     var = 0
@@ -153,13 +153,13 @@ def test_get_record():
 def test_log_animation():
     print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(32, 100, 100)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for log_animation')    
     logger.log_animation('var1',var1)
 
 def test_save_matlab():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for saving MATLAB files using a dictionary')    
     data_to_save = dict(data1 = np.random.rand(3,3),
                         data2 = 'test',
@@ -170,7 +170,7 @@ def test_save():
     print('Testing function', inspect.currentframe().f_code.co_name)
     var1 = np.random.rand(100)
     
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for save')    
     logger.save('var1/var1.txt', var1)
     logger.save('var1/var1.npy', var1)
@@ -186,7 +186,7 @@ def test_plot():
     var2 = 3 + np.random.rand(100)
     var3 = 6 + np.random.rand(100)
     
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for plot')    
     
     logger.plot('var1', var1)
@@ -199,7 +199,7 @@ def test_hist():
     var2 = 3 + np.random.rand(1000)
     var3 = 6 + np.random.rand(1000)
     
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for hist')    
     
     logger.hist(parameter_name = 'var1', 
@@ -218,7 +218,7 @@ def test_scatter3():
 
     var3d = np.array([var1, var2, var3])
     
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for scatter3')    
     
     logger.scatter3('var3d', var3d.T)
@@ -231,7 +231,7 @@ def test_savefig():
     print('Testing function', inspect.currentframe().f_code.co_name)
     from lognflow.plt_utils import plt_imshow
     plt_imshow(np.random.rand(100, 100))
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for savefig')    
     logger.savefig('var3d')        
     
@@ -240,21 +240,21 @@ def test_hexbin():
     var1 = np.random.randn(10000)
     var2 = 3 + np.random.randn(10000)
 
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for hexbin')    
     
     logger.hexbin('hexbin', [var1, var2])    
 
 def test_imshow():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for imshow')    
     logger.imshow('var2d', np.random.rand(100, 100))    
     logger.imshow('var2d_100_of_them', np.random.rand(25, 100, 100))
 
 def test_surface():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for surface')    
     logger.surface('var3d', np.random.rand(100, 100))    
 
@@ -264,7 +264,7 @@ def test_imshow_series():
         When we have 8 set of images, each is 100x100 and there are 9 of them 
         which will appear as 3x3 tile.
     """
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for prepare_stack_of_images')
 
     stack_1 = np.random.rand(8, 9, 100, 100)
@@ -290,7 +290,7 @@ def test_imshow_series():
         _imgs[:, 50, 50] = 2
         imgs.append(_imgs)
     
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for imshow_series')    
     logger(f'imgs.shape: {imgs[0].shape}')
 
@@ -315,7 +315,7 @@ def test_imshow_series():
 
 def test_names_with_slashes_and_backslashes():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for test_names_with_slashes_and_backslashes')   
 
     _imgs = np.random.rand(10, 10)
@@ -337,21 +337,21 @@ def test_log_confusion_matrix():
     target_names = np.arange(n_classes)
     
     cm = confusion_matrix(vec1, vec2, normalize='all')
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for log_confusion_matrix')
     logger.log_confusion_matrix('cm1', cm, target_names = target_names, 
                          title = 'Test_truth_accuracy_recall_precision')
 
 def test_rename():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for test_rename')
     logger.rename(logger.log_dir.name + '_new_name')
     logger('This is another test for test_rename')
     
 def test_save_text():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for test_save_text', flush = True)
     var = 2
     logger.save('text_log\a\t/\b/\b//\\/b', 'hello\n', suffix='txt', time_tag = False)
@@ -360,7 +360,7 @@ def test_save_text():
     
 def test_imshow_complex():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for test_imshow_complex', flush = True)
     
     mat = np.random.rand(100, 100) + 10 * 1j * np.random.rand(100, 100)
@@ -370,7 +370,7 @@ def test_imshow_complex():
     
 def test_replace_time_with_index():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for reading using logger')
     
     for _ in range(5):
@@ -394,7 +394,7 @@ def test_replace_time_with_index():
 
 def test_copy_file():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for copying files')
     
     var = np.random.rand(10)
@@ -408,7 +408,7 @@ def test_copy_file():
     
 def test_copy_list_of_files():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for copy list of files')
     
     logger.save('test/var', np.random.rand(10), suffix = 'txt')
@@ -425,22 +425,22 @@ def test_copy_list_of_files():
     
 def test_imshow_subplots():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for imshow_subplots')
     images = np.random.rand(20, 100, 100)
     logger.imshow_subplots('images', images, frame_shape = (4, 5))
 
 def test_copy():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger1 = lognflow(temp_dir)
+    logger1 = getLogger(temp_dir)
     fpath = logger1('This is a test for test_copy', flush = True)
 
-    logger2 = lognflow(temp_dir)
+    logger2 = getLogger(temp_dir)
     logger2.copy('some_text.txt', fpath)
 
 def test_log_images_to_pdf():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('test log images in pdf')
     
     logger.imshow('im1', np.random.randn(30, 30))
@@ -452,7 +452,7 @@ def test_log_images_to_pdf():
     
 def test_variables_to_pdf():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('test log variables in pdf')
     
     logger.imshow('im1', np.random.randn(30, 30))
@@ -461,14 +461,14 @@ def test_variables_to_pdf():
 
 def test_log_code():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('test log variables in pdf')
     
     logger.log_code(__file__)
 
 def test_get_flist_multiple_directories():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('This is a test for test_multiple_directories_get_flist')
     
     logger.save('dir1/dir/var', np.random.rand(100))
@@ -481,7 +481,7 @@ def test_get_flist_multiple_directories():
         
 def test_get_stack_from_files():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     
     logger('This is a test for get_stack_from_files')
 
@@ -529,7 +529,7 @@ def test_get_stack_from_files():
 
 def test_text_to_object():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir, time_tag = False)
+    logger = getLogger(temp_dir, time_tag = False)
     test_list = ['asdf', 1243, "dd"]
     logger.save('test_list', test_list, suffix = 'txt')
     
@@ -555,7 +555,7 @@ def test_text_to_object():
 
 def test_load_specific_fname():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('test get single specific fname')
     
     vec = np.array([1])
@@ -570,7 +570,7 @@ def test_load_specific_fname():
 
 def test_get_stack_from_names():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('test get single specific fname')
     
     logger.imshow('im1', np.random.randn(30, 30))
@@ -582,7 +582,7 @@ def test_get_stack_from_names():
 
 def test_depricated_logviewer():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     logger('testing the depricated logviewer')
     
     logger.save('test', 1)
@@ -590,7 +590,7 @@ def test_depricated_logviewer():
 
 def test_log_json():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir, time_tag = False)
+    logger = getLogger(temp_dir, time_tag = False)
     logger('testing the save for list and dict')
 
     import pathlib
@@ -618,11 +618,6 @@ def test_log_json():
     for x, y in zip(input_list, var_readback): 
         print(f'{x} --> {y}')
     
-def test_lognflow_here():
-    print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(log_dir = './')
-    logger('test')
-
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()

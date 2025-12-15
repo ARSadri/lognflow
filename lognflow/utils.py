@@ -1,3 +1,4 @@
+import os
 from pathlib import Path as pathlib_Path
 import numpy as np
 
@@ -294,7 +295,6 @@ def deepstr(obj):
 #         # For anything else that's not serializable, use str()
 #         return str(obj)
 
-
 def prepare_for_np_savez(input_dict):
     """
     Prepare a dictionary for saving with np.savez by converting all elements
@@ -364,24 +364,13 @@ def assure_is_collection(returned_obj):
 
 def name_from_file(log_dir, fpath):
     """ 
-        Given an fpath inside the logger log_dir, 
+        Given an fpath and related to the logger log_dir, 
         what would be its equivalent parameter_name?
-    """
-    fpath_str = str(fpath.absolute())
-    try:
-        log_dir = str(log_dir.absolute())
-    except:
-        log_dir = str(log_dir)
-    log_dir_str = None
-    if log_dir in fpath_str:
-        log_dir_str = log_dir
-    if (log_dir + '/') in fpath_str:
-        log_dir_str = log_dir + '/'
-    if (log_dir + '\\') in fpath_str:
-        log_dir_str = log_dir + '\\'
-    if log_dir_str:
-        fpath_name = fpath_str.split(log_dir_str)[-1]
-        return fpath_name
+    """    
+    fpath = fpath.resolve()
+    log_dir = log_dir.resolve()
+    
+    return os.path.relpath(fpath, start=log_dir)
     
 def repr_raw(text):
     """ Raw text representation

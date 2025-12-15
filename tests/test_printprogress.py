@@ -4,7 +4,7 @@
 
 import pytest
 import inspect
-from lognflow import lognflow, select_directory, printprogress
+from lognflow import getLogger, select_directory, printprogress
 
 import numpy as np
 import time
@@ -49,7 +49,7 @@ def test_singles():
 
 def test_printprogress_with_logger():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     N = 1500000
     pprog = printprogress(N, print_function = logger, log_time_stamp = False)
     for _ in range(N):
@@ -57,7 +57,7 @@ def test_printprogress_with_logger():
         
 def test_specific_timing():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     N = 7812
     pprog = printprogress(N, title='Inference of 7812 points. ')
     for _ in range(N):
@@ -86,7 +86,7 @@ def test_varying_periods():
 
 def test_printprogress_ETA():
     print('Testing function', inspect.currentframe().f_code.co_name)
-    logger = lognflow(temp_dir)
+    logger = getLogger(temp_dir)
     N = 5000000
     pprog = printprogress(N, print_function = None)
     perv_print = 0
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #---------------------------#
-    test_printprogress_ETA(); exit()
+    test_printprogress_ETA()
     test_singles()
     test_printprogress()
     test_generator_type()

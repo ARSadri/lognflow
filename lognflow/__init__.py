@@ -2,9 +2,9 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.13.19'
+__version__ = '0.14.00'
 
-from .lognflow import lognflow, getLogger
+from .lognflow import getLogger
 from .printprogress import printprogress
 from .plt_utils import (
     plt_imshow, plt_imshow_subplots, subplots_grid, plt_plot, plt_hist2)

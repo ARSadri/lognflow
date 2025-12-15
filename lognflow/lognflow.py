@@ -80,10 +80,11 @@ class textinlog:
     last_log_flush_time : float
     log_flush_period    : int
 
-class lognflow:
+class getLogger:
     """Initialization
         
-        lognflow creates a directory called and puts all logs in there.
+        lognflow.getLogger creates a directory called log_dir and puts all 
+        logs in there.
         
         Where?
         1: if logs_root is given, it makes a log_dir in it with a time_stamp.
@@ -227,27 +228,6 @@ class lognflow:
         self.close = self.flush_all
         self.warning_log_dir = False
         
-        #all depricated and will be removed in a few revisions
-        self.log_text               = self.text
-        self.log_text_flush         = self.text_flush
-        self.log_var                = self.record
-        self.log_var_flush          = self.record_flush
-        self.log_plot               = self.plot
-        self.log_hist               = self.hist
-        self.log_scatter3           = self.scatter3
-        self.log_surface            = self.surface
-        self.log_hexbin             = self.hexbin
-        self.log_imshow             = self.imshow
-        self.log_imshow_by_subplots = self.imshow_subplots
-        self.log_imshow_series      = self.imshow_series
-        self.log_images_in_pdf      = self.images_to_pdf
-        self.log_plt                = self.savefig
-        self.log_torch_dict         = self.save_torch
-        self.get_torch_dict         = self.load_torch
-        self.log_single             = self.save
-        self.get_single             = self.load
-        self.get_var                = self.get_record
-
     def setLevel(self, level = 'info.txt'):
         self.log_name = level
         
@@ -289,7 +269,7 @@ class lognflow:
             Given an fpath inside the logger log_dir, 
             what would be its equivalent parameter_name?
         """
-        return name_from_file(self.log_dir_str, fpath)
+        return name_from_file(self.log_dir, fpath)
     
     def file_from_name(self, parameter_name):
         """ file from name
@@ -1823,6 +1803,12 @@ class lognflow:
                 supported.
         """
         self.assert_log_dir()
+        try:
+            if isinstance(var_name, pathlib_Path): 
+                var_name = self.name_from_file(var_name)
+        except: pass
+        assert isinstance(var_name, str)
+        
         var_name = var_name.replace('\t', '\\t').replace('\n', '\\n')\
             .replace('\r', '\\r').replace('\b', '\\b')
 
@@ -1885,7 +1871,7 @@ class lognflow:
         self.assert_log_dir()
         nlist = self.get_flist(var_name, suffix)
         if nlist:
-            nlist = [name_from_file(self.log_dir_str, fpath) for fpath in nlist]
+            nlist = [self.name_from_file(fpath) for fpath in nlist]
         return nlist
 
     def get_common_files(self, var_name_A, var_name_B, suffix = None,
@@ -2323,5 +2309,3 @@ class lognflow:
 
     def __bool__(self):
         return self.log_dir.is_dir()
-
-getLogger = lognflow

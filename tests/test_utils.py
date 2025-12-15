@@ -5,9 +5,8 @@ import pytest
 from pathlib import Path
 import matplotlib.pyplot as plt
 import lognflow
+from lognflow.utils import printv, is_builtin_collection
 import numpy as np
-import inspect
-from sympy.core.tests import test_truediv
 
 def test_is_builtin_collection():
 
@@ -19,12 +18,12 @@ def test_is_builtin_collection():
     test_tuple  = (1, 2, 3)
     test_array  = np.array([1, 2, 3])
     
-    assert     lognflow.utils.is_builtin_collection(test_list  ) 
-    assert not lognflow.utils.is_builtin_collection(test_string)
-    assert     lognflow.utils.is_builtin_collection(test_dict  ) 
-    assert     lognflow.utils.is_builtin_collection(test_set   )  
-    assert     lognflow.utils.is_builtin_collection(test_tuple )
-    assert not lognflow.utils.is_builtin_collection(test_array )
+    assert     is_builtin_collection(test_list  ) 
+    assert not is_builtin_collection(test_string)
+    assert     is_builtin_collection(test_dict  ) 
+    assert     is_builtin_collection(test_set   )  
+    assert     is_builtin_collection(test_tuple )
+    assert not is_builtin_collection(test_array )
 
 def test_ssh_system():
     try:
@@ -36,37 +35,38 @@ def test_ssh_system():
         ssh.monitor_and_move(remote_dir, local_dir, target_fname)
         ssh.close_connection()
     except:
-        print('SSH test not passed maybe because you did not set the credentials.')
+        print('SSH test not passed maybe because '
+              'you did not set the SSH credentials.')
     
 def test_printv():
     
     test_True1 = True
     test_True2 = True
     
-    lognflow.printv(test_True2)
+    printv(test_True2)
 
     test0 = np.random.rand(10).max()
-    lognflow.utils.printv(test0)
+    printv(test0)
     test1 = 123
-    lognflow.utils.printv(test1)
+    printv(test1)
     test2 = 123.2
-    lognflow.utils.printv(test2)
+    printv(test2)
     test3 = np.random.rand(10000)
-    lognflow.utils.printv(test3)
+    printv(test3)
     test4 = [test3, 'asdf', 21]
-    lognflow.utils.printv(test4)
+    printv(test4)
     test5 = {'A':test3, 'B': test4}
-    lognflow.utils.printv(test5)
+    printv(test5)
     test55 = {'A':test5, 'C': test4}
-    lognflow.utils.printv(test55)
+    printv(test55)
     test6 = [test3, 'asdf', 21]*200
-    lognflow.utils.printv(test6)
+    printv(test6)
     test7 = 'asdf'*200000
-    lognflow.utils.printv(test7)
+    printv(test7)
     test8 = ['34', '123']
-    lognflow.utils.printv(test8)
+    printv(test8)
     test9 = np.random.rand(3, 3)
-    lognflow.utils.printv(test9)
+    printv(test9)
 
 def test_save_or_load_kernel_state():
     vec = np.random.rand(100)
