@@ -1,9 +1,21 @@
 from lognflow import multiprocessor, printprogress
 from lognflow.multiprocessor import multiprocessor_gen, loopprocessor
+from lognflow.utils import print_box
 import numpy as np
 import inspect
 import time
 
+def func_to_run(iterables_sliced, shareables):
+    return iterables_sliced * shareables
+
+def test_simplest():
+    print('Testing function', inspect.currentframe().f_code.co_name)
+    result = multiprocessor(func_to_run, 
+                            iterables = 100,
+                            shareables = 112322,
+                            verbose = True)
+    print(result)
+    
 def randgen(_):
     print(_)
     n_data =  int(10000*np.random.rand())
@@ -102,7 +114,6 @@ def test_multiprocessor_ccorr():
     print(f'ccorr.shape: {ccorr.shape}')
 
 def error_multiprocessor_targetFunc(iterables_sliced, shareables):
-    print('Testing function', inspect.currentframe().f_code.co_name)
     idx = iterables_sliced
     data, mask, op_type = shareables
     _data = data[idx]
@@ -120,8 +131,8 @@ def test_error_handling_in_multiprocessor():
     print('Testing function', inspect.currentframe().f_code.co_name)
     print('-'*80, '\n', inspect.stack()[0][3], '\n', '-'*80)
     
-    N = 10000
-    D = 1000
+    N = 4000
+    D = 100
     data = (10+100*np.random.randn(N,D)).astype('int')
     mask = (2*np.random.rand(N,D)).astype('int')
     op_type = 'median'
@@ -129,9 +140,7 @@ def test_error_handling_in_multiprocessor():
     iterables = N
     shareables  = (data, mask, op_type)
     
-    print('             ------------------------------')
-    print('             NOTE: IT SHOULD RAISE AN ERROR')
-    print('             ------------------------------')
+    print_box('NOTE: IT SHOULD RAISE AN ERROR', style = 'red')
     
     try:
         stats = multiprocessor(
@@ -264,11 +273,12 @@ def test_custom_parfor():
  
 if __name__ == '__main__':
     print('lets test', flush=True)
+    test_simplest()
+    test_error_handling_in_multiprocessor()
     test_simple_randgen()
     test_loopprocessor()
     test_multiprocessor_gen()
     test_multiprocessor()
     test_noslice_multiprocessor()
     test_multiprocessor_ccorr()
-    test_error_handling_in_multiprocessor()
 

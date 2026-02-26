@@ -479,3 +479,8 @@ History
 * getting a name from pathlib location is fixed
 * lognflow is removed from imports and the name is now getLogger forever
 * deprecated log_.... are all removed hence the revision.
+
+0.14.01 (2026-01-07)
+-------------------
+* fixing the plt_imshow when show_values = True and cmap is given
+* added download to ssh utils

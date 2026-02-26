@@ -154,7 +154,8 @@ class getLogger:
                  time_tag         : Union[bool, str] = True,
                  print_text       : bool             = True,
                  main_log_name    : str              = 'log',
-                 log_flush_period : int              = 10):
+                 log_flush_period : int              = 10,
+                 enabled          : bool             = True):
         atexit.register(self.flush_all)
         self._init_time = time.time()
         self.log_dir_prefix = log_dir_prefix
@@ -222,7 +223,7 @@ class getLogger:
         self.log_flush_period = log_flush_period
     
         self.log_dir_str = str(self.log_dir.absolute())
-        self.enabled = True
+        self.enabled = enabled
         self.counted_vars = {}
         self.param_name_set = set()
         self.close = self.flush_all
@@ -671,9 +672,9 @@ class getLogger:
 
         if ( (not (log_dirnamesuffix in self._loggers_dict)) or new_file):
             self._text_handler(log_dirnamesuffix, 
-                                   log_size_limit = log_size_limit,
-                                   time_tag = time_tag,
-                                   suffix = suffix)
+                               log_size_limit = log_size_limit,
+                               time_tag = time_tag,
+                               suffix = suffix)
 
         if((print_text is None) | (print_text is True)):
             print_text = self._print_text
@@ -909,7 +910,8 @@ class getLogger:
                    parameter_value,
                    suffix = None,
                    mat_field = None,
-                   time_tag: bool = None):
+                   time_tag: bool = None,
+                   verify = False):
         """log a single variable
             The most frequently used function would probably be this one.
             
@@ -985,8 +987,11 @@ class getLogger:
                 with open(fpath,'a') as fdata: 
                     fdata.write(str(parameter_value))
         except Exception as e:
+            print(f"lognflow: An error occurred while saving {parameter_name}")
+            if verify: raise e
             fpath = None
-            print(f"An error occurred: {e}")
+            print(e)
+            
         return fpath
     
     def savefig(self, 
@@ -1964,7 +1969,8 @@ class getLogger:
                 supported.
         """
         self.assert_log_dir()
-        assert file_index == int(file_index), \
+        if file_index is not None:
+            assert file_index == int(file_index), \
                     f'file_index {file_index} must be an integer'
         flist = self.get_flist(var_name, suffix)
         if flist:

@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 import matplotlib.pyplot as plt
 import lognflow
-from lognflow.utils import printv, is_builtin_collection
+from lognflow.utils import printv, is_builtin_collection, print_table
 import numpy as np
 
 def test_is_builtin_collection():
@@ -28,11 +28,39 @@ def test_is_builtin_collection():
 def test_ssh_system():
     try:
         ssh = ssh_system(
-            hostname = 'hostname', username = 'username', password = 'password')
+            hostname = 'hostname', 
+            username = 'username', 
+            password = 'password')
         remote_dir = Path('/remote/folder/path')
         local_dir = Path('/local/folder/path')
         target_fname = 'intresting_file.log'
         ssh.monitor_and_move(remote_dir, local_dir, target_fname)
+        ssh.close_connection()
+    except:
+        print('SSH test not passed maybe because '
+              'you did not set the SSH credentials.')
+
+def test_ssh_upload_download():
+    try:        
+        from pathlib import Path
+        from lognflow.utils import SSHSystem
+        
+        ssh = SSHSystem(
+            hostname="hostname",
+            username="username",
+            password="password"
+        )
+        
+        ssh.upload(
+            local_root=Path(r"local_root"),
+            remote_root=Path(r"remote_root")
+        )
+        
+        ssh.download(
+            local_root=Path(r"local_root"),
+            remote_root=Path(r"remote_root")
+        )
+        
         ssh.close_connection()
     except:
         print('SSH test not passed maybe because '
@@ -67,6 +95,52 @@ def test_printv():
     printv(test8)
     test9 = np.random.rand(3, 3)
     printv(test9)
+
+def test_print_table():
+    print("\n=== basic table ===")
+    print_table(
+        header=["A", "B"],
+        rows=[
+            [1, 2],
+            [3, 4],
+        ],
+        title="No row labels",
+    )
+
+    print("\n=== table with row labels ===")
+    print_table(
+        header=["A", "B"],
+        rows=[
+            [1, 2],
+            [3, 4],
+        ],
+        row_labels=["r1", "r2"],
+        title="With row labels",
+    )
+
+    print("\n=== numeric row labels ===")
+    print_table(
+        header=["X", "Y"],
+        rows=[
+            [10, 20],
+            [30, 40],
+            [50, 60],
+        ],
+        row_labels=[0, 1, 2],
+        title="Numeric row labels",
+    )
+
+    print("\n=== auto-generated row labels ===")
+    print_table(
+        header=["foo", "bar"],
+        rows=[
+            ["a", "b"],
+            ["c", "d"],
+        ],
+        row_labels="auto",
+        title="Auto index",
+    )
+
 
 def test_save_or_load_kernel_state():
     vec = np.random.rand(100)
@@ -120,9 +194,23 @@ def test_richprint():
     richprint("Message inside a box", box=True, style="bold cyan")
     richprint(table=dict(header=["a", "b"], rows=np.random.rand(10, 2)))
 
+def test_print_table_simple():
+    print_table(np.arange(0, 10), 
+                (100 * np.random.rand(11, 10)).astype('int'))
+
+    print_table(header = np.arange(0, 10), 
+                rows = (100 * np.random.rand(11, 10)).astype('int'), 
+                row_labels = 'auto')
+
 if __name__ == '__main__':
+    test_print_table_simple(); exit()
+    test_print_table()
     test_printv()
     test_richprint()
     test_is_builtin_collection()
     test_block_runner()
     test_ssh_system()
+    test_ssh_upload_download()
+    
+    
+    

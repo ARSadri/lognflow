@@ -14,6 +14,53 @@ from lognflow.plt_utils import (
 from lognflow.utils import print_box, printv
 import numpy as np
 
+import numpy as np
+
+def gaussian_2d(
+    shape,
+    shiftx=0.0,
+    shifty=0.0,
+    scalex=None,
+    scaley=None,
+    theta=0.0,
+    amplitude=1.0,
+    normalize=True,
+):
+    if not lognflow.utils.has_len(shape):
+        shape = (shape, shape)
+    H, W = shape
+
+    if scalex is None: scalex = H / 6
+    if scaley is None: scaley = W / 6
+
+    # coordinate grid (pixel-centered)
+    y, x = np.mgrid[0:H, 0:W]
+    x = x - (W - 1) / 2 - shiftx
+    y = y - (H - 1) / 2 - shifty
+
+    # rotation
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    x_rot =  cos_t * x + sin_t * y
+    y_rot = -sin_t * x + cos_t * y
+
+    # Gaussian
+    img = amplitude * np.exp(
+        -0.5 * (
+            (x_rot / scalex) ** 2 +
+            (y_rot / scaley) ** 2
+        )
+    )
+
+    if normalize:
+        s = img.sum()
+        if s > 0:
+            img /= s
+
+    return img
+
+
 def test_plt_imshow_subplots_complex():
     data = [np.random.rand(100, 100) + 1j * np.random.rand(100, 100),
             np.random.rand(100, 100), np.random.rand(100, 100),
@@ -150,6 +197,9 @@ def test_plt_imshow():
     print_box('Testing function', inspect.currentframe().f_code.co_name)
     data = np.random.rand(100, 100) + 1j * np.random.rand(100, 100)
     plt_imshow(data, cmap = 'complex', title = 'test plt_imshow')
+    
+    plt_imshow(gaussian_2d(100), cmap = 'gray', show_values = True)
+    
     plt.show()
     
 def test_complex2hsv_colorbar():
@@ -367,9 +417,9 @@ def test_plt_bar():
     plt.show()
 
 if __name__ == '__main__':
+    test_plt_imshow(); exit()
     test_plt_contours()
     test_plt_imshow_complex()
-    test_plt_imshow()
     test_plt_imshow_subplots_complex()
     test_plt_hist2()
     test_plt_plot()

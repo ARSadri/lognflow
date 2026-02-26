@@ -526,7 +526,7 @@ def plt_confusion_matrix(cm,
     return fig, ax
 
 def complex2hsv_colorbar(
-        fig_and_ax=None, vmin=0, vmax=1, 
+        fig_ax=None, vmin=0, vmax=1, 
         min_angle=0, max_angle=0, 
         fontsize=8, angle_threshold=np.pi / 18):
     
@@ -544,13 +544,13 @@ def complex2hsv_colorbar(
     conv_rgba[conv_rgba < 0] = 0
     conv_rgba[conv_rgba > 1] = 1
     conv_rgba = conv_rgba[::-1, :]
-    if fig_and_ax is None:
+    if fig_ax is None:
         fig, ax = plt.subplots()
     else:
         try:
-            fig, ax = fig_and_ax
+            fig, ax = fig_ax
         except Exception as e:
-            print('fig_and_ax should be a two-tuple of (fig, ax). Use:')
+            print('fig_ax should be a two-tuple of (fig, ax). Use:')
             print('>>> fig, ax = plt.subplots()')
             raise e
 
@@ -586,14 +586,16 @@ def complex2hsv_colorbar(
 
 def plt_violinplot(
         dataset:list, positions, facecolor = None, edgecolor = None, 
-        alpha = 0.5, label = None, fig_and_ax : tuple = None, figsize = (6, 6),
-        title = None, plt_violinplot_kwargs = {}):
+        alpha = 0.5, fig_ax : tuple = None, figsize = (6, 6),
+        title = None, **kwargs):
     
-    if(fig_and_ax is None):
+    if(fig_ax is None):
         fig, ax = plt.subplots(figsize = figsize)
     else:
-        fig, ax = fig_and_ax
-    violin_parts = ax.violinplot(dataset, positions, **plt_violinplot_kwargs)
+        fig, ax = fig_ax
+    if not 'widths' in kwargs:
+        kwargs['widths'] = np.diff(positions).min() / 2
+    violin_parts = ax.violinplot(dataset, positions, **kwargs)
     for partname in ('cbars','cmins','cmaxes','cmeans','cmedians','bodies'):
         vp = violin_parts.get(partname, [])
         if partname == 'bodies':
@@ -1059,7 +1061,9 @@ def plt_imshow(img,
 
     if(not np.iscomplexobj(img)):
         if cmap is None:
-            cmap = plt.get_cmap('viridis')
+            cmap = 'viridis'
+        if isinstance(cmap, str):
+            cmap = plt.get_cmap(cmap)
 
         if fig_ax is None:
             fig, ax = plt.subplots(figsize = figsize)
@@ -2758,7 +2762,7 @@ def pv_surface(data_2d, plotter=None, show_edges=True, cmap=None, zscale = None)
     
     return plotter
 
-def interpolate_mse_surface(grid_locations, mse, resolution=None, method='cubic'):
+def interpolate_mse_surface(grid_locations, mse, resolution=None, method='cubic', return_grid = False):
     from scipy.interpolate import griddata
 
     x = grid_locations[:, 0]
@@ -2780,8 +2784,11 @@ def interpolate_mse_surface(grid_locations, mse, resolution=None, method='cubic'
     )
 
     grid_z = griddata(grid_locations, mse, (grid_x, grid_y), method=method)
-    extent = (x_min, x_max, y_min, y_max)
-    return grid_z, extent
+    extent = (x_min, x_max, y_max, y_min)
+    if return_grid:
+        return grid_z, extent, grid_x, grid_y
+    else:
+        return grid_z, extent
 
 if __name__ == '__main__':
     plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100), portrait = True)

@@ -1,6 +1,8 @@
 import os
 from pathlib import Path as pathlib_Path
+import posixpath
 import numpy as np
+from .printprogress import printprogress
 
 def dummy_function(*args, **kwargs): ...
 
@@ -81,12 +83,10 @@ class _Richprint:
         Table = self.Table
         Panel = self.Panel
 
-        # --- Combine all positional args ---
         text = ''
         if args:
             text = sep.join(str(a) for a in args)
 
-        # --- LINE ---
         if line:
             if text:
                 console.rule(text, style=style)
@@ -95,26 +95,34 @@ class _Richprint:
             console.print(end=end)
             return
 
-        # --- BOX ---
         if box:
             panel = Panel.fit(text, border_style=style, title=title)
             console.print(panel, end=end)
             return
 
-        # --- TABLE ---
         if table is not None:
             header = table.get("header", [])
             rows = table.get("rows", [])
-
+            row_labels = table.get("row_labels", None)
+        
             t = Table(title=title, style=style)
+        
+            if row_labels is not None:
+                t.add_column("", style="dim", justify="right")
+        
             for h in header:
                 t.add_column(str(h))
-            for row in rows:
-                t.add_row(*map(str, row))
+        
+            for i, row in enumerate(rows):
+                if row_labels is not None:
+                    label = row_labels[i] if i < len(row_labels) else ""
+                    t.add_row(str(label), *map(str, row))
+                else:
+                    t.add_row(*map(str, row))
+        
             console.print(t, end=end)
             return
 
-        # --- DEFAULT TEXT ---
         if text is not None:
             console.print(f"[{style}]{text}[/{style}]", end=end)
             return
@@ -245,6 +253,7 @@ def print_box(
 def print_table(
     header:list,
     rows:list,
+    row_labels:list = None,
     style="cyan",
     title=None,
     end="\n",
@@ -254,7 +263,9 @@ def print_table(
     Usage:
         print_table(["A","B"], [[1,2],[3,4]])
     """
-    tbl = dict(header=header, rows=rows)
+    if row_labels == 'auto':
+        row_labels = np.arange(1, 1 + len(rows), dtype='int')
+    tbl = dict(header=header, rows=rows, row_labels = row_labels)
 
     _Richprint().richprint(
         table=tbl,
@@ -485,48 +496,241 @@ def text_to_collection(text):
     output = parse_node(tree.body)
     return output
 
+def format_bytes(nbytes: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if nbytes < 1024:
+            return f"{nbytes:.2f} {unit}"
+        nbytes /= 1024
+    return f"{nbytes:.2f} PB"
+
 class SSHSystem:
-    """
-    A class to handle basic SSH and SFTP operations on a remote system.
-
-    Attributes:
-        ssh_client (paramiko.SSHClient): The SSH client for executing 
-        commands on the remote system.
-        sftp_client (paramiko.SFTPClient): The SFTP client for file 
-        transfer operations.
-    """
-
     def __init__(self, hostname: str, username: str, password: str):
-        """
-        Initialize the SSHSystem by setting up the SSH and SFTP clients.
-
-        Args:
-            hostname (str): The hostname or IP address of the remote system.
-            username (str): The username for SSH authentication.
-            password (str): The password for SSH authentication.
-        """
         import paramiko
-        self.ssh_client = paramiko.SSHClient()
-        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh_client = None
+        self.sftp_client = None
+        self.connected = False
         try:
+            self.ssh_client = paramiko.SSHClient()
+            self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh_client.connect(
-                hostname=hostname, username=username, password=password)
+                hostname=hostname,
+                username=username,
+                password=password,
+            )
             self.sftp_client = self.ssh_client.open_sftp()
-        except Exception as e:
-            print(f"Failed to connect to {hostname}: {e}")
-            self.ssh_client = None
-            self.sftp_client = None
+            self.connected = True
+            print(f'Connected to {hostname}')
+            
+        except Exception:
+            if self.sftp_client is not None:
+                try:
+                    self.sftp_client.close()
+                except Exception:
+                    print('The opened SFTP connection could not be closed.')
+            if self.ssh_client is not None:
+                try:
+                    self.ssh_client.close()
+                except Exception:
+                    print('The opened SSH connection could not be closed.')
+            self.connected = False
+            raise
+
+    def _remote_exists(self, remote_path: str, local_size: int = None) -> bool:
+        try:
+            rstat = self.sftp_client.stat(remote_path)
+
+            return True if local_size is None else rstat.st_size == local_size
+        
+        except FileNotFoundError:
+            return False
+
+    def _ensure_remote_dir(self, remote_root: str, remote_dir: str):
+        """
+        Create directories under remote_root only.
+        Assumes remote_root already exists.
+        """
+        remote_root = remote_root.rstrip("/")
+        remote_dir = remote_dir.rstrip("/")
+    
+        if remote_dir == remote_root:
+            return  # nothing to create
+    
+        # path relative to remote_root
+        rel = remote_dir[len(remote_root) + 1:]  # safe because remote_dir starts with remote_root
+        parts = rel.split("/")
+    
+        path = remote_root
+        for part in parts:
+            path = posixpath.join(path, part)
+            try:
+                self.sftp_client.stat(path)
+            except FileNotFoundError:
+                self.sftp_client.mkdir(path)
+
+    def _remote_walk(self, remote_dir):
+        """
+        Generator similar to os.walk for remote directories.
+        Yields (remote_root, dirnames, filenames)
+        """
+        dirnames = []
+        filenames = []
+    
+        for attr in self.sftp_client.listdir_attr(remote_dir):
+            if attr.st_mode & 0o40000:  # directory
+                dirnames.append(attr.filename)
+            else:
+                filenames.append(attr.filename)
+    
+        yield remote_dir, dirnames, filenames
+    
+        for d in dirnames:
+            new_dir = posixpath.join(remote_dir, d)
+            yield from self._remote_walk(new_dir)
+
+    def upload(
+        self,
+        local_root: pathlib_Path,
+        remote_root: pathlib_Path,
+        overwrite = False,
+        *,
+        verbose: bool = True):
+        """
+            Recursively upload a local directory tree to the remote system,
+            skipping files that already exist remotely.
+    
+            Safe to re-run multiple times.
+        """
+        assert self.connected, 'not connected'
+        remote_root = pathlib_Path(remote_root)
+        local_root = pathlib_Path(local_root).resolve()
+        total_fcount = 0
+        for root, _, files in os.walk(local_root):
+            for fname in files:
+                total_fcount += 1
+            
+        total_size, fcnt = 0, 0
+        local_root = pathlib_Path(local_root).resolve()
+        remote_root_posix = remote_root.as_posix()
+        list_to_copy = []
+        if verbose:
+            pbar = printprogress(
+                total_fcount, title = f'Number of files to check: {total_fcount}')
+        for root, _, files in os.walk(local_root):
+            root = pathlib_Path(root)
+            rel = root.relative_to(local_root)
+
+            remote_dir = (
+                remote_root_posix
+                if rel == pathlib_Path(".")
+                else posixpath.join(remote_root_posix, rel.as_posix())
+            )
+
+            self._ensure_remote_dir(remote_root_posix, remote_dir)
+
+            for fname in files:
+                local_file = root / fname
+                remote_file = posixpath.join(remote_dir, fname)
+
+                size_bytes = local_file.stat().st_size
+                if verbose:
+                    pbar()
+                if not overwrite:
+                    if self._remote_exists(remote_file, size_bytes):
+                        continue
+
+                size_str = format_bytes(size_bytes)
+
+                list_to_copy.append([str(local_file), remote_file, size_bytes, size_str])
+                total_size += size_bytes
+                fcnt += 1
+    
+        if verbose:
+            print(f'Total number of files to copy: {fcnt}')
+            print(f'Total size of files to copy: {format_bytes(total_size)}')
+            pbar = printprogress(total_size, print_function = None)
+        for str_local_file, remote_file, size_bytes, size_str in list_to_copy:
+            self.sftp_client.put(str_local_file, remote_file)
+            if verbose:
+                ETA = int(pbar(size_bytes))
+                print(f"ETA: {ETA}, copying [{size_str}]")
+                print(f"{str_local_file}")
+                print("to")
+                print(f"{remote_file}")
+
+    def download(
+        self,
+        remote_root: pathlib_Path,
+        local_root: pathlib_Path,
+        overwrite=False,
+        *,
+        verbose: bool = True):
+        """
+        Recursively download a remote directory tree to the local system,
+        skipping files that already exist locally.
+    
+        Safe to re-run multiple times.
+        """
+        assert self.connected, "not connected"
+    
+        remote_root = pathlib_Path(remote_root).as_posix().rstrip("/")
+        local_root = pathlib_Path(local_root).resolve()
+    
+        # first pass: count files
+        total_fcount = 0
+        for _, _, files in self._remote_walk(remote_root):
+            total_fcount += len(files)
+    
+        total_size, fcnt = 0, 0
+        list_to_copy = []
+    
+        if verbose:
+            pbar = printprogress(
+                total_fcount, title=f"Number of files to check: {total_fcount}"
+            )
+    
+        for rroot, _, files in self._remote_walk(remote_root):
+            rel = pathlib_Path(rroot).relative_to(remote_root)
+            local_dir = (
+                local_root if rel == pathlib_Path(".") else local_root / rel
+            )
+            local_dir.mkdir(parents=True, exist_ok=True)
+    
+            for fname in files:
+                remote_file = posixpath.join(rroot, fname)
+                local_file = local_dir / fname
+    
+                rstat = self.sftp_client.stat(remote_file)
+                size_bytes = rstat.st_size
+    
+                if verbose:
+                    pbar()
+    
+                if not overwrite and local_file.exists():
+                    if local_file.stat().st_size == size_bytes:
+                        continue
+    
+                size_str = format_bytes(size_bytes)
+                list_to_copy.append(
+                    [remote_file, str(local_file), size_bytes, size_str]
+                )
+                total_size += size_bytes
+                fcnt += 1
+    
+        if verbose:
+            print(f"Total number of files to copy: {fcnt}")
+            print(f"Total size of files to copy: {format_bytes(total_size)}")
+            pbar = printprogress(total_size, print_function=None)
+    
+        for remote_file, str_local_file, size_bytes, size_str in list_to_copy:
+            self.sftp_client.get(remote_file, str_local_file)
+            if verbose:
+                ETA = int(pbar(size_bytes))
+                print(f"ETA: {ETA}, copying [{size_str}]")
+                print(f"{remote_file}")
+                print("to")
+                print(f"{str_local_file}")
 
     def ssh_ls(self, path: pathlib_Path):
-        """
-        List the contents of a directory on the remote system.
-
-        Args:
-            path (pathlib_Path): The path to the directory on the remote system.
-
-        Returns:
-            list: A list of pathlib_Path objects representing the files in the directory.
-        """
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
             ls_result = stdout.readlines()
@@ -536,28 +740,12 @@ class SSHSystem:
             return []
 
     def ssh_scp(self, source: pathlib_Path, destination: pathlib_Path):
-        """
-        Copy a file from the remote system to the local system using SFTP.
-
-        Args:
-            source (pathlib_Path): The path of the file on the remote system.
-            destination (pathlib_Path): The path where the file will be saved locally.
-        """
         try:
             self.sftp_client.get(str(source), str(destination))
         except Exception as e:
             print(f"Error copying {source} to {destination}: {e}")
 
     def ssh_rm(self, path: pathlib_Path):
-        """
-        Remove a file from the remote system.
-
-        Args:
-            path (pathlib_Path): The path to the file to be removed.
-
-        Returns:
-            tuple: A tuple containing the stdout and stderr outputs from the command.
-        """
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(f'rm {path}')
             return stdout.read().decode(), stderr.read().decode()
@@ -565,24 +753,13 @@ class SSHSystem:
             print(f"Error removing file {path}: {e}")
             return "", str(e)
 
-    def monitor_and_move(
+    def monitor_and_download(
         self, remote_folder: pathlib_Path, target_fname: str,
         local_folder: pathlib_Path, interval=30
     ):
-        """
-        Monitor a remote folder for a specific file. Once the file appears,
-        transfer and delete other files from the folder.
-
-        Args:
-            remote_folder (pathlib_Path): The folder on the remote system to monitor.
-            local_folder (pathlib_Path): The local folder where files will be copied.
-            target_fname (str): The name of the file to wait for.
-            interval (int, optional): The time interval (in seconds) 
-            between each check. Default is 30 seconds.
-        """
+        import time
         interesting_file_path = remote_folder / target_fname
         cnt = 0
-        import time
         while not self.is_file(interesting_file_path):
             if (cnt % 100) == 0:
                 print(f'Waiting for {interesting_file_path}', end='')
@@ -596,37 +773,22 @@ class SSHSystem:
         files = self.ssh_ls(remote_folder)
         for file in files:
             local_file = local_folder / file.name
-            
-            # Copy file to local folder
             print(f"Copying {file} to {local_file}")
             self.ssh_scp(file, local_file)
-            
-            # Delete file from remote server
             print(f"Deleting {file} from remote server")
             self.ssh_rm(file)
 
     def is_file(self, path: pathlib_Path) -> bool:
-        """
-        Check if a file exists on the remote system.
-
-        Args:
-            path (pathlib_Path): The path to the file on the remote system.
-
-        Returns:
-            bool: True if the file exists, False otherwise.
-        """
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(
-                f'test -f {path} && echo "exists"')
+                f'test -f {path} && echo "exists"'
+            )
             return "exists" in stdout.read().decode()
         except Exception as e:
             print(f"Error checking file {path}: {e}")
             return False
 
     def close_connection(self):
-        """
-        Close the SSH and SFTP connections to the remote system.
-        """
         if self.sftp_client:
             self.sftp_client.close()
         if self.ssh_client:

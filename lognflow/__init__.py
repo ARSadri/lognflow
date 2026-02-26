@@ -2,7 +2,7 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.14.00'
+__version__ = '0.14.01'
 
 from .lognflow import getLogger
 from .printprogress import printprogress
@@ -11,6 +11,8 @@ from .plt_utils import (
 from .utils import (select_directory, select_file, block_runner, printv,
                     print_line, print_box, print_table, has_len)
 from .multiprocessor import multiprocessor
+
+lognflow = getLogger
 
 def basicConfig(*args, **kwargs):
     ...

@@ -265,9 +265,9 @@ def multiprocessor(
             multiprocessing of your task.
             default: False
     """
-    if shareables is not None:
-        if not isinstance(shareables, tuple):
-            shareables = (shareables, )
+    # if shareables is not None:
+    #     if not isinstance(shareables, tuple):
+    #         shareables = (shareables, )
     
     try:
         n_pts = int(iterables)
@@ -293,16 +293,19 @@ def multiprocessor(
                         ' integer.'
                         ) from e
     indices = np_arange(n_pts, dtype='int')
-    if(verbose):
+    if verbose:
         logger(f'inputs to iterate over are {n_pts}.')
 
-    if(max_cpu is None):
+    if test_mode:
+        logger('TEST mode, uses only 1 CPU')
+
+    if max_cpu is None:
         max_cpu = cpu_count()
     default_batchSize = int(np_ceil(n_pts/max_cpu/2))
-    if(batchSize is not None):
+    if batchSize is not None:
         if(default_batchSize >= batchSize):
             default_batchSize = batchSize
-    if(verbose):
+    if verbose:
         logger('lognflow multiprocessor initialized with:') 
         logger('max_cpu: ', max_cpu)
         logger('n_pts: ', n_pts)
@@ -311,7 +314,7 @@ def multiprocessor(
 
     aQ = Queue()
 
-    if(outputs is None):
+    if outputs is None:
         outputs_is_given = False
         outputs = []
     else:
@@ -321,19 +324,20 @@ def multiprocessor(
     procID = 0
     numProcessed = 0
     numBusyCores = 0
-    if(verbose):
-        pBar = printprogress(n_pts, title = 
-            f'Processing {n_pts} data points with {max_cpu} CPUs')
+    if verbose:
+        title = f'Processing {n_pts} data points with {max_cpu} CPUs'
+        if test_mode: title = f'Processing {n_pts} data points with 1 CPU in Test mode'
+        pBar = printprogress(n_pts, title = title)
     any_error = False
     
     error_event = Event()
     
-    while(numProcessed<n_pts):
-        if (not aQ.empty()):
+    while numProcessed<n_pts:
+        if not aQ.empty():
             aQElement = aQ.get()
             ret_procID_range = aQElement[0]
             ret_result = aQElement[1]
-            if ((not any_error) & aQElement[2]):
+            if (not any_error) & aQElement[2]:
                 any_error = True
                 error_ret_procID = ret_procID_range.copy()
                 try:
@@ -342,7 +346,7 @@ def multiprocessor(
                     pass
                 logger('lognflow, multiprocessor:')
                 logger('An exception has been raised. Joining all processes...')
-            if (not any_error):
+            if not any_error:
                 if(outputs_is_given):
                     outputs[ret_procID_range] = ret_result
                     for ret_procID_range_element in ret_procID_range:
@@ -357,13 +361,13 @@ def multiprocessor(
             _batchSize = ret_procID_range.shape[0]
             numProcessed += _batchSize
             numBusyCores -= 1
-            if(verbose & (not any_error)):
+            if verbose & (not any_error):
                 pBar(_batchSize)
-            if(any_error & (numBusyCores == 0)):
+            if any_error & (numBusyCores == 0):
                 logger(f'All cores are free')
                 break
             
-        if((procID<n_pts) & (numBusyCores < max_cpu) & (not any_error)):
+        if (procID<n_pts) & (numBusyCores < max_cpu) & (not any_error):
             batchSize = np_minimum(default_batchSize, n_pts - procID)
             procID_range = np_arange(procID, procID + batchSize, dtype = 'int')
 
@@ -374,14 +378,14 @@ def multiprocessor(
             _args = (iterables_batch, ) + (
                 targetFunction, shareables, aQ, procID_range, error_event)
             
-            if(test_mode):
+            if test_mode:
                 _multiprocessor_function_test_mode(*_args)
             else:
                 Process(target = _multiprocessor_function, args = _args).start()
             procID += len(procID_range)
             numBusyCores += 1
     
-    if(any_error):        
+    if any_error:
         _reraise_any_error(
             any_error, targetFunction, error_ret_procID, iterables, 
             shareables, aQ, error_event, logger)
@@ -436,7 +440,7 @@ def multiprocessor_gen(
                         ' integer.'
                         ) from e
     indices = np_arange(n_pts, dtype='int')
-    if(verbose):
+    if verbose:
         logger(f'inputs to iterate over are {n_pts}.')
 
     if(max_cpu is None):
@@ -445,7 +449,7 @@ def multiprocessor_gen(
     if(batchSize is not None):
         if(default_batchSize >= batchSize):
             default_batchSize = batchSize
-    if(verbose):
+    if verbose:
         logger('lognflow multiprocessor initialized with:') 
         logger('max_cpu: ', max_cpu)
         logger('n_pts: ', n_pts)
@@ -464,7 +468,7 @@ def multiprocessor_gen(
     procID = 0
     numProcessed = 0
     numBusyCores = 0
-    if(verbose):
+    if verbose:
         pBar = printprogress(n_pts, title = 
             f'Processing {n_pts} data points with {max_cpu} CPUs')
     any_error = False
