@@ -851,7 +851,11 @@ def printv(var, logger = print, var_name = None, tab = 0,
             if len(var_name) > 20: var_name = type(var)
     
     if shared_name:
-        toprint = f'printv: shared {[vname for vname in var_names if not("__" in vname)]}: {type(var).__name__}'
+        list_of_shared = [vname for vname in var_names if not("__" in vname)]
+        if len(list_of_shared) <= 3:
+            toprint = f'printv: shared by {list_of_shared}: {type(var).__name__}'
+        else:
+            toprint = f'printv: shared by {len(list_of_shared)} vars: {type(var).__name__}'
     else:
         toprint = f'{var_name}: {type(var).__name__}'
     
@@ -1343,3 +1347,10 @@ def is_notebook():
         return shell == 'ZMQInteractiveShell'   # Jupyter notebook or JupyterLab
     except:
         return False
+    
+def dict_deep_update(base, new):
+    for k, v in new.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            dict_deep_update(base[k], v)
+        else:
+            base[k] = v

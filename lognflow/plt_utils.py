@@ -1,27 +1,25 @@
 import copy
 import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from   matplotlib.colors import hsv_to_rgb
-from   matplotlib.widgets import RangeSlider, TextBox, Button
+from   matplotlib.widgets import RangeSlider, TextBox, Button, Slider, CheckButtons
 from   mpl_toolkits.mplot3d import Axes3D
 from   mpl_toolkits.axes_grid1 import make_axes_locatable
 from   itertools import cycle as itertools_cycle
 from   itertools import product as itertools_product
-from lognflow.utils import has_len
+from   lognflow.utils import has_len
 
 matplotlib_lines_Line2D_markers_keys_cycle = itertools_cycle([
     's', '*', 'd', 'X', 'v', '.', 'x', '|', 'D', '<', '^', '8', 'p',  
     '_','P','o','h', 'H', '>', '1', '2','3', '4',  '+', 'x', ])
 
 matplotlib_colors_list = [
-    'green', 'blue', 'cyan', 'red', 'magenta', 'yellow', 
-    'orange', 'purple', 'brown', 'pink', 'lime', 
-    'indigo', 'violet', 'turquoise', 'teal', 'gold', 
-    'silver', 'lavender', 'maroon', 'coral', 'navy', 
-    'beige', 'chocolate', 'olive', 'skyblue', 'rose', 
-    'crimson', 'plum', 'orchid', 'chartreuse', 'tan',
-]
+    'green', 'blue', 'cyan', 'red', 'magenta', 'yellow', 'orange', 'purple', 
+    'brown', 'pink', 'lime', 'indigo', 'violet', 'turquoise', 'teal', 'gold', 
+    'silver', 'lavender', 'maroon', 'coral', 'navy', 'beige', 'chocolate', 
+    'olive', 'skyblue', 'rose', 'crimson', 'plum', 'orchid', 'chartreuse', 'tan']
 
 def label_connected_same_values(image, ignore_value=None):
     """
@@ -988,66 +986,184 @@ def plt_imshow(img,
                show_values_n_pix = 4096,
                **kwargs):
     """
-    Display an image or a complex-valued image using matplotlib's imshow.
+    Display a single real-valued or complex-valued image with flexible layout,
+    colorbar handling, and optional per-pixel value labeling.
 
-    This function can handle real images and complex-valued data, allowing for
-    visualization of magnitude and phase. The function provides options for 
-    displaying a colorbar, removing axis ticks, and setting titles. If the input 
-    image is complex, it will be represented in either RGB or separate real and 
-    imaginary components.
+    For real-valued images (2D) this is a thin wrapper around `imshow` with
+    sensible defaults (e.g., `viridis` colormap), optional colorbar, and tick
+    management. For complex-valued images, several visualization modes are
+    supported:
 
-    Parameters:
+      1) `cmap == 'complex'`: render a single HSV-composited image (magnitude
+         encoded in value, phase/angle in hue) and draw an inset HSV colorbar.
+
+      2) Default complex mode: create two subplots for magnitude (`abs`) and
+         phase (`angle`) with independent colormaps (and optional colorbars).
+         Orientation can be portrait (2 rows × 1 column) or landscape (1 row ×
+         2 columns), either auto-chosen or overridden via `portrait`.
+
+      3) Real/Imag mode: if `cmap` contains the substring `'real_imag'`, show
+         the real part on the first axes and the imaginary part on the second
+         axes, with optional `angle_cmap` for the imag panel.
+
+    Parameters
     ----------
-    img : array_like
-        The image data to be displayed. This can be a 2D array for real images or 
-        a 2D complex array for complex-valued data.
-        
-    fig_ax : tuple, optional
-        A tuple containing a figure and an axis to plot on. If None, a new figure 
-        and axis will be created.
-        
-    colorbar : bool, optional
-        Whether to display a colorbar alongside the image. Default is True.
-        
-    remove_axis_ticks : bool, optional
-        Whether to remove ticks from the axes. Default is False.
-        
-    title : str, optional
-        A title to be displayed above the figure. Default is None.
-        
-    cmap : str, optional
-        The colormap to be used for displaying the image. Default is None.
-        to get real and imag part separately for a xomplex image, use 
-        cmap = 'complex_real_imag', if you don't provide the cmap, it will show
-        the abs and angle part of the image separately.
-        
-    angle_cmap : str, optional
-        The colormap to be used for displaying the angle of complex numbers. 
-        Default is twilight_shifted. 
-        
-    portrait : bool, optional
-        If True, the figure will be set up in portrait mode. If None, the function 
-        will automatically determine the orientation based on the window dimensions.
-    
-    aspect : str, optional
-        by default I set the aspect ratio to equal
-        
-    figsize: 2-tuple, optional
-        figsize parameter of plt.figure
-    
-    **kwargs : keyword arguments
-        Additional keyword arguments passed to `imshow`, such as `vmin`, `vmax`, 
-        etc.
+    img : array-like or torch.Tensor
+        The input image. Accepted shapes:
+        - Real/grayscale: (H, W)
+        - RGB: (H, W, 3)
+        - Complex: (H, W) complex array
+        PyTorch tensors are moved to CPU and converted to NumPy automatically.
+        Any other type raises a `TypeError`.
 
-    Returns: 2-tuple
+    fig_ax : tuple(matplotlib.figure.Figure, matplotlib.axes.Axes) or None, optional
+        Existing `(fig, ax)` to draw into. If `None`, a new figure/axes are
+        created. For complex two-panel layouts, `ax` will be a list of two axes.
+
+    colorbar : bool, default True
+        Whether to add a colorbar:
+        - Real images: standard colorbar via `plt_colorbar`.
+        - Complex with `cmap == 'complex'`: an inset HSV colorbar via
+          `complex2hsv_colorbar`.
+        - Complex two-panel modes: a colorbar is added for each panel if True.
+
+    remove_axis_ticks : bool, default False
+        If True, removes all ticks and tick labels (`xticks=[]`, `yticks=[]`).
+
+    remove_middle_axis_ticks : bool, default True
+        Only applies to the two-panel complex layouts. Removes the shared
+        interior tick labels (x for portrait, y for landscape) for cleaner
+        presentation.
+
+    title : str, optional
+        Figure-level title (suptitle). If provided, it will be placed just
+        above the plotted content; the vertical position can be adjusted with
+        `title_y`.
+
+    cmap : str or matplotlib.colors.Colormap or None, optional
+        Colormap for real-valued images, or controls complex display mode:
+        - Real image: defaults to `'viridis'` if None.
+        - Complex image:
+            * `'complex'`: render a single HSV composite.
+            * Contains `'real_imag'`: render real/imag panels. The substring
+              `'real_imag'` is removed to derive a base colormap for real (and
+              `angle_cmap` used for imag if provided).
+            * Any other string/None: render `abs` and `angle` panels; `cmap`
+              applies to the magnitude panel.
+
+    angle_cmap : str or Colormap or None, optional
+        Colormap for the angle/imag panel in complex two-panel modes. Defaults
+        to `'twilight_shifted'` for the angle panel when not provided.
+
+    portrait : bool or None, optional
+        For two-panel complex layouts:
+        - True: stack panels vertically (2x1).
+        - False: place panels horizontally (1x2).
+        - None: attempt to infer from figure window shape (portrait if window
+          is taller than it is wide); falls back to landscape when inference
+          is not possible.
+
+    aspect : {'equal', 'auto'} or float or None, default 'equal'
+        Passed to `Axes.set_aspect`. If None, aspect is left unchanged.
+
+    figsize : tuple(float, float), optional
+        Figure size in inches if a new figure is created.
+
+    title_y : float, optional
+        Normalized y-position for the suptitle. If None, a heuristic offset
+        above the topmost axes is used.
+
+    show_values : bool, default False
+        If True (real-valued images only), overlay representative pixel/region
+        values as text annotations. Color is auto-chosen to contrast with the
+        local colormap.
+
+    values_levels : int or sequence or None, optional
+        Controls how value regions are computed when `show_values=True`:
+        - None: connected components of equal values are detected directly;
+          if the number of regions exceeds `show_values_n_pix`, this is
+          replaced by a level-based discretization of the image.
+        - int: if an integer-like step is supplied (e.g., 0.5), it is treated
+          as a uniform step and the levels are `np.arange(img_min, img_max, step)`.
+        - sequence: explicit bin edges; image is digitized into these levels.
+
+    values_filter_size : int or None, optional
+        Median filter window size used before discretization for labeling
+        (when `values_levels` is not None). Defaults to
+        `max(1, ceil(min(H, W)/20))`.
+
+    values_fontsize : float, default 8
+        Base font size for value labels. The function scales this per region
+        by a (log-compressed) region size to maintain readability.
+
+    show_values_n_pix : int, default 4096
+        Threshold to switch from exact connected-component labeling to
+        discretized labeling when the number of regions is large.
+
+    **kwargs
+        Additional arguments forwarded to `imshow` (e.g., `vmin`, `vmax`,
+        `interpolation`). For complex HSV mode (`cmap == 'complex'`), `vmin`
+        and `vmax` scale the magnitude used in the HSV visualization and
+        its inset colorbar.
+
+    Returns
     -------
     fig : matplotlib.figure.Figure
-        The figure object containing the displayed image(s).
-        
-    ax : matplotlib.axes.Axes or list of Axes
-        The axes object(s) containing the displayed image(s). If the image is 
-        complex and displayed as two separate plots, a list of axes will be returned.
+        The Matplotlib figure.
+
+    ax : matplotlib.axes.Axes or list[matplotlib.axes.Axes]
+        The axes used for plotting:
+        - Real/RGB and complex HSV (single-panel): a single `Axes`.
+        - Complex two-panel modes: a list `[ax0, ax1]`.
+
+    Notes
+    -----
+    - **Type handling**: PyTorch tensors are converted to NumPy; all other
+      non-array-like types raise `TypeError`.
+    - **Shape validation**: Only 2D arrays, 3-channel RGB arrays, or 2D complex
+      arrays are accepted. Any other shape raises an assertion error.
+    - **Complex visualization**:
+        * `'complex'` mode uses `complex2hsv(img, vmin, vmax)` and
+          `complex2hsv_colorbar((fig, inset_ax), ...)`.
+        * Two-panel default shows `abs(img)` and `angle(img)*(abs(img)!=0)`.
+        * Real/Imag mode shows `np.real(img)` and `np.imag(img)`.
+    - **Tick removal**: `remove_axis_ticks` suppresses ticks for all panels.
+      `remove_middle_axis_ticks` hides the interior shared axis in two-panel
+      complex layouts to reduce clutter.
+
+    Examples
+    --------
+    Real image with default colormap and colorbar:
+
+    >>> fig, ax = plt_imshow(img2d, title="Height Map")
+
+    Real image with value labels (auto-binned):
+
+    >>> fig, ax = plt_imshow(
+    ...     img2d, show_values=True, values_levels=20, values_fontsize=9
+    ... )
+
+    Complex image in HSV composite mode:
+
+    >>> fig, ax = plt_imshow(
+    ...     img_complex, cmap='complex', vmin=0, vmax=np.abs(img_complex).max()
+    ... )
+
+    Complex image as magnitude/angle panels, landscape layout:
+
+    >>> fig, ax = plt_imshow(
+    ...     img_complex, cmap='magma', angle_cmap='twilight_shifted',
+    ...     portrait=False, colorbar=True, title="Magnitude & Phase"
+    ... )
+
+    Complex image real/imag panels:
+
+    >>> fig, ax = plt_imshow(
+    ...     img_complex, cmap='magma_real_imag', angle_cmap='viridis',
+    ...     portrait=True
+    ... )
     """
+
     vmin = kwargs.get('vmin', None)
     vmax = kwargs.get('vmax', None)
     
@@ -1105,7 +1221,7 @@ def plt_imshow(img,
                     color, color_adjacent = (0, 0, 0), (0.2, 0.2, 0.2)
 
                 color_ = color if (i + j) % 2 == 0 else color_adjacent
-                ax.text(j, i, str(val), ha='center', va='center', color=color_, 
+                ax.text(j, i + np.random.randn()/6, f'{val:.3f}', ha='center', va='center', color=color_, 
                         fontsize=values_fontsize * siz)
 
         if(remove_axis_ticks):
@@ -1864,31 +1980,176 @@ def plt_imshow_subplots(
         colorbar_aspect=None, colorbar_pad_fraction=0.05, title_ax_gap = None,
         figsize=None, remove_axis_ticks=True, **kwargs):
     """
-    Plots a list of 2D images at specified 2D grid_locations with titles 
-    and colormaps.
-    
-    Parameters:
-    images (list of 2D arrays): List of 2D images to plot.
-    grid_locations (list of tuples or None): List of subplot grid_locations 
-        in (rows, cols, index) format or None to generate a grid.
-    titles (list of str): List of titles for each image.
-    cmaps (list of str): List of colormaps for each image.
-    colorbar (bool): Whether to add a colorbar beside each image. 
-        Default is True.
-    colorbar_aspect (int): Aspect ratio for the colorbars. Default is 2.
-    colorbar_pad_fraction (float): Padding fraction for the colorbars. 
-        Default is 0.05.
-    figsize (tuple): Size of the figure.
-    remove_axis_ticks (bool): Whether to remove axis ticks. Default is True.
+    Display multiple images on a single Matplotlib figure by laying them out
+    using absolute coordinates normalized to the figure canvas. This provides
+    fine-grained control over placement, margins, and colorbars compared to
+    standard `plt.subplots`.
+
+    The function automatically determines a grid layout if neither explicit
+    `grid_locations` nor `frame_shape` are provided. It supports per-image colormaps,
+    a global or complex-number-aware colorbar, optional figure title placement,
+    and automatic axis tick removal.
+
+    Parameters
+    ----------
+    images : Sequence[array-like]
+        A list/tuple of images. Each image can be:
+        - 2D array (H, W) for grayscale.
+        - 3D array (H, W, C) for RGB/RGBA.
+        - Complex-valued 2D array (H, W) — will be visualized using HSV mapping
+          (via `complex2hsv`), with a tailored inset colorbar (via
+          `complex2hsv_colorbar`) if `colorbar=True`.
+
+        PyTorch tensors are accepted and will be moved to CPU and converted to
+        NumPy internally.
+
+    grid_locations : array-like of shape (N, 2), optional
+        Absolute pixel-based top-left coordinates for each image (x, y),
+        *before* normalization to the figure canvas. If omitted, locations are
+        computed from `frame_shape` or an automatically determined grid.
+
+    frame_shape : tuple of (rows, cols), optional
+        The desired grid shape used to compute `grid_locations` when not
+        explicitly supplied. If not provided:
+        - For N in {2, 3}, the function chooses a row or column vector based on
+          the dominant image orientation (wide vs tall).
+        - Otherwise, it approximates a square grid (ceil(sqrt(N)) by rows/cols).
+
+    title : str, optional
+        Figure-level title (suptitle). If provided, it is positioned just above
+        the topmost image; use `title_y` for custom vertical placement.
+
+    titles : Sequence[str] or bool, default []
+        Per-image titles. If `True`, will default to integer indices `[0..N-1]`.
+        If a sequence, its length should be ≥ N (extra entries are ignored).
+        If omitted/empty, no individual axes titles are set.
+
+    cmaps : Sequence[str or Colormap], optional
+        Per-image Matplotlib colormap specifications. If provided, its length
+        must equal the number of images N. Do **not** pass `cmap` in `**kwargs`
+        simultaneously when using this list.
+
+    colorbar : bool, default True
+        If True, a colorbar is added:
+        - For real-valued images: a standard colorbar via `plt_colorbar`.
+        - For complex images: an inset HSV colorbar via `complex2hsv_colorbar`.
+        When enabled, the function enforces a minimum margin of 0.2 around/among
+        images for visual spacing.
+
+    margin : float, default 0.025
+        Fraction (relative to max image width/height) added around the outer
+        bounding box of all images. Ignored and replaced by ≥ 0.2 if
+        `colorbar=True`.
+
+    inter_image_margin : float, default 0.01
+        Fractional spacing between neighboring images when the grid is
+        auto-computed. Ignored and replaced by ≥ 0.2 if `colorbar=True`.
+
+    title_y : float, optional
+        Explicit normalized y-position for the figure suptitle. If omitted,
+        the function places the title just above the tallest axes block by a
+        heuristic gap (see `title_ax_gap`).
+
+    colorbar_aspect : float, optional
+        Aspect ratio passed to `plt_colorbar` for real-valued images.
+
+    colorbar_pad_fraction : float, default 0.05
+        Fractional padding between the axes and the colorbar for real-valued
+        images (passed to `plt_colorbar`).
+
+    title_ax_gap : float, optional
+        Gap between the top of the topmost axes and the figure title, in
+        normalized figure coordinates. If omitted, a heuristic is used:
+        - 0.1 if `titles` is provided (per-axis titles present),
+        - 0.05 otherwise.
+
+    figsize : tuple, optional
+        Passed to `plt.figure(figsize=...)`. If None, Matplotlib’s default
+        figure size is used.
+
+    remove_axis_ticks : bool, default True
+        If True, calls `ax.axis('off')` to hide axes spines and ticks for each
+        image.
+
+    **kwargs
+        Additional keyword arguments forwarded to `imshow` for real-valued
+        images (e.g., `vmin`, `vmax`, `interpolation`, `cmap` if `cmaps` not
+        supplied). For complex images, `vmin` and `vmax` are used to scale the
+        magnitude component in the inset HSV colorbar.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The created Matplotlib figure.
+
+    axes : list[matplotlib.axes.Axes]
+        A list of axes, one per image, in the same order as `images`.
+
+    Notes
+    -----
+    - **Layout normalization**: Input `grid_locations` are interpreted in pixel
+      space (x from left, y from bottom), then normalized to [0, 1] relative to
+      an automatically computed figure bounding box that includes `margin`.
+    - **Complex images**: Complex arrays are visualized via HSV conversion
+      (`complex2hsv`) mapping magnitude to value and angle/phase to hue. If
+      `colorbar=True`, an inset axes is added inside the image axes showing the
+      magnitude and phase legend via `complex2hsv_colorbar`.
+    - **Per-image colormaps**: When `cmaps` is provided, do not also pass a
+      global `cmap` in `**kwargs`. The function asserts that `len(cmaps) == N`.
+    - **Window title**: If supported by the Matplotlib backend, the OS window
+      title is set to `title`.
+
+    Examples
+    --------
+    Basic usage with automatic grid:
+
+    >>> fig, axes = plt_imshow_subplots([img1, img2, img3], title="Samples")
+
+    Specify a 2x2 grid and per-image titles:
+
+    >>> fig, axes = plt_imshow_subplots(
+    ...     [img_a, img_b, img_c, img_d],
+    ...     frame_shape=(2, 2),
+    ...     titles=["A", "B", "C", "D"],
+    ...     figsize=(8, 8)
+    ... )
+
+    Per-image colormaps (ensure `cmaps` length matches number of images):
+
+    >>> fig, axes = plt_imshow_subplots(
+    ...     [img_gray, img_edges, img_heat],
+    ...     cmaps=["gray", "magma", "viridis"]
+    ... )
+
+    Complex-valued image with HSV colorbar:
+
+    >>> fig, axes = plt_imshow_subplots(
+    ...     [complex_img],
+    ...     colorbar=True,  # shows HSV inset colorbar
+    ...     vmin=0, vmax=np.abs(complex_img).max()
+    ... )
+
+    Manual placement using `grid_locations` (x, y in pixels) for two images:
+
+    >>> H, W = img1.shape[:2]
+    >>> grid_locations = np.array([[0, 0], [W * 1.1, 0]])  # side-by-side
+    >>> fig, axes = plt_imshow_subplots(
+    ...     [img1, img2],
+    ...     grid_locations=grid_locations,
+    ...     margin=0.05, inter_image_margin=0.02
+    ... )
     """
+
     if colorbar:
         margin = np.maximum(margin, 0.2)
         inter_image_margin = np.maximum(margin, 0.2)
-    
+
     N = len(images)
     # Determine the maximum image size
     max_width = max(img.shape[1] for img in images)
     max_height = max(img.shape[0] for img in images)
+
+    if titles is True: titles = np.arange(N, dtype='int')
     
     if frame_shape is None:
         if (N == 2) | (N == 3):
@@ -2089,6 +2350,230 @@ def subplots_grid(plots_shape,
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
+    return fig, axes
+
+def plt_plots_subplots(
+        plotables,
+        *plot_args,
+        x_values_list=None,
+        fig_ax = None,
+        grid_locations=None,
+        frame_shape=None,
+        title=None,
+        titles=[],
+        margin=0.025,
+        inter_image_margin=0.01,
+        figsize=None,
+        remove_axis_ticks=False,
+        max_width = None,
+        max_height = None,
+        aspect=None,
+        **kwargs):
+    """
+    Plot multiple 1D signals on a custom subplot grid using absolute positioning,
+    with optional per-plot x-values and aspect-aware layout scaling.
+
+    This function extends `subplots_grid` to support line plots (via `ax.plot`)
+    while preserving fine-grained control over subplot placement, spacing, and
+    figure layout. It supports PyTorch tensors, per-plot x-values, and consistent
+    data-driven aspect scaling across subplots.
+
+    Parameters
+    ----------
+    plotables : Sequence[array-like]
+        A list/tuple of 1D arrays representing y-values to plot. Each element can be:
+        - NumPy array
+        - PyTorch tensor (will be moved to CPU and converted to NumPy)
+        - Any array-like structure convertible to NumPy
+
+    *plot_args :
+        Additional positional arguments passed directly to `ax.plot` for each subplot
+        (e.g., line style strings like '-', '--', etc.).
+
+    x_values_list : Sequence[array-like], optional
+        A list of x-values corresponding to each y-array in `plotables`.
+        - If None, defaults to `np.arange(len(y))` for each plot.
+        - If provided, must have the same length as `plotables`.
+        - Each element can be NumPy array, PyTorch tensor, or array-like.
+
+    fig_ax : tuple (fig, axes), optional
+        If provided, uses an existing figure and axes instead of creating new ones.
+        Expected format is the output of `subplots_grid`.
+
+    grid_locations : array-like of shape (N, 2), optional
+        Absolute (x, y) positions for each subplot before normalization. If None,
+        positions are computed automatically using `frame_shape` or a square layout.
+
+    frame_shape : tuple of (rows, cols), optional
+        Grid layout used to compute subplot positions when `grid_locations` is not
+        provided. If None, a near-square layout is automatically determined.
+
+    title : str, optional
+        Figure-level title (suptitle).
+
+    titles : Sequence[str], optional
+        Per-subplot titles. Length should be ≥ N. Extra entries are ignored.
+
+    margin : float, default=0.025
+        Fractional margin around the entire figure (relative to max width/height).
+
+    inter_image_margin : float, default=0.01
+        Fractional spacing between subplots when grid is auto-generated.
+
+    figsize : tuple, optional
+        Figure size passed to `plt.figure(figsize=...)`.
+
+    remove_axis_ticks : bool, default=False
+        If True, removes axis ticks and spines (`ax.axis('off')`) for each subplot.
+
+    max_width : float, optional
+        Maximum width used for layout scaling. If None, computed as the maximum
+        x-range across all plots.
+
+    max_height : float, optional
+        Maximum height used for layout scaling. If None, computed as the maximum
+        y-range across all plots.
+
+    aspect : {'equal', None}, optional
+        Controls aspect ratio behavior:
+        - 'equal': Enforces equal scaling between x and y dimensions:
+            * Layout: sets `max_width == max_height` based on the larger range.
+            * Axes: applies `ax.set_aspect('equal')` so one unit in x equals one
+            unit in y.
+        - None: Default behavior; x and y scales are treated independently.
+
+    **kwargs
+        Additional keyword arguments passed to `ax.plot` (e.g., `color`, `linewidth`,
+        `marker`, etc.).
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The created or reused Matplotlib figure.
+
+    axes : list of matplotlib.axes.Axes
+        List of axes corresponding to each plot, in the same order as `plotables`.
+
+    Notes
+    -----
+    - **Data-driven layout**: Subplot sizes are determined using data ranges:
+    width ~ (x_max - x_min), height ~ (y_max - y_min). This ensures that layout
+    reflects the physical scale of the data rather than array length.
+    - **Aspect handling**:
+    When `aspect='equal'`, both subplot geometry and axis scaling are adjusted
+    to preserve true geometric proportions.
+    - **Tensor support**: PyTorch tensors are automatically converted to NumPy.
+    - **Flexibility**: The function is fully compatible with custom subplot layouts
+    via `grid_locations` and integrates seamlessly with `subplots_grid`.
+
+    Examples
+    --------
+    Basic usage:
+
+    >>> ys = [np.sin(np.linspace(0, 10, 100)),
+    ...       np.cos(np.linspace(0, 5, 50))]
+    >>> fig, axes = plt_plots_subplots(ys)
+
+    Using custom x-values:
+
+    >>> xs = [np.linspace(0, 10, 100),
+    ...       np.linspace(0, 5, 50)]
+    >>> fig, axes = plt_plots_subplots(ys, x_values_list=xs)
+
+    Enforcing equal aspect ratio:
+
+    >>> fig, axes = plt_plots_subplots(
+    ...     ys, x_values_list=xs, aspect='equal'
+    ... )
+
+    Custom layout:
+
+    >>> fig, axes = plt_plots_subplots(
+    ...     ys,
+    ...     frame_shape=(1, 2),
+    ...     titles=["sin", "cos"],
+    ...     figsize=(8, 4)
+    ... )
+    """
+    N = len(plotables)
+
+    if x_values_list is None:
+        x_values_list = [None] * N
+    else:
+        assert len(x_values_list) == N, \
+            "x_values_list must match plotables length"
+
+    widths = []
+    heights = []
+
+    for i in range(N):
+        y = plotables[i]
+        try: y = y.detach().cpu().numpy()
+        except: pass
+
+        x = x_values_list[i]
+        if x is None:
+            x = np.arange(len(y))
+        else:
+            try: x = x.detach().cpu().numpy()
+            except: pass
+
+        if len(x) > 0:
+            widths.append(np.max(x) - np.min(x))
+        else:
+            widths.append(1)
+
+        if len(y) > 0:
+            heights.append(np.max(y) - np.min(y))
+        else:
+            heights.append(1)
+
+    if max_width is None:
+        max_width = max(widths)
+    if max_height is None:
+        max_height = max(heights)
+
+    # avoid zero
+    if max_width == 0: max_width = 1
+    if max_height == 0: max_height = 1
+
+    if aspect == 'equal':
+        m = max(max_width, max_height)
+        max_width = m
+        max_height = m
+
+    if fig_ax is None:
+        fig, axes = subplots_grid(
+            (N, max_width, max_height),
+            grid_locations=grid_locations,
+            frame_shape=frame_shape,
+            title=title,
+            titles=titles,
+            margin=margin,
+            inter_image_margin=inter_image_margin,
+            figsize=figsize,
+            remove_axis_ticks=remove_axis_ticks
+        )
+    else:
+        fig, axes = fig_ax
+
+    for i, ax in enumerate(axes):
+        y = plotables[i]
+        try: y = y.detach().cpu().numpy()
+        except: pass
+
+        x = x_values_list[i]
+        if x is None:
+            x = np.arange(len(y))
+        else:
+            try: x = x.detach().cpu().numpy()
+            except: pass
+
+        ax.plot(x, y, *plot_args, **kwargs)
+
+        if aspect == 'equal':
+            ax.set_aspect('equal', adjustable='box')
+
     return fig, axes
 
 class transform3D_viewer:
@@ -2789,6 +3274,209 @@ def interpolate_mse_surface(grid_locations, mse, resolution=None, method='cubic'
         return grid_z, extent, grid_x, grid_y
     else:
         return grid_z, extent
+
+class imshow_gui_by_function:
+    def __init__(self, func, list_of_var_names, list_of_ranges, bins = 40):
+        self.bins = int(bins)
+        self.func = func
+        self.names = list_of_var_names
+        self.ranges = list_of_ranges
+        self.n = len(list_of_var_names)
+
+        self.auto_update = False
+
+        self.init_vals = [(r[0] + r[1]) / 2 for r in self.ranges]
+
+        # ---- initial computation ----
+        self.img = self._compute(self.init_vals)
+
+        self.vmin = float(np.min(self.img))
+        self.vmax = float(np.max(self.img))
+
+        # ---- figure layout ----
+        self.fig = plt.figure(figsize=(8, 6))
+
+        # image
+        self.ax_img = plt.axes([0.08, 0.35, 0.5, 0.55])
+
+        # histogram
+        self.ax_hist = plt.axes([0.60, 0.35, 0.12, 0.55])
+
+        # contrast slider (vertical)
+        self.ax_contrast = plt.axes([0.75, 0.32, 0.03, 0.58])
+
+        # vmax textbox
+        self.ax_vmax = plt.axes([0.73, 0.92, 0.08, 0.04])
+
+        # vmin textbox
+        self.ax_vmin = plt.axes([0.73, 0.24, 0.08, 0.04])
+
+        # auto checkbox
+        self.ax_auto = plt.axes([0.20, 0.25, 0.1, 0.05])
+
+        # update button
+        self.ax_button = plt.axes([0.35, 0.25, 0.15, 0.05])
+
+        # parameter sliders
+        self.slider_axes = []
+        start_y = 0.18
+
+        for i in range(self.n):
+            ax = plt.axes([0.15, start_y - i * 0.05, 0.5, 0.03])
+            self.slider_axes.append(ax)
+
+        # ---- image ----
+        self.im = self.ax_img.imshow(self.img, vmin=self.vmin, vmax=self.vmax)
+
+        # ---- histogram ----
+        self.hist = None
+        self._draw_hist()
+
+        # ---- contrast slider ----
+        self.range_slider = RangeSlider(
+            self.ax_contrast,
+            "",
+            self.vmin,
+            self.vmax,
+            valinit=(self.vmin, self.vmax),
+            orientation="vertical"
+        )
+
+        self.range_slider.on_changed(self.update_contrast)
+
+        # ---- textboxes ----
+        self.box_vmax = TextBox(self.ax_vmax, "", initial=f"{self.vmax:.4f}")
+        self.box_vmin = TextBox(self.ax_vmin, "", initial=f"{self.vmin:.4f}")
+
+        self.box_vmax.on_submit(self.update_range_limits)
+        self.box_vmin.on_submit(self.update_range_limits)
+
+        # ---- checkbox ----
+        self.checkbox = CheckButtons(self.ax_auto, ["Auto"], [False])
+        self.checkbox.on_clicked(self.toggle_auto)
+
+        # ---- update button ----
+        self.button = Button(self.ax_button, "Update")
+        self.button.on_clicked(self.update_image)
+
+        # ---- variable sliders ----
+        self.sliders = []
+
+        for ax, name, r, val in zip(self.slider_axes, self.names, self.ranges, self.init_vals):
+
+            s = Slider(ax, name, r[0], r[1], valinit=val)
+
+            s.on_changed(self._slider_changed)
+
+            self.sliders.append(s)
+
+        plt.show()
+
+    # --------------------------------
+    def _compute(self, values):
+
+        img = self.func(*values)
+
+        if hasattr(img, "detach"):
+            img = img.detach().cpu().numpy()
+
+        return np.asarray(img)
+
+    # --------------------------------
+    def _draw_hist(self):
+
+        self.ax_hist.clear()
+
+        data = self.img.ravel()
+
+        bins = np.linspace(self.vmin, self.vmax, self.bins)
+
+        self.ax_hist.hist(
+            data,
+            bins=bins,
+            orientation="horizontal"
+        )
+
+        self.ax_hist.set_ylim(self.vmin, self.vmax)
+
+    # --------------------------------
+    def _slider_changed(self, val):
+
+        if self.auto_update:
+            self.update_image(None)
+
+    # --------------------------------
+    def toggle_auto(self, label):
+
+        self.auto_update = not self.auto_update
+        self.update_image(None)
+
+    # --------------------------------
+    def update_image(self, event):
+
+        values = [s.val for s in self.sliders]
+
+        self.img = self._compute(values)
+
+        vmin = float(np.min(self.img))
+        vmax = float(np.max(self.img))
+
+        self.vmin = vmin
+        self.vmax = vmax
+
+        # update image
+        self.im.set_data(self.img)
+        self.im.set_clim(vmin, vmax)
+
+        # update slider
+        self.range_slider.valmin = vmin
+        self.range_slider.valmax = vmax
+        self.range_slider.ax.set_ylim(vmin, vmax)
+        self.range_slider.set_val((vmin, vmax))
+
+        # update boxes
+        self.box_vmin.set_val(f"{vmin:.4f}")
+        self.box_vmax.set_val(f"{vmax:.4f}")
+
+        # update histogram
+        self._draw_hist()
+
+        self.fig.canvas.draw_idle()
+
+    # --------------------------------
+    def update_contrast(self, val):
+
+        vmin, vmax = self.range_slider.val
+        self.vmin = vmin
+        self.vmax = vmax
+
+        self.im.set_clim(vmin, vmax)
+
+        self._draw_hist()
+
+        self.fig.canvas.draw_idle()
+        
+    # --------------------------------
+    def update_range_limits(self, text):
+        try:
+            new_min = float(self.box_vmin.text)
+            new_max = float(self.box_vmax.text)
+
+            self.range_slider.valmin = new_min
+            self.range_slider.valmax = new_max
+
+            self.range_slider.ax.set_ylim(new_min, new_max)
+
+            self.fig.canvas.draw_idle()
+
+        except ValueError:
+            pass
+
+def FunctionImshowGUI_test():
+    def gbys(L, s):
+        L = int(L)
+        return pyms.Gaussian_2dkernel(L, s).numpy()
+    imshow_gui_by_function(gbys, ['L', 's'], [[3, 100], [0.001, 30]])
 
 if __name__ == '__main__':
     plt_imshow(np.random.rand(100, 100) + 1j * np.random.rand(100, 100), portrait = True)

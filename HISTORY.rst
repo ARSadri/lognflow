@@ -484,3 +484,7 @@ History
 -------------------
 * fixing the plt_imshow when show_values = True and cmap is given
 * added download to ssh utils
+
+0.14.02 (2026-03-26)
+-------------------
+* if titles = True for plt_imshow_subplots typs numbers above plots

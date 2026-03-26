@@ -140,8 +140,13 @@ class getLogger:
             all file names will not have time tags if you set it to False. so,
             you can give time_tag argument for all logger functions, whose 
             default is this default. It can also be a string: options
-            are 'index' or 'time_and_index'. If you use index, instead of time
-            stamps, it will simply put an index that counts up after each logging.
+            are 'index', 'time_and_index' and 'keep_initial'. 
+            If you use 'index', instead of time stamps, it will simply put an 
+            index that counts up after each logging.
+            If you use 'time_and_index', it will use both time_tag and an index.
+            If you use 'keep_initial', it will save the first instance with suffix
+            '_initial' and then it will make a new one for the next instance and
+            update that file onwards.
         :type time_tag: bool
     """
     
@@ -479,14 +484,22 @@ class getLogger:
 
         if time_tag == True:
             index_tag = False
+            keep_initial_tag = False
         elif time_tag == False:
             index_tag = False
+            keep_initial_tag = False
+        elif (time_tag.lower() == 'keep_initial'):
+            time_tag = False
+            index_tag = False
+            keep_initial_tag = True
         elif (time_tag.lower() == 'index'):
             time_tag = False
             index_tag = True
+            keep_initial_tag = False
         elif (time_tag.lower() == 'time_and_index'):
             time_tag = True
             index_tag = True
+            keep_initial_tag = False
         
         _param_dir = self.log_dir / param_dir
         if(not _param_dir.is_dir()):
@@ -496,6 +509,18 @@ class getLogger:
             return _param_dir
         else:
             self.param_name_set.add(param_name)
+
+            if keep_initial_tag:
+                var_fullname = param_dir + '/' + param_name
+                if self.counted_vars.get(var_fullname, 0) == 0:
+                    index_tag_str = 'initial'
+                    self.counted_vars[var_fullname] = 1
+                    if(len(param_name) > 0):
+                        param_name += '_' + index_tag_str
+                    else:
+                        param_name = index_tag_str
+                elif len(param_name) == 0:
+                    param_name = 'latest'
 
             if index_tag:
                 var_fullname = param_dir + '/' + param_name
@@ -981,7 +1006,7 @@ class getLogger:
             elif(suffix == 'json'):
                 import json
                 obj_str = deepstr(parameter_value)
-                with open(fpath,'a') as fdata: 
+                with open(fpath,'w') as fdata: 
                     json.dump(obj_str, fdata)
             else:
                 with open(fpath,'a') as fdata: 
@@ -2095,7 +2120,9 @@ class getLogger:
                 try:
                     txt = var_path.read_text(errors = 'ignore')
                     if (var_path.suffix == '.json'):
-                        return_collection = True
+                        import json
+                        txt = json.loads(txt)
+                        return_collection = False
                     if return_collection:
                         txt = text_to_collection(txt)
                     return(txt, var_path)
@@ -2311,7 +2338,7 @@ class getLogger:
         return fpath
 
     def __repr__(self):
-        return f'{self.log_dir}'
+        return str(self.log_dir.absolute())
 
     def __bool__(self):
         return self.log_dir.is_dir()

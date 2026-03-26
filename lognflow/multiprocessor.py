@@ -1,11 +1,7 @@
-from numpy import __name__    as np___name__,\
-                  array       as np_array,\
-                  ndarray     as np_ndarray,\
+from numpy import array       as np_array,\
                   ceil        as np_ceil,\
                   arange      as np_arange,\
-                  zeros       as np_zeros,\
                   minimum     as np_minimum,\
-                  concatenate as np_concatenate,\
                   argsort     as np_argsort,\
                   unique      as np_unique
 
