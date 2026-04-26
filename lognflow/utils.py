@@ -1354,3 +1354,63 @@ def dict_deep_update(base, new):
             dict_deep_update(base[k], v)
         else:
             base[k] = v
+
+def sanitize_config(x, path="root", verbose=True, _is_root=True, _removed_flag=None):
+    import json
+    import numpy as np
+
+    if _removed_flag is None:
+        _removed_flag = {"removed": False}  # mutable tracker
+
+    allowed_scalar = (int, float, bool, str)
+
+    def preview(v, maxlen=60):
+        s = str(v)
+        return s if len(s) <= maxlen else s[:maxlen] + "..."
+
+    def json_safe(v):
+        if isinstance(v, dict):
+            return {k: json_safe(val) for k, val in v.items()}
+        elif isinstance(v, (list, tuple)):
+            return [json_safe(val) for val in v]
+        elif isinstance(v, np.generic):  # numpy scalar
+            return v.item()
+        else:
+            return v
+
+    # --- main logic ---
+    if isinstance(x, dict):
+        cleaned = {}
+        for k, v in x.items():
+            new_path = f"{path}['{k}']"
+            v_clean = sanitize_config(v, new_path, verbose, False, _removed_flag)
+
+            if isinstance(v_clean, dict) and len(v_clean) > 0:
+                cleaned[k] = v_clean
+            elif isinstance(v_clean, allowed_scalar):
+                cleaned[k] = v_clean
+            else:
+                _removed_flag["removed"] = True
+                if verbose:
+                    print(f"REMOVED {new_path} | type={type(v).__name__} | value={preview(v)}")
+
+        # only act at root
+        if _is_root and verbose and _removed_flag["removed"]:
+            from lognflow import print_line, print_box
+            print_box('All lists, tuples, arrays, tensors, etc have been removed\n' 
+                      ' from your configuration dictionary, but dicts and \n'
+                      ' literal scalar types (int, float, bool, str) remain.\n')
+            print_line("Cleaned config")
+            print(json.dumps(json_safe(cleaned), indent=2, sort_keys=True))
+            print_line('End of config')
+
+        return cleaned
+
+    elif isinstance(x, allowed_scalar):
+        return x
+
+    else:
+        _removed_flag["removed"] = True
+        if verbose:
+            print(f"REMOVED {path} | type={type(x).__name__} | value={preview(x)}")
+        return None

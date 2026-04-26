@@ -423,9 +423,10 @@ class getLogger:
     def _param_dir_name_suffix(self, parameter_name: str, suffix: str = None):
         
         assert isinstance(parameter_name, str), \
-            f'lognflow: The parameter name {parameter_name} is not a string.' \
+            f'lognflow: The parameter name for this log is not a string.' \
             + f' It is of type {type(parameter_name)}.' \
-            + 'Perhaps you forgot to pass the name of the variable first.'
+            + ' Perhaps you forgot to pass the name of the variable first.' \
+            + f' Here is its content: {parameter_name}'
         parameter_name = ''.join(
             [_ for _ in repr(repr_raw(parameter_name))  if _ != '\''])
         parameter_name = replace_all(parameter_name, ' ', '_')
@@ -1062,6 +1063,7 @@ class getLogger:
                    image_format='jpg',
                    dpi=1200,
                    title = None,
+                   labels = [],
                    time_tag: bool = None,
                    fig_ax = None,
                    return_figure = False,
@@ -1091,7 +1093,8 @@ class getLogger:
         from .plt_utils import plt_plot
         plt_plot(
             parameter_value_list, *plt_plot_args, 
-            x_values_list = x_values_list, fig_ax = fig_ax, **kwargs)
+            x_values_list = x_values_list, fig_ax = fig_ax, 
+            title = title, labels = labels, **kwargs)
             
         if not return_figure:
             fpath = self.savefig(

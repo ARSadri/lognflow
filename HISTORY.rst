@@ -488,3 +488,7 @@ History
 0.14.02 (2026-03-26)
 -------------------
 * if titles = True for plt_imshow_subplots typs numbers above plots
+
+0.14.03 (2026-04-26)
+-------------------
+* Santize the jason condig files for saving
