@@ -80,6 +80,21 @@ class textinlog:
     last_log_flush_time : float
     log_flush_period    : int
 
+save_configs_script = """\
+import numpy as np
+import torch
+
+# ---------------- CONFIG VARIABLES ----------------
+
+{assignments}
+
+# ---------------- CONFIG ACCESSOR ----------------
+
+CFG = dict(
+{cfg_dict}
+)
+"""
+
 class getLogger:
     """Initialization
         
@@ -1019,7 +1034,112 @@ class getLogger:
             print(e)
             
         return fpath
+        
+    def save_configs(self, configs_dict, max_array_size=256):
+        if not self.enabled:
+            return
+        time_tag = False
+        suffix = 'py'
+        param_dir, param_name, suffix = self._param_dir_name_suffix(
+            'configs_gen', suffix
+        )
+        self.configs_fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
+
+        def serialize(obj, k, max_array_size):
+
+            # Torch tensor 
+            try:
+                import torch
+                if isinstance(obj, torch.Tensor):
+
+                    numel = obj.numel()
+
+                    if numel > max_array_size:
+                        self.text(None, f'save_configs: variable {k} not '
+                              f'saved as its size {numel} is larger than given '
+                              f'threshold max_array_size: {max_array_size}')
+                        return 'save_configs_skipped'
+
+                    data = obj.detach().cpu().tolist()
+                    dtype = str(obj.dtype).replace("torch.", "")
+                    device = str(obj.device)
+
+                    return (
+                        f"torch.tensor({data}, "
+                        f"dtype=getattr(torch, '{dtype}'), "
+                        f"device='{device}')"
+                    )
+            except Exception as e:
+                pass
+
+            #  NumPy array 
+            if isinstance(obj, np.ndarray):
+                numel = obj.size
+                if numel > max_array_size:
+                    self.text(None, f'save_configs: variable {k} not '
+                              f'saved as its size {numel} is larger than given '
+                              f'threshold max_array_size: {max_array_size}')
+                    return 'save_configs_skipped'
+
+                return f"np.array({obj.tolist()})"
+
+            if isinstance(obj, (int, float, bool, str)):
+                return repr(obj)
+
+            if isinstance(obj, list):
+                return "[" + ", ".join(serialize(x, k, max_array_size) for x in obj) + "]"
+
+            if isinstance(obj, tuple):
+                inner = ", ".join(serialize(x, k, max_array_size) for x in obj)
+                return f"({inner}{',' if len(obj)==1 else ''})"
+
+            if isinstance(obj, dict):
+                items = []
+                for k, v in obj.items():
+                    items.append(f'"{k}": {serialize(v, k, max_array_size)}')
+                return "{" + ", ".join(items) + "}"
+
+            raise TypeError(f"[configs] Unsupported type: {type(obj)}")
+
+        assignments = []
+        keys = []
+
+        for k, v in configs_dict.items():
+            if v is not None:
+                val_ = serialize(v, k, max_array_size)
+                if val_ != 'save_configs_skipped':
+                    assignments.append(f"{k} = {val_}")
+                    keys.append(k)
+
+        script = save_configs_script.format(
+            assignments="\n\n".join(assignments),
+            cfg_dict=",\n".join(f"    {k}={k}" for k in keys),
+        )
+
+        self.configs_fpath.write_text(script)
+
+        return self.configs_fpath
     
+    def load_configs(self):
+
+        import importlib.util
+        import sys
+
+        try: 
+            assert self.configs_fpath.is_file() , "No configs have been saved."
+        except:
+            return None
+
+        module_name = f"_dynamic_configs_{self.configs_fpath.stem}"
+
+        spec = importlib.util.spec_from_file_location(module_name, self.configs_fpath)
+        module = importlib.util.module_from_spec(spec)
+
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+        return module.CFG
+
     def savefig(self, 
                 parameter_name: str, 
                 image_format='jpg', dpi=1200,

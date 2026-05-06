@@ -96,6 +96,11 @@ def test_printprogress_ETA():
             perv_print = time.time()
             print(f'ETA: {ETA:.2f}')
 
+def test_ETA_only():
+    for _ in printprogress(np.arange(100), ETA_only=True):
+        print(np.random.randn(10))
+        time.sleep(0.2)
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
@@ -107,4 +112,4 @@ if __name__ == '__main__':
     test_specific_timing()
     test_printprogress_with_logger()
     test_varying_periods()
-
+    test_ETA_only()

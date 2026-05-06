@@ -22,6 +22,7 @@ class printprogress:
                  desc = None,
                  method = 'linear',
                  print_function = print,
+                 ETA_only = False,
                  **print_function_kwargs):
         """
             int_or_iterable: int or iterable
@@ -73,8 +74,6 @@ class printprogress:
         self.method = method
         self.print_function = print_function
         
-         ############################################################################### what happens in case of [1] as input
-        
         if (title is None):
             needs_s(n_steps)
             title = f'Progress for {n_steps} step{needs_s(n_steps)}'
@@ -88,23 +87,26 @@ class printprogress:
             self.numTicks = len(title)+2
         else:
             self.numTicks = numTicks
-        
-        self._print_func(' ', end='')
-        self._print_func('_'*self.numTicks, end='')
-        self._print_func(' ')
-        
-        self._print_func('/', end='')
-        self._print_func(' '*int((self.numTicks - len(title))/2), end='')
+        self.ETA_only = ETA_only
+        if not self.ETA_only:
+            self._print_func(' ', end='')
+            self._print_func('_'*self.numTicks, end='')
+            self._print_func(' ')
+            self._print_func('/', end='')
+            self._print_func(' '*int((self.numTicks - len(title))/2), end='')
         self._print_func(title, end='')
-        self._print_func(' '*int(ceil((self.numTicks-len(title))/2)-1), end='')
-        self._print_func(' \\')
+        if not self.ETA_only:
+            self._print_func(' '*int(ceil((self.numTicks-len(title))/2)-1), end='')
+            self._print_func(' \\')
+            self._print_func(' ', end = '')
+        else:
+            self._print_func('')
         
-        self._print_func(' ', end = '')
         self.len_prog_text = 0
         self.remTimeS_perv = 0
         self.average_filter_coeff = 0
     
-    def _print_func(self, text, end='\n'):
+    def _print_func(self, text = '', end='\n'):
         if (self.print_function is not None):
             if (self.print_function == print):
                 print(text, end = end, flush = True)
@@ -128,42 +130,49 @@ class printprogress:
         return remTimeS
     
     def _make_progress(self, ck = 1):
-        
         remTimeS = 0
         if(self.FLAG_ended):
             if(not self.FLAG_warning):
                 self.FLAG_warning = True
-                self._print_func('-' * (self.numTicks + 2))
+                if not self.ETA_only:
+                    self._print_func('-' * (self.numTicks + 2))
         else:
             self.ck += ck
             if(self.ck <= self.n_steps):
                 remTimeS = self._calc_ETA() # useful when print_function is None
                 try: cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)
-                except: cProg = int(self.numTicks/3)
-                #3: because 3 charachters are used
+                except: cProg = int(self.numTicks/3) # 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
                     remTimeS = self._calc_ETA()
                     if remTimeS < 86400*100:
                         if(remTimeS>356400): # less than 99d and more than 99h
                             progStr = "%02d" % int(ceil(remTimeS/86400))
+                            if self.ETA_only: self._print_func('ETA: ', end='')
                             self._print_func(progStr, end='')
                             self._print_func('d', end='')
+                            if self.ETA_only: self._print_func()
                             self.len_prog_text += 3
                         elif(remTimeS>5940): # less than 99h and more than 99m
                             progStr = "%02d" % int(ceil(remTimeS/3600))
+                            if self.ETA_only: self._print_func('ETA: ', end='')
                             self._print_func(progStr, end='')
                             self._print_func('h', end='')
+                            if self.ETA_only: self._print_func()
                             self.len_prog_text += 3
                         elif(remTimeS>99): # less than 99m and more than 99s
                             progStr = "%02d" % int(ceil(remTimeS/60))
+                            if self.ETA_only: self._print_func('ETA: ', end='')
                             self._print_func(progStr, end='')
                             self._print_func('m', end='')
+                            if self.ETA_only: self._print_func()
                             self.len_prog_text += 3
                         elif(remTimeS>=0): # less than 99s and more than 0
                             progStr = "%02d" % int(ceil(remTimeS))
+                            if self.ETA_only: self._print_func('ETA: ', end='')
                             self._print_func(progStr, end='')
                             self._print_func('s', end='')
+                            if self.ETA_only: self._print_func()
                             self.len_prog_text += 3
                         else:
                             self._end()

@@ -618,10 +618,65 @@ def test_log_json():
     for x, y in zip(input_list, var_readback): 
         print(f'{x} --> {y}')
     
+def test_configs():
+    import numpy as np
+    import torch
+
+    def compare(a, b):
+        if isinstance(a, np.ndarray):
+            assert isinstance(b, np.ndarray)
+            assert (a == b).all()
+
+        elif isinstance(a, torch.Tensor):
+            assert isinstance(b, torch.Tensor)
+            assert (a == b).all()
+
+        elif isinstance(a, dict):
+            assert isinstance(b, dict)
+            assert a.keys() == b.keys()
+            for k in a:
+                compare(a[k], b[k])
+
+        elif isinstance(a, (list, tuple)):
+            assert type(a) == type(b)
+            assert len(a) == len(b)
+            for x, y in zip(a, b):
+                compare(x, y)
+
+        else:
+            assert a == b
+
+
+    configs_dict = dict(
+        vec_np    = np.zeros(10),
+        vec_torch = torch.zeros(10, dtype=torch.float32, device='cuda'),
+        vec_torch2 = torch.zeros(100, dtype=torch.float32, device='cuda'),
+        var_a     = True,
+        var_b     = 'var_b_text',
+        var_c     = np.random.rand(100),
+        var_d     = 12.2,
+        var_e     = [12, 'test'],
+        var_f     = (29, 'waw'),
+        var_g     = dict(
+            var_g_arr  = np.arange(12),
+            var_g_list = [12, 3, 'test2']
+        ),
+    )
+
+    logger = getLogger(r'C:\Alireza\mcemtoolsProject\Atomic_magnetism\code\test_cfg')
+    logger.save_configs(configs_dict, max_array_size = 20)
+
+    cfg = logger.load_configs()
+
+    compare(cfg, configs_dict)
+    print('test passed')
+
 if __name__ == '__main__':
     #-----IF RUN BY PYTHON------#
     temp_dir = select_directory()
     #===========================#
+    test_configs()
+    exit()
     test_replace_time_with_index()
     test_log_json()
     test_record_savefig()

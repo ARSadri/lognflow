@@ -492,3 +492,7 @@ History
 0.14.03 (2026-04-26)
 -------------------
 * Santize the jason condig files for saving
+
+0.15.00 (2026-05-06)
+-------------------
+* save_configs and load_configs is added and tested.
