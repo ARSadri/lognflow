@@ -1055,10 +1055,10 @@ class getLogger:
                     numel = obj.numel()
 
                     if numel > max_array_size:
-                        self.text(None, f'save_configs: variable {k} not '
+                        self.text(None, f'[save_configs]: variable {k} not '
                               f'saved as its size {numel} is larger than given '
                               f'threshold max_array_size: {max_array_size}')
-                        return 'save_configs_skipped'
+                        return 'lognflow_save_configs_skipped'
 
                     data = obj.detach().cpu().tolist()
                     dtype = str(obj.dtype).replace("torch.", "")
@@ -1076,12 +1076,15 @@ class getLogger:
             if isinstance(obj, np.ndarray):
                 numel = obj.size
                 if numel > max_array_size:
-                    self.text(None, f'save_configs: variable {k} not '
+                    self.text(None, f'[save_configs]: variable {k} not '
                               f'saved as its size {numel} is larger than given '
                               f'threshold max_array_size: {max_array_size}')
-                    return 'save_configs_skipped'
+                    return 'lognflow_save_configs_skipped'
 
                 return f"np.array({obj.tolist()})"
+
+            if obj is None:
+                return repr(obj)
 
             if isinstance(obj, (int, float, bool, str)):
                 return repr(obj)
@@ -1099,7 +1102,8 @@ class getLogger:
                     items.append(f'"{k}": {serialize(v, k, max_array_size)}')
                 return "{" + ", ".join(items) + "}"
 
-            raise TypeError(f"[configs] Unsupported type: {type(obj)}")
+            self.text(None, f"[save_configs] Unsupported type for {k}: {type(obj)}")
+            return 'lognflow_save_configs_skipped'
 
         assignments = []
         keys = []
@@ -1107,7 +1111,7 @@ class getLogger:
         for k, v in configs_dict.items():
             if v is not None:
                 val_ = serialize(v, k, max_array_size)
-                if val_ != 'save_configs_skipped':
+                if val_ != 'lognflow_save_configs_skipped':
                     assignments.append(f"{k} = {val_}")
                     keys.append(k)
 

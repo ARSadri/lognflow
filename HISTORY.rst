@@ -496,3 +496,7 @@ History
 0.15.00 (2026-05-06)
 -------------------
 * save_configs and load_configs is added and tested.
+
+0.15.01 (2026-05-07)
+-------------------
+* save_configs handles None too now.

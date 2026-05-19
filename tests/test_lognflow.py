@@ -655,7 +655,7 @@ def test_configs():
         var_b     = 'var_b_text',
         var_c     = np.random.rand(100),
         var_d     = 12.2,
-        var_e     = [12, 'test'],
+        var_e     = [None, 'test'],
         var_f     = (29, 'waw'),
         var_g     = dict(
             var_g_arr  = np.arange(12),
@@ -664,11 +664,12 @@ def test_configs():
     )
 
     logger = getLogger(r'C:\Alireza\mcemtoolsProject\Atomic_magnetism\code\test_cfg')
-    logger.save_configs(configs_dict, max_array_size = 20)
+    logger.save_configs(configs_dict, max_array_size = 100)
 
     cfg = logger.load_configs()
 
     compare(cfg, configs_dict)
+    print(cfg)
     print('test passed')
 
 if __name__ == '__main__':
