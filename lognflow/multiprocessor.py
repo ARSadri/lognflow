@@ -534,6 +534,7 @@ def multiprocessor_gen(
             any_error, targetFunction, error_ret_procID, iterables, 
             shareables, aQ, error_event, logger)
 
+#----------------------- loopprocessor --------------------------
 def _loopprocessor_function_test_mode(
          targetFunction, theQ, procID_range, error_event, args, kwargs):
     results = targetFunction(*args, **kwargs)

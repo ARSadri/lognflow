@@ -341,51 +341,6 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = N
 
     return fig, ax
 
-def _compute_tn_from_cm(cm):
-    """
-    Compute True Negatives (TN) directly from the confusion matrix (cm).
-    True Negatives are the elements that are not in the row or column of the class.
-    """
-    n_classes = cm.shape[0]
-    total_samples = np.sum(cm)
-    tn_total = 0
-    for i in range(n_classes):
-        cm_without_class_i = np.delete(np.delete(cm, i, axis=0), i, axis=1)
-        tn_class_i = np.sum(cm_without_class_i)
-        tn_total += tn_class_i
-    tn_normalized = tn_total / total_samples
-    return tn_normalized
-
-def compute_tp_tn_fp_fn(cm):
-    """
-    computes average tp, tn, fp and fn of a confusion matrix
-    Example:
-    ---------
-    
-    import numpy as np
-    from sklearn.metrics import confusion_matrix
-    from lognflow.plt_utils import plt_confusion_matrix
-    
-    N, n_classes = 10000, 20
-    
-    labels1 = (np.random.rand(N)*n_classes).astype('int')
-    labels2 = (np.random.rand(N)*n_classes).astype('int')
-    target_names = np.arange(n_classes)
-
-    cm = confusion_matrix(labels1, labels2, normalize='all')
-
-    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm)
-    print(TP, TN, FP, FN)
-    
-    """
-    
-    total_samples = np.sum(cm)
-    TP = np.sum(np.diag(cm)) / total_samples
-    FP = np.sum(np.sum(cm, axis=0) - np.diag(cm)) / total_samples
-    FN = np.sum(np.sum(cm, axis=1) - np.diag(cm)) / total_samples
-    TN = _compute_tn_from_cm(cm)
-    
-    return TP, TN, FP, FN
 
 def calculate_contrasting_color(value, cmap):
     """Calculate a contrasting color for a given value in the colormap."""
@@ -395,132 +350,254 @@ def calculate_contrasting_color(value, cmap):
     # Return white for dark colors and black for light colors
     return 'white' if luminance < 0.5 else 'black'
 
-def plt_confusion_matrix(cm, 
-        target_names=None, title=None, cmap=None,
-        figsize=None, fontsize = None, fontsize_title = None, show_zeros = False):
+def compute_tp_tn_fp_fn(cm, normalize=True):
     """
-    This function plots a confusion matrix and returns the figure and axis.
-    Parameters:
-    - cm: Confusion matrix
-    - target_names: List of target names (default: None)
-    - title: have any of the following options you like to see in the title
-        title = YOUR_TITLE + '_truth' + '_accuracy' + '_recall' + '_precision' + '_f1_score' + '_specificity' + '_mcc'
-        YOUR_TITLE could be nothing like ''
-        eg. if I want to see the truth table and the f1_score I code:
-            title = 'My truth table' + '_truth_f1_score'
-        
-    - cmap: Colormap (default: None)
-    - figsize: Size of the figure (default: None)
+    Compute TP, TN, FP, FN for each class using one-vs-rest.
+
+    Rows of cm are true classes and columns are predicted classes.
+
+    If normalize=True, TP/TN/FP/FN are divided by the total mass of
+    the confusion matrix.
+
+    For each class i:
+
+        TP[i] + TN[i] + FP[i] + FN[i] == total
+
+    or, if normalized:
+
+        TP[i] + TN[i] + FP[i] + FN[i] == 1
+    """
+    cm = np.asarray(cm, dtype=float)
+
+    if cm.ndim != 2 or cm.shape[0] != cm.shape[1]:
+        raise ValueError("cm must be a square 2D confusion matrix.")
+
+    if not np.all(np.isfinite(cm)):
+        raise ValueError("cm contains NaN or infinite values.")
+
+    if np.any(cm < 0):
+        raise ValueError("cm cannot contain negative values.")
+
+    total = cm.sum()
+
+    if total <= 0:
+        raise ValueError("Confusion matrix is empty.")
+
+    TP = np.diag(cm).copy()
+    FN = cm.sum(axis=1) - TP
+    FP = cm.sum(axis=0) - TP
+    TN = total - TP - FN - FP
+
+    TN = np.maximum(TN, 0.0)
+
+    if normalize:
+        TP = TP / total
+        TN = TN / total
+        FP = FP / total
+        FN = FN / total
+
+    return TP, TN, FP, FN
+
+
+def confusion_matrix_metrics(cm):
+    """
+    Compute standard multiclass classification metrics.
+
     Returns:
-    - fig: Figure object
-    - ax: Axis object
-    
-    
-    Example:
-    ---------
-    
-    import numpy as np
-    from sklearn.metrics import confusion_matrix
-    from lognflow.plt_utils import plt_confusion_matrix
-    
-    N, n_classes = 10000, 20
-    
-    vec1 = (np.random.rand(N)*n_classes).astype('int')
-    vec2 = (np.random.rand(N)*n_classes).astype('int')
-    target_names = np.arange(n_classes)
-
-    cm = confusion_matrix(vec1, vec2, normalize='all')
-
-    plt_confusion_matrix(cm, target_names = target_names)
-    plt.show()
-    
+        accuracy
+        recall       : macro recall / sensitivity / TPR
+        precision    : macro precision
+        f1_score     : macro F1
+        specificity  : macro specificity / TNR
+        mcc          : multiclass Matthews correlation coefficient
     """
-    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm)
+    cm = np.asarray(cm, dtype=float)
 
-    figsize_was_None = False
+    if cm.ndim != 2 or cm.shape[0] != cm.shape[1]:
+        raise ValueError("cm must be a square 2D confusion matrix.")
+
+    if not np.all(np.isfinite(cm)):
+        raise ValueError("cm contains NaN or infinite values.")
+
+    if np.any(cm < 0):
+        raise ValueError("cm cannot contain negative values.")
+
+    total = cm.sum()
+
+    if total <= 0:
+        raise ValueError("Confusion matrix is empty.")
+
+    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm, normalize=False)
+
+    accuracy = TP.sum() / total
+
+    recall_per_class = np.divide(TP, TP + FN, out=np.zeros_like(TP, dtype=float), where=(TP + FN) > 0)
+    precision_per_class = np.divide(TP, TP + FP, out=np.zeros_like(TP, dtype=float), where=(TP + FP) > 0)
+    specificity_per_class = np.divide(TN, TN + FP, out=np.zeros_like(TN, dtype=float), where=(TN + FP) > 0)
+    f1_per_class = np.divide(2 * TP, 2 * TP + FP + FN, out=np.zeros_like(TP, dtype=float), where=(2 * TP + FP + FN) > 0)
+
+    recall = np.mean(recall_per_class)
+    precision = np.mean(precision_per_class)
+    f1_score = np.mean(f1_per_class)
+    specificity = np.mean(specificity_per_class)
+
+    true_counts = cm.sum(axis=1)
+    pred_counts = cm.sum(axis=0)
+
+    numerator = np.trace(cm) * total - np.dot(true_counts, pred_counts)
+    denominator = np.sqrt((total**2 - np.dot(pred_counts, pred_counts)) * (total**2 - np.dot(true_counts, true_counts)))
+
+    mcc = numerator / denominator if denominator > 0 else 0.0
+
+    return accuracy, recall, precision, f1_score, specificity, mcc
+
+
+def plt_confusion_matrix(cm, target_names=None, title=None, cmap=None, figsize=None, fontsize=None, fontsize_title=None, show_zeros=False):
+    """
+    Plot a confusion matrix and return the figure and axis.
+
+    title can contain:
+
+        _truth
+        _accuracy
+        _recall
+        _precision
+        _f1_score
+        _specificity
+        _mcc
+
+    `_truth` displays:
+
+        TPR = true-positive rate / sensitivity / recall
+        TNR = true-negative rate / specificity
+        FPR = false-positive rate
+        FNR = false-negative rate
+
+    Example:
+
+        title = 'Validation_truth_accuracy_f1_score_mcc'
+    """
+    cm = np.asarray(cm, dtype=float)
+
+    if cm.ndim != 2 or cm.shape[0] != cm.shape[1]:
+        raise ValueError("cm must be a square 2D confusion matrix.")
+
+    if not np.all(np.isfinite(cm)):
+        raise ValueError("cm contains NaN or infinite values.")
+
+    if np.any(cm < 0):
+        raise ValueError("cm cannot contain negative values.")
+
+    if cm.sum() <= 0:
+        raise ValueError("Confusion matrix is empty.")
+
+    TP, TN, FP, FN = compute_tp_tn_fp_fn(cm, normalize=False)
+
+    TPR_per_class = np.divide(TP, TP + FN, out=np.zeros_like(TP, dtype=float), where=(TP + FN) > 0)
+    TNR_per_class = np.divide(TN, TN + FP, out=np.zeros_like(TN, dtype=float), where=(TN + FP) > 0)
+    FPR_per_class = np.divide(FP, FP + TN, out=np.zeros_like(FP, dtype=float), where=(FP + TN) > 0)
+    FNR_per_class = np.divide(FN, FN + TP, out=np.zeros_like(FN, dtype=float), where=(FN + TP) > 0)
+
+    TPR = np.mean(TPR_per_class)
+    TNR = np.mean(TNR_per_class)
+    FPR = np.mean(FPR_per_class)
+    FNR = np.mean(FNR_per_class)
+
+    accuracy, recall, precision, f1_score, specificity, mcc = confusion_matrix_metrics(cm)
+
     if figsize is None:
-        figsize = np.ceil(cm.shape[0]**0.5)
-        figsize_was_None = True
-    if figsize_was_None:
-        figsize = np.maximum(figsize, 5)
-        figsize = (figsize + 1, figsize)
+        size = np.ceil(cm.shape[0] ** 0.5)
+        size = np.maximum(size, 5)
+        figsize = (size + 1, size)
+
     if target_names is None:
         target_names = [chr(x + 65) for x in range(cm.shape[0])]
+
+    if len(target_names) != cm.shape[0]:
+        raise ValueError("Length of target_names must equal the number of classes in cm.")
 
     if cmap is None:
         cmap = plt.get_cmap('Blues')
 
     fig, ax = plt.subplots(figsize=figsize)
-    
+
     if fontsize is None:
-        fontsize = 6*(np.minimum(*figsize) / cm.shape[0])**0.5
+        fontsize = 6 * (np.minimum(*figsize) / cm.shape[0]) ** 0.5
+
     if fontsize_title is None:
         fontsize_title = 4 * fontsize
 
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
-    
+
     tick_marks = np.arange(len(target_names))
+
     ax.set_xticks(tick_marks)
-    ax.set_xticklabels(target_names, rotation=45, fontsize = fontsize)
+    ax.set_xticklabels(target_names, rotation=45, fontsize=fontsize)
     ax.set_yticks(tick_marks)
-    ax.set_yticklabels(target_names, fontsize = fontsize)
+    ax.set_yticklabels(target_names, fontsize=fontsize)
+
+    cm_max = cm.max()
+    norm_factor = cm_max if cm_max > 0 else 1.0
+
     for i, j in itertools_product(range(cm.shape[0]), range(cm.shape[1])):
-        clr = calculate_contrasting_color(cm[i, j] / cm.max(), cmap)
-        if not show_zeros:
-            if cm[i, j] == 0:
-                continue
-        ax.text(j, i, f"{cm[i, j]:2.02f}", horizontalalignment="center", color=clr,
-                fontsize = fontsize)
+        value = cm[i, j]
+
+        if not show_zeros and value == 0:
+            continue
+
+        clr = calculate_contrasting_color(value / norm_factor, cmap)
+        ax.text(j, i, f"{value:2.02f}", horizontalalignment="center", color=clr, fontsize=fontsize)
 
     for i in range(cm.shape[0]):
-        rect = plt.Rectangle((i - 0.5, i - 0.5), 1, 1, fill=False, 
-                             edgecolor='darkred', lw=1, linestyle='--')
+        rect = plt.Rectangle((i - 0.5, i - 0.5), 1, 1, fill=False, edgecolor='darkred', lw=1, linestyle='--')
         ax.add_patch(rect)
 
-    ax.set_ylabel('True label', fontsize = fontsize)
-    ax.set_xlabel('Predicted label', fontsize = fontsize)
+    ax.set_ylabel('True label', fontsize=fontsize)
+    ax.set_xlabel('Predicted label', fontsize=fontsize)
+
+    def remove_flag(text, flag):
+        while flag.lower() in text.lower():
+            idx = text.lower().find(flag.lower())
+            text = text[:idx] + text[idx + len(flag):]
+
+        return text
+
     if title is None:
-        title_str = f'Average TP={TP:.02f}, TN={TN:.02f}, FP={FP:.02f}, FN={FN:.02f}'
+        title_str = f'TPR={TPR:.4f}, TNR={TNR:.4f}, FPR={FPR:.4f}, FNR={FNR:.4f}'
+
     else:
-        title_str = ''
-        if '_truth' in title.lower():
-            title_str += f'Average TP={TP:.02f}, TN={TN:.02f}, FP={FP:.02f}, FN={FN:.02f}\n'
-            title = title.replace('_truth', '')
-        if '_accuracy' in title.lower():
-            accuracy = (TP + TN) / (TP + TN + FP + FN)
-            title_str += f'Accuracy={accuracy:.04f}'
-            title = title.replace('_accuracy', '')
-        if '_recall' in title.lower():
-            recall = TP / (TP + FN) if (TP + FN) > 0 else 0
-            title_str += f', Recall={recall:.04f}'
-            title = title.replace('_recall', '')
-        if '_precision' in title.lower():
-            precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-            title_str += f', Precision={precision:.04f}'
-            title = title.replace('_precision', '')
-        if '_f1_score' in title.lower():
-            f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-            title_str += f', F1-Score={f1_score:.04f}'
-            title = title.replace('_f1_score', '')
-        if '_specificity' in title.lower():
-            specificity = TN / (TN + FP) if (TN + FP) > 0 else 0
-            title_str += f', Specificity={specificity:.04f}'
-            title = title.replace('_specificity', '')
-        if '_mcc' in title.lower():
-            numerator = (TP * TN) - (FP * FN)
-            denominator = ((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)) ** 0.5
-            mcc = numerator / denominator if denominator > 0 else 0
-            title_str += f', MCC={mcc:.04f}'
-            title = title.replace('_mcc', '')
-            
-        if len(title) > 0:
-            if title[-1] != '\n':
-                title += '\n'
-        title_str = title + title_str
-        
-    ax.set_title(title_str, fontsize = fontsize_title)
-    plt_colorbar(im, colorbar_invisible=False, colorbar_aspect = fontsize**0.5 * 4, 
-                 fontsize = fontsize, tick_labels = target_names)
+        title_parts = []
+        title_lower = title.lower()
+
+        if '_truth' in title_lower:
+            title_parts.append(f'TPR={TPR:.4f}, TNR={TNR:.4f}, FPR={FPR:.4f}, FNR={FNR:.4f}')
+            title = remove_flag(title, '_truth')
+
+        metrics_map = [
+            ('_accuracy', f'Accuracy={accuracy:.4f}'),
+            ('_recall', f'Recall={recall:.4f}'),
+            ('_precision', f'Precision={precision:.4f}'),
+            ('_f1_score', f'F1-Score={f1_score:.4f}'),
+            ('_specificity', f'Specificity={specificity:.4f}'),
+            ('_mcc', f'MCC={mcc:.4f}'),
+        ]
+
+        for key, value in metrics_map:
+            if key in title_lower:
+                title_parts.append(value)
+                title = remove_flag(title, key)
+
+        title = title.strip()
+
+        if title and not title.endswith('\n'):
+            title += '\n'
+
+        title_str = title + ', '.join(title_parts)
+
+    ax.set_title(title_str, fontsize=fontsize_title)
+
+    plt_colorbar(im, colorbar_invisible=False, colorbar_aspect=fontsize**0.5 * 4, fontsize=fontsize, tick_labels=target_names)
+
     return fig, ax
 
 def complex2hsv_colorbar(
@@ -3473,9 +3550,17 @@ class imshow_gui_by_function:
             pass
 
 def FunctionImshowGUI_test():
+    
     def gbys(L, s):
+        import numpy as np
+        from scipy import ndimage
         L = int(L)
-        return pyms.Gaussian_2dkernel(L, s).numpy()
+        kernel = np.zeros((L, L))
+        kernel[L // 2, L // 2] = 1.0
+        radius = (L - 1) / 2.0
+        kernel = ndimage.gaussian_filter(kernel, sigma=s, truncate=radius/s)
+        return kernel / np.sum(kernel)
+
     imshow_gui_by_function(gbys, ['L', 's'], [[3, 100], [0.001, 30]])
 
 if __name__ == '__main__':

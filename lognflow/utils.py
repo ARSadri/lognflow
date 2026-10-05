@@ -1,6 +1,4 @@
-import os
-from pathlib import Path as pathlib_Path
-import posixpath
+import os, time, pathlib, posixpath
 import numpy as np
 from .printprogress import printprogress
 
@@ -75,13 +73,16 @@ class _Richprint:
         table=None,
         style="cyan",
         title=None,
-        width=80,
+        width=None,
         sep=" ",
         end="\n",
     ):
         console = self.console
         Table = self.Table
         Panel = self.Panel
+
+        if width is not None:
+            console.width = width
 
         text = ''
         if args:
@@ -257,6 +258,7 @@ def print_table(
     style="cyan",
     title=None,
     end="\n",
+    **kwargs
 ):
     """
     Print a table using rich.
@@ -272,6 +274,7 @@ def print_table(
         style=style,
         title=title,
         end=end,
+        **kwargs,
     )
 
 def deepstr(obj):
@@ -423,7 +426,7 @@ def select_directory(default_directory = './'):
     """ Open dialog to select a directory
         It works for windows and Linux using PyQt5.
     
-       :param default_directory: pathlib_Path
+       :param default_directory: pathlib.Path
                 When dialog opens, it starts from this default directory.
     """
     from PyQt5.QtWidgets import QFileDialog, QApplication
@@ -439,7 +442,7 @@ def select_file():
     from PyQt5.QtWidgets import QFileDialog, QApplication
     _ = QApplication([])
     fpath = QFileDialog.getOpenFileName()
-    fpath = pathlib_Path(fpath[0])
+    fpath = pathlib.Path(fpath[0])
     return(fpath)
 
 def text_to_collection(text):
@@ -589,8 +592,8 @@ class SSHSystem:
 
     def upload(
         self,
-        local_root: pathlib_Path,
-        remote_root: pathlib_Path,
+        local_root: pathlib.Path,
+        remote_root: pathlib.Path,
         overwrite = False,
         *,
         verbose: bool = True):
@@ -601,27 +604,27 @@ class SSHSystem:
             Safe to re-run multiple times.
         """
         assert self.connected, 'not connected'
-        remote_root = pathlib_Path(remote_root)
-        local_root = pathlib_Path(local_root).resolve()
+        remote_root = pathlib.Path(remote_root)
+        local_root = pathlib.Path(local_root).resolve()
         total_fcount = 0
         for root, _, files in os.walk(local_root):
             for fname in files:
                 total_fcount += 1
             
         total_size, fcnt = 0, 0
-        local_root = pathlib_Path(local_root).resolve()
+        local_root = pathlib.Path(local_root).resolve()
         remote_root_posix = remote_root.as_posix()
         list_to_copy = []
         if verbose:
             pbar = printprogress(
                 total_fcount, title = f'Number of files to check: {total_fcount}')
         for root, _, files in os.walk(local_root):
-            root = pathlib_Path(root)
+            root = pathlib.Path(root)
             rel = root.relative_to(local_root)
 
             remote_dir = (
                 remote_root_posix
-                if rel == pathlib_Path(".")
+                if rel == pathlib.Path(".")
                 else posixpath.join(remote_root_posix, rel.as_posix())
             )
 
@@ -659,8 +662,8 @@ class SSHSystem:
 
     def download(
         self,
-        remote_root: pathlib_Path,
-        local_root: pathlib_Path,
+        remote_root: pathlib.Path,
+        local_root: pathlib.Path,
         overwrite=False,
         *,
         verbose: bool = True):
@@ -672,8 +675,8 @@ class SSHSystem:
         """
         assert self.connected, "not connected"
     
-        remote_root = pathlib_Path(remote_root).as_posix().rstrip("/")
-        local_root = pathlib_Path(local_root).resolve()
+        remote_root = pathlib.Path(remote_root).as_posix().rstrip("/")
+        local_root = pathlib.Path(local_root).resolve()
     
         # first pass: count files
         total_fcount = 0
@@ -689,9 +692,9 @@ class SSHSystem:
             )
     
         for rroot, _, files in self._remote_walk(remote_root):
-            rel = pathlib_Path(rroot).relative_to(remote_root)
+            rel = pathlib.Path(rroot).relative_to(remote_root)
             local_dir = (
-                local_root if rel == pathlib_Path(".") else local_root / rel
+                local_root if rel == pathlib.Path(".") else local_root / rel
             )
             local_dir.mkdir(parents=True, exist_ok=True)
     
@@ -730,7 +733,7 @@ class SSHSystem:
                 print("to")
                 print(f"{str_local_file}")
 
-    def ssh_ls(self, path: pathlib_Path):
+    def ssh_ls(self, path: pathlib.Path):
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(f'ls {path}')
             ls_result = stdout.readlines()
@@ -739,13 +742,13 @@ class SSHSystem:
             print(f"Error listing directory {path}: {e}")
             return []
 
-    def ssh_scp(self, source: pathlib_Path, destination: pathlib_Path):
+    def ssh_scp(self, source: pathlib.Path, destination: pathlib.Path):
         try:
             self.sftp_client.get(str(source), str(destination))
         except Exception as e:
             print(f"Error copying {source} to {destination}: {e}")
 
-    def ssh_rm(self, path: pathlib_Path):
+    def ssh_rm(self, path: pathlib.Path):
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(f'rm {path}')
             return stdout.read().decode(), stderr.read().decode()
@@ -754,8 +757,8 @@ class SSHSystem:
             return "", str(e)
 
     def monitor_and_download(
-        self, remote_folder: pathlib_Path, target_fname: str,
-        local_folder: pathlib_Path, interval=30
+        self, remote_folder: pathlib.Path, target_fname: str,
+        local_folder: pathlib.Path, interval=30
     ):
         import time
         interesting_file_path = remote_folder / target_fname
@@ -778,7 +781,7 @@ class SSHSystem:
             print(f"Deleting {file} from remote server")
             self.ssh_rm(file)
 
-    def is_file(self, path: pathlib_Path) -> bool:
+    def is_file(self, path: pathlib.Path) -> bool:
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(
                 f'test -f {path} && echo "exists"'
@@ -864,6 +867,19 @@ def printv(var, logger = print, var_name = None, tab = 0,
         logger(toprint, **kwargs_logger)
         return len(toprint)
     
+    import pathlib
+    if isinstance(var, pathlib.Path):
+        if var.is_file():
+            path_status = "is a file"
+        elif var.is_dir():
+            path_status = "is a dir"
+        else:
+            path_status = "does not exist"
+        
+        toprint += f', {path_status}, "{str(var)}"'
+        logger(toprint, **kwargs_logger)
+        return len(toprint)
+
     has_element_0 = False
     try:
         var_ = var.item()
@@ -957,12 +973,6 @@ def printv(var, logger = print, var_name = None, tab = 0,
     logger(toprint, **kwargs_logger)
     return len(toprint)
 
-def find_duplicates(a_list):
-    from collections import Counter
-    element_count = Counter(a_list)
-    duplicates = [item for item, count in element_count.items() if count > 1]
-    return duplicates
-
 class block_runner:
     """
     A Jupyter-like Python code runner that executes code in blocks based 
@@ -970,7 +980,7 @@ class block_runner:
     interactive execution.
 
     Attributes:
-        fpath (pathlib_Path): The path to the Python file to execute.
+        fpath (pathlib.Path): The path to the Python file to execute.
         logger_ (callable): An optional logger function to log messages.
         log (str): A string containing the accumulated log messages.
         saved_state (dict): A dictionary to hold saved kernel states.
@@ -1001,7 +1011,7 @@ class block_runner:
         self.figsize = figsize
         self.block_identifier = block_identifier
         self.logger_ = logger
-        self.fpath = pathlib_Path(fpath)
+        self.fpath = pathlib.Path(fpath)
         assert self.fpath.is_file(), f"File {fpath} does not exist."
         self.log = ''
         self.saved_state = {}
@@ -1023,6 +1033,12 @@ class block_runner:
                 print('-----------Block runner error-------------')
                 print(e)
                 print('-'*40)
+
+    def find_duplicates(self, a_list):
+        from collections import Counter
+        element_count = Counter(a_list)
+        duplicates = [item for item, count in element_count.items() if count > 1]
+        return duplicates
 
     def logger(self, toprint: str, end: str = '\n'):
         """
@@ -1121,7 +1137,7 @@ class block_runner:
                         f'block identifier {blk} is using a preserved word.'
                         ' Please do not use load, save and exit to name your'
                         'code blocks.')
-        for blk_id_rep in find_duplicates(block_identifiers):
+        for blk_id_rep in self.find_duplicates(block_identifiers):
             self.logger(f'block identifier {blk_id_rep} is used more than once.')
         buttons = {}
         for block_identifier in block_identifiers:
@@ -1176,90 +1192,138 @@ class block_runner:
         globals_[self.block_identifier] = show_and_ask_result
         return globals_
 
-def fit_loss_exponential_offset(loss_vals, settling_factor=5):
+def fit_loss_exponential_offset(loss_vals, time_vals, settling_factor=5, n_fit_points=1000):
     """
-    Fit an exponential decay model with offset to a training loss curve.
+    Fit an exponential decay model with offset to a loss curve sampled at arbitrary times.
 
-    The model assumes the loss decays as:
+    The fitted model is:
         L(t) = L_inf + A * exp(-t / tau)
 
     where:
-        - L_inf : steady-state loss (final asymptotic value)
-        - A     : initial amplitude above the steady-state
-        - tau   : exponential decay time constant
+        A     : amplitude of the decaying component.
+        tau   : exponential time constant, in the same units as `time_vals`.
+        L_inf : asymptotic loss as training approaches convergence.
 
-    After fitting, this function estimates how many epochs it would take
-    for the loss to effectively "settle" (settling_factor × tau).
+    The timestamps in `time_vals` do not need to be regularly spaced. Internally,
+    time is shifted so that the first observation occurs at t=0, which also makes
+    the fit numerically stable when absolute or Unix timestamps are supplied.
+
+    Training is considered effectively settled at:
+        t_settle = settling_factor * tau
+
+    For the default `settling_factor=5`, the exponential component has decreased
+    to exp(-5) ~= 0.0067 of its initial amplitude.
 
     Parameters
     ----------
     loss_vals : array-like of float
-        Sequence of loss values (e.g., per epoch or iteration).
+        Observed loss values.
+    time_vals : array-like of float
+        Times corresponding to `loss_vals`. Values may be irregularly spaced.
     settling_factor : float, optional
-        Multiple of the fitted time constant τ used to define when the loss
-        is considered settled. Default is 5.
+        Number of time constants used to define effective convergence.
+        Default is 5.
+    n_fit_points : int, optional
+        Number of regularly spaced points used to evaluate the fitted curve for
+        plotting and extrapolation. This does not affect the fitting itself.
+        Default is 1000.
 
     Returns
     -------
     tau : float
-        Estimated exponential decay time constant.
-    epochs_remaining : int
-        Number of epochs remaining until the loss is considered settled
-        (if the sequence has not yet reached settling_factor × tau).
+        Estimated exponential time constant.
+    time_remaining : float
+        Estimated time remaining from the last observation until the predicted
+        settling time, in the same units as `time_vals`.
     A : float
-        Amplitude of the exponential decay.
+        Estimated amplitude of the exponential decay.
     L_inf : float
-        Asymptotic (steady-state) loss value.
-    full_t : ndarray of int
-        Time indices up to the predicted settling time.
-    fitted_vals : ndarray of float
-        Exponential fit values evaluated over `full_t`.
+        Estimated asymptotic loss.
+    t_fit : ndarray
+        Time coordinates for the fitted and extrapolated curve, expressed in
+        the same absolute time coordinates as `time_vals`.
+    y_fit : ndarray
+        Model-predicted loss values evaluated at `t_fit`.
+    estimated_finish_time : float
+        Estimated absolute time at which the settling criterion is reached.
+    t_elapsed : ndarray
+        Recorded times shifted so that the first observation occurs at zero.
 
-    Notes
-    -----
-    - Useful for estimating convergence speed of training.
-    - If the loss does not follow a smooth exponential trend, the fit may
-      not converge or may produce unreliable parameters.
-    - The settling time (≈ 5 × tau) corresponds to when the loss is within
-      about 0.7% of its final value (since exp(-5) ≈ 0.007).
+    Example
+    -------
+    Assuming `data` contains the recorded loss values and `time` contains their
+    corresponding timestamps:
 
-    Examples
-    --------
-    >>> losses = [5.0, 3.2, 2.1, 1.5, 1.1, 0.95, 0.9]
-    >>> tau, remaining, A, L_inf, t_fit, y_fit = fit_loss_exponential_offset(losses)
-    >>> tau
-    2.3
-    >>> remaining
-    8
+        >>> tau, remaining, A, L_inf, t_fit, y_fit, finish_time, t_elapsed = (
+                fit_loss_exponential_offset(data, time))
+        >>> import matplotlib.pyplot as plt
+        >>> fig, ax = plt.subplots(figsize=(16, 8))
+        >>> ax.plot(time, data, '.', label='Recorded loss')
+        >>> ax.plot(t_fit, y_fit, label='Fit and prediction')
+        >>> ax.axvline(finish_time, linestyle='--', label='Estimated finish')
+        >>> ax.axhline(L_inf, linestyle=':', label='Estimated final loss')
+        >>> ax.set_xlabel('Time')
+        >>> ax.set_ylabel('Loss')
+        >>> ax.legend()
     """
+    import numpy as np
+    from scipy.optimize import curve_fit
+
+    loss_vals = np.asarray(loss_vals, dtype=float).squeeze()
+    time_vals = np.asarray(time_vals, dtype=float).squeeze()
+    if loss_vals.ndim != 1 or time_vals.ndim != 1:
+        raise ValueError("loss_vals and time_vals must be 1-D.")
+    if len(loss_vals) != len(time_vals):
+        raise ValueError("loss_vals and time_vals must have the same length.")
+    if len(loss_vals) < 3:
+        raise ValueError("At least 3 samples are required.")
+    
+    valid = np.isfinite(loss_vals) & np.isfinite(time_vals)
+    loss_vals = loss_vals[valid]
+    time_vals = time_vals[valid]
+    order = np.argsort(time_vals)
+    time_vals = time_vals[order]
+    loss_vals = loss_vals[order]
+    time_start = time_vals[0]
+    
+    t_elapsed = time_vals - time_start
+    if t_elapsed[-1] <= 0:
+        raise ValueError("time_vals must span a non-zero time interval.")
     def exponential_offset(t, A, tau, L_inf):
         return L_inf + A * np.exp(-t / tau)
     
-    from scipy.optimize import curve_fit
-
-    n = len(loss_vals)
-    t = np.arange(n)
-
-    # Initial parameter guesses
     L0 = loss_vals[0]
     L_inf_guess = loss_vals[-1]
-    A_guess = L0 - L_inf_guess
-    tau_guess = n / 2
+    A_guess = max(L0 - L_inf_guess, np.finfo(float).eps)
+    total_time = t_elapsed[-1]
+    dt = np.diff(t_elapsed)
+    positive_dt = dt[dt > 0]
+    if len(positive_dt):
+        typical_dt = np.median(positive_dt)
+    else:
+        typical_dt = total_time / len(loss_vals)
+    tau_guess = max(total_time / 2, typical_dt, np.finfo(float).eps)
 
-    popt, _ = curve_fit(
-        exponential_offset, t, loss_vals,
-        p0=[A_guess, tau_guess, L_inf_guess]
+    popt, pcov = curve_fit(
+        exponential_offset,
+        t_elapsed,
+        loss_vals,
+        p0=[A_guess, tau_guess, L_inf_guess],
+        bounds=([0, np.finfo(float).eps, -np.inf], [np.inf, np.inf, np.inf]),
+        maxfev=50_000,
     )
-
     A, tau, L_inf = popt
 
-    # Predict settling time and extrapolate fit
-    epochs_settle = int(np.ceil(settling_factor * tau))
-    epochs_remaining = max(0, epochs_settle - n)
-    full_t = np.arange(epochs_settle)
-    fitted_vals = exponential_offset(full_t, A, tau, L_inf)
+    settle_elapsed = settling_factor * tau
+    current_elapsed = t_elapsed[-1]
+    time_remaining = max(0.0, settle_elapsed - current_elapsed)
+    estimated_finish_time = time_start + settle_elapsed
+    plot_end_elapsed = max(current_elapsed, settle_elapsed)
+    fit_elapsed = np.linspace(0, plot_end_elapsed, n_fit_points)
+    t_fit = time_start + fit_elapsed
+    y_fit = exponential_offset(fit_elapsed, A, tau, L_inf)
 
-    return tau, epochs_remaining, A, L_inf, full_t, fitted_vals
+    return tau, time_remaining, A, L_inf, t_fit, y_fit, estimated_finish_time, t_elapsed
 
 
 def trim_losses(steps_avg_losses, steps_std_losses,
@@ -1414,3 +1478,320 @@ def sanitize_config(x, path="root", verbose=True, _is_root=True, _removed_flag=N
         if verbose:
             print(f"REMOVED {path} | type={type(x).__name__} | value={preview(x)}")
         return None
+
+save_configs_script = r"""\
+__IMPORTS__
+
+__CONFIG_ASSIGNMENTS__
+
+
+
+
+
+
+# -------------------------------------------------------------------------------
+#                     AUTO-GENERATED — DO NOT EDIT BELOW
+# -------------------------------------------------------------------------------
+import keyword as _keyword
+import types as _types
+from dataclasses import dataclass as _dataclass, field as _field
+from pathlib import Path as _Path
+
+_EXCLUDED = frozenset({'np', 'torch', 'Path', 'CFG'})
+
+def _is_user(k, v):
+    if k.startswith('_'):
+        return False
+    if k in _EXCLUDED:
+        return False
+    if isinstance(v, _types.ModuleType):
+        return False
+    return True
+
+def _build(obj, name):
+    if isinstance(obj, dict):
+        cls_dict = {'__module__': __name__, '__annotations__': {}}
+        for k, v in obj.items():
+            if not isinstance(k, str) or not k.isidentifier() or _keyword.iskeyword(k):
+                raise ValueError(f'Invalid config key: {k!r}')
+            built = _build(v, f'{name}_{k}')
+            if isinstance(built, type):
+                cls_dict['__annotations__'][k] = built
+                cls_dict[k] = _field(default_factory=built)
+            else:
+                cls_dict['__annotations__'][k] = object
+                cls_dict[k] = built
+        cls = _dataclass(type(name, (), cls_dict))
+        return _add_methods(cls)
+        
+    if obj is None or isinstance(obj, (bool, int, float, complex, str, bytes, tuple, _Path)):
+        return obj
+    return _field(default_factory=lambda o=obj: o)
+
+def _add_methods(cls):
+    cls.__getitem__ = lambda self, key: getattr(self, key)
+    cls.__setitem__ = lambda self, key, value: setattr(self, key, value)
+    cls.get = lambda self, key, default=None: getattr(self, key, default)
+    cls.__contains__ = lambda self, key: hasattr(self, key)
+    
+    def as_dict(self):
+        def convert(obj):
+            if hasattr(obj, '__dataclass_fields__'):
+                return {key: convert(getattr(obj, key)) for key in obj.__dataclass_fields__}
+            if isinstance(obj, dict):
+                return {k: convert(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [convert(v) for v in obj]
+            if isinstance(obj, tuple):
+                return tuple(convert(v) for v in obj)
+            return obj
+        return convert(self)
+        
+    def update(self, values=None, **kwargs):
+        if values is None:
+            values = {}
+        if hasattr(values, 'as_dict'):
+            values = values.as_dict()
+        values = dict(values)
+        values.update(kwargs)
+        for key, value in values.items():
+            if not hasattr(self, key):
+                raise KeyError(f'Unknown config key: {key!r}')
+            current = getattr(self, key)
+            if hasattr(current, '__dataclass_fields__') and isinstance(value, dict):
+                current.update(value)
+            else:
+                setattr(self, key, value)
+        return self
+        
+    cls.as_dict = as_dict
+    cls.update = update
+    return cls
+
+def _make_cfg():
+    data = {k: v for k, v in globals().items() if _is_user(k, v)}
+    return _build(data, 'CFG')()
+
+CFG = _make_cfg()
+# ================================================================================
+"""
+
+def job_handler_code():
+    import json, os, time, subprocess, pathlib
+    import numpy as np
+    from lognflow import getLogger, printv, print_line
+
+    user_root = pathlib.Path(r'/mle1_data/USERS/sadria20')
+    log_dir = user_root / 'projects/classifier_using_pretrained/winter_2026_CUFES'
+    classifier_checkpoint = user_root / 'projects/classifier_using_pretrained/logs/1786851869/model/model_240.pth'
+    script_name = "step1_2_run_classifier.py"
+    python_executable = user_root / "venv/.pixi/envs/default/bin/python"
+
+    script_path = pathlib.Path(script_name).absolute()
+    assert script_path.exists(), f'Worker script not found: {script_path}'
+    script_text = script_path.read_text()
+    required_keywords = ['fetch_nohup_job', 'finish_nohup_job', 'ETA.npy']
+    missing_keywords = [keyword for keyword in required_keywords if keyword not in script_text]
+    if missing_keywords:
+        raise RuntimeError(f'Worker script {script_path} is missing required job-handler keywords: {missing_keywords}')
+
+    logger = getLogger(log_dir=log_dir)
+    logger.log_code()
+    logger(f'[CHECK] Worker script has passed preflight check: {script_path}')
+
+    points = np.linspace(0, 412, 9, dtype='int')
+    starts = points[:-1]
+    ends = points[1:]
+    n_created = 0
+    for job_id, (start, end) in enumerate(zip(starts, ends)):
+        CFG = {}
+        CFG['start'] = start
+        CFG['end'] = end
+        CFG['classifier_checkpoint'] = classifier_checkpoint
+        fname = f'CFG_{job_id}.json'
+        CFG_jobs = logger.load(fname)
+        if CFG_jobs is not None:
+            if ('finished' in CFG_jobs) or ('visited_time_tag' in CFG_jobs):
+                continue
+        fpath = logger.save(fname, CFG, time_tag=False)
+        print(fpath, ' saved!')
+        n_created += 1
+    if n_created > 0:
+        print(f'{n_created} CFG files made!')
+    else:
+        print('No new CFG file was made!')
+    print_line('end of making CFG files')
+
+    check_interval = 1
+    worker_log_path = (pathlib.Path(logger.log_dir) / "all_processes_logs.log").absolute()
+    cmd = f"nohup {python_executable} -u {script_path} >> {worker_log_path} 2>&1 &"
+    files = logger.get_flist("CFG_*.json")
+    printv(logger)
+    printv(files, logger)
+
+    list_pids = []
+    list_pid_start_times = []
+    list_log_dir = []
+    list_log_name = []
+    for file_path in files:
+        CFG_jobs = json.loads(file_path.read_text())
+        if 'visited_time_tag' in CFG_jobs:
+            pid = CFG_jobs['pid']
+            pid_start_time = CFG_jobs['pid_start_time']
+            log_dir = CFG_jobs['log_dir']
+            log_name = pathlib.Path(CFG_jobs['job_fpath']).stem
+            list_pids.append(pid)
+            list_pid_start_times.append(pid_start_time)
+            list_log_dir.append(log_dir)
+            list_log_name.append(log_name)
+            logger(f'{file_path} is already there!')
+            continue
+        active_process = subprocess.Popen(cmd, shell=True)
+        logger(f"[LAUNCH] Submitted process for {file_path}")
+        visited = False
+        wrnd = 0
+        while not visited:
+            exit_code = active_process.poll()
+            assert exit_code is None or exit_code == 0, f"[ERROR] Failed to launch command: {cmd} (Exit code: {exit_code})"
+            CFG_jobs = json.loads(file_path.read_text())
+            if 'pid' in CFG_jobs:
+                print(f"PID: {CFG_jobs['pid']}")
+            if all(key in CFG_jobs for key in ['visited_time_tag', 'pid', 'pid_start_time', 'log_dir']):
+                tag = CFG_jobs['visited_time_tag']
+                pid = CFG_jobs['pid']
+                pid_start_time = CFG_jobs['pid_start_time']
+                log_dir = CFG_jobs['log_dir']
+                log_name = pathlib.Path(CFG_jobs['job_fpath']).stem
+                list_pids.append(pid)
+                list_pid_start_times.append(pid_start_time)
+                list_log_dir.append(log_dir)
+                list_log_name.append(log_name)
+                logger(f"[STATUS] File visited: {file_path} at timestamp {tag} (PID: {pid})")
+                visited = True
+            else:
+                time.sleep(check_interval)
+                if wrnd % 10 == 0:
+                    print('waiting for the job to start', end='')
+                    wrnd = 0
+                else:
+                    print('.', end='')
+                wrnd += 1
+        print('')
+    logger(f'All jobs launched. Logs routed to {worker_log_path}')
+    print_line('End of launching jobs!')
+
+    logger("\n--- Starting Monitoring Phase ---")
+    monitor_interval = 30
+
+    def is_running(pid, pid_start_time):
+        stat_path = pathlib.Path(f'/proc/{pid}/stat')
+        if not stat_path.exists():
+            return False
+        try:
+            fields = stat_path.read_text().split()
+            state = fields[2]
+            current_start_time = fields[21]
+        except Exception:
+            return False
+        if state == 'Z':
+            return False
+        return current_start_time == str(pid_start_time)
+
+    active_items = list(zip(list_log_dir, list_pids, list_pid_start_times, list_log_name))
+    while active_items:
+        
+        new_active_items = []
+        for log_d, pid, pid_start, log_n in active_items:
+            if is_running(pid, pid_start):
+                new_active_items.append((log_d, pid, pid_start, log_n))
+                continue
+            job_fpath = pathlib.Path(log_d) / f'{log_n}.json'
+            if job_fpath.exists():
+                CFG_jobs = json.loads(job_fpath.read_text())
+                if 'finished' in CFG_jobs:
+                    logger(f'[FINISHED] {log_n} PID {pid}')
+                else:
+                    logger(f'[FAILED] {log_n} PID {pid} stopped without finishing')
+            else:
+                logger(f'[FAILED] Could not find CFG file for {log_n}')
+        active_items = new_active_items
+
+        if active_items:
+            for log_dir, pid, pid_start_time, log_name in active_items:
+                logged = getLogger(log_dir=pathlib.Path(log_dir) / log_name)
+                try:
+                    ETA = logged.load('ETA.npy')
+                    logger(f'log with name {log_name} and pid {pid} is at {ETA}')
+                except Exception:
+                    logger(f'log with name {log_name} and pid {pid} has no ETA')
+                    logger(f'here is its log_dir {log_dir}')
+                del logged
+            time.sleep(monitor_interval)
+        else:
+            logger('No active job is remaining!')
+    logger("Monitoring complete.")
+
+def nohup_job_inspect_script(script_fpath):
+    script_path = pathlib.Path(script_fpath).absolute()
+    assert script_path.exists(), f'Worker script not found: {script_path}'
+    script_text = script_path.read_text()
+    required_keywords = ['nohup_job_fetch', 'nohup_job_finish', 'ETA.npy']
+    missing_keywords = [keyword for keyword in required_keywords if keyword not in script_text]
+    if missing_keywords:
+        raise RuntimeError(f'Worker script {script_path} is missing required job-handler keywords: {missing_keywords}')
+    return script_path
+
+def nohup_job_fetch(log_dir, pattern='CFG_*.json'):
+    """
+    Scans log_dir for JSON jobs matching pattern, atomically claims the first
+    unvisited one, and returns its configuration dictionary.
+    """
+    from lognflow import getLogger
+    log_dir = pathlib.Path(log_dir).absolute()
+    logged = getLogger(log_dir=log_dir)
+    fnames_jobs = logged.get_namelist(pattern)
+    for fname_job in fnames_jobs:
+        CFG_jobs = logged.load(fname_job)
+        if 'visited_time_tag' in CFG_jobs:
+            continue
+        lock_path = logged.log_dir / f'{fname_job}.lock'
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+        except FileExistsError:
+            continue
+        try:
+            CFG_jobs = logged.load(fname_job)
+            if 'visited_time_tag' in CFG_jobs:
+                continue
+            timestamp = int(time.time())
+            CFG_jobs['job_fpath'] = str((logged.log_dir / fname_job).absolute())
+            CFG_jobs['log_dir'] = str(log_dir)
+            CFG_jobs['visited_time_tag'] = timestamp
+            CFG_jobs['pid'] = os.getpid()
+            CFG_jobs['pid_start_time'] = pathlib.Path(f'/proc/{CFG_jobs["pid"]}/stat').read_text().split()[21]
+
+            logged.save(fname_job, CFG_jobs, time_tag=False)
+            verify_data = logged.load(fname_job)
+            if verify_data.get('visited_time_tag') != timestamp:
+                raise RuntimeError(f'Could not verify claim of {fname_job}')
+            CFG_jobs['job_fpath'] = pathlib.Path(CFG_jobs['job_fpath'])
+            CFG_jobs['log_dir'] = pathlib.Path(CFG_jobs['log_dir'])
+            print(f"Running job: {CFG_jobs}")
+            return CFG_jobs
+        finally:
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
+    print("No unvisited jobs found.")
+    exit(0)
+
+def nohup_job_finish(CFG_jobs):
+    import json, pathlib, time
+    job_fpath = pathlib.Path(CFG_jobs['job_fpath'])
+    data = json.loads(job_fpath.read_text())
+    data['finished'] = 1
+    data['finished_time_tag'] = int(time.time())
+    job_fpath.write_text(json.dumps(data, indent=4))
+    return job_fpath

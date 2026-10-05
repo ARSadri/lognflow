@@ -240,6 +240,8 @@ class printprogress:
             raise StopIteration
     
     def _end(self):
+        try: self.FLAG_ended
+        except AttributeError: self.FLAG_ended = False
         if(not self.FLAG_ended):
             if (self.print_function is not None):
                 self._print_func(f' --> {time() - self.startTime:.2f}s')

@@ -500,3 +500,7 @@ History
 0.15.01 (2026-05-07)
 -------------------
 * save_configs handles None too now.
+
+0.15.02 (2026-10-05)
+-------------------
+* save_configs handles many.

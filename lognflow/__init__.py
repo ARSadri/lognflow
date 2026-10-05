@@ -2,14 +2,14 @@
 
 __author__ = 'Alireza Sadri'
 __email__ = 'arsadri@gmail.com'
-__version__ = '0.15.01'
+__version__ = '0.15.02'
 
 from .lognflow import getLogger
 from .printprogress import printprogress
-from .plt_utils import (
-    plt_imshow, plt_imshow_subplots, subplots_grid, plt_plot, plt_hist2)
-from .utils import (select_directory, select_file, block_runner, printv,
-                    print_line, print_box, print_table, has_len, sanitize_config)
+from .plt_utils import (imshow_gui_by_function,
+    plt_imshow, plt_imshow_subplots, subplots_grid, plt_plot, question_dialog)
+from .utils import (select_directory, select_file, printv,
+                    print_line, print_box, print_table, has_len, )
 from .multiprocessor import multiprocessor
 
 lognflow = getLogger

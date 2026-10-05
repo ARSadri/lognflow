@@ -57,7 +57,8 @@ from   .utils      import (repr_raw,
                            text_to_collection,
                            printv,
                            deepstr,
-                           prepare_for_np_savez)
+                           prepare_for_np_savez,
+                           save_configs_script)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -79,21 +80,6 @@ class textinlog:
     log_size            : int     
     last_log_flush_time : float
     log_flush_period    : int
-
-save_configs_script = """\
-import numpy as np
-import torch
-
-# ---------------- CONFIG VARIABLES ----------------
-
-{assignments}
-
-# ---------------- CONFIG ACCESSOR ----------------
-
-CFG = dict(
-{cfg_dict}
-)
-"""
 
 class getLogger:
     """Initialization
@@ -231,6 +217,7 @@ class getLogger:
         else:
             self.log_dir_provided = True
             self.log_dir = pathlib_Path(log_dir)
+            self.logs_root = log_dir.parent
 
         self.logged = self
         
@@ -650,17 +637,17 @@ class getLogger:
             curr_textinlog.last_log_flush_time = self.time_stamp
 
     def text(self, 
-                 log_name: str = None,
-                 to_be_logged = '', 
-                 log_time_stamp = True,
-                 print_text = None,
-                 log_size_limit: int = int(1e+7),
-                 time_tag: bool = None,
-                 log_flush_period: int = None,
-                 flush = False,
-                 end = '\n',
-                 new_file = False,
-                 suffix = None):
+             log_name: str = None,
+             to_be_logged = '', 
+             log_time_stamp = True,
+             print_text = None,
+             log_size_limit: int = int(1e+7),
+             time_tag: bool = None,
+             log_flush_period: int = None,
+             flush = False,
+             end = '\n',
+             new_file = False,
+             suffix = None):
         """ log a string into a text file
             You can shose a name for the log and give the text to put in it.
             Also you can pass a small numpy array. You can ask it to put time
@@ -702,7 +689,10 @@ class getLogger:
         time_tag = self.time_tag if (time_tag is None) else time_tag
         log_flush_period = self.log_flush_period \
             if (log_flush_period is None) else log_flush_period
-        log_name = self.log_name if (log_name is None) else log_name
+        if log_name is None:
+            log_name = self.log_name
+        else:
+            log_time_stamp = False
 
         param_dir, param_name, suffix = self._param_dir_name_suffix(
             log_name, suffix)
@@ -721,13 +711,13 @@ class getLogger:
             print_text = self._print_text
         if(print_text):
             if(log_time_stamp):
-                print(f'T:{self.time_stamp:>6.6f}| ', end='')
+                print(f'T:{self.time_stamp:>6.1f}| ', end='')
             print(to_be_logged, end = end)
 
         curr_textinlog = self._loggers_dict[log_dirnamesuffix]
         _logger = []
         if(log_time_stamp):
-            _time_str = f'T:{self.time_stamp:>6.6f}| '
+            _time_str = f'T:{self.time_stamp:>6.1f}| '
             _logger.append(_time_str)
         if(isinstance(to_be_logged, list)):
             for _ in to_be_logged:
@@ -1038,111 +1028,129 @@ class getLogger:
     def save_configs(self, configs_dict, max_array_size=256):
         if not self.enabled:
             return
+        import keyword
+        import pathlib
+
+        if hasattr(configs_dict, 'as_dict'):
+            configs_dict = configs_dict.as_dict()
+        if not isinstance(configs_dict, dict):
+            raise TypeError('configs_dict must be a dict or CFG object.')
+            
         time_tag = False
         suffix = 'py'
-        param_dir, param_name, suffix = self._param_dir_name_suffix(
-            'configs_gen', suffix
-        )
+        param_dir, param_name, suffix = self._param_dir_name_suffix('configs_gen', suffix)
         self.configs_fpath = self._get_fpath(param_dir, param_name, suffix, time_tag)
 
-        def serialize(obj, k, max_array_size):
+        class _SkipConfig(Exception):
+            pass
 
-            # Torch tensor 
-            try:
-                import torch
-                if isinstance(obj, torch.Tensor):
+        try:
+            import torch
+        except ImportError:
+            torch = None
+            
+        try:
+            import numpy as np
+        except ImportError:
+            np = None
 
-                    numel = obj.numel()
+        needs_import = {'numpy': False, 'torch': False, 'pathlib': False}
 
-                    if numel > max_array_size:
-                        self.text(None, f'[save_configs]: variable {k} not '
-                              f'saved as its size {numel} is larger than given '
-                              f'threshold max_array_size: {max_array_size}')
-                        return 'lognflow_save_configs_skipped'
-
-                    data = obj.detach().cpu().tolist()
-                    dtype = str(obj.dtype).replace("torch.", "")
-                    device = str(obj.device)
-
-                    return (
-                        f"torch.tensor({data}, "
-                        f"dtype=getattr(torch, '{dtype}'), "
-                        f"device='{device}')"
-                    )
-            except Exception as e:
-                pass
-
-            #  NumPy array 
-            if isinstance(obj, np.ndarray):
+        def serialize(obj, key):
+            if hasattr(obj, 'as_dict'):
+                obj = obj.as_dict()
+                
+            if torch is not None and isinstance(obj, torch.Tensor):
+                numel = obj.numel()
+                if numel > max_array_size:
+                    self.text(None, f'[save_configs]: variable {key} not saved as its size {numel} is larger than max_array_size: {max_array_size}')
+                    raise _SkipConfig
+                needs_import['torch'] = True
+                data = obj.detach().cpu().tolist()
+                dtype = str(obj.dtype).replace('torch.', '')
+                device = str(obj.device)
+                return f"torch.tensor({data!r}, dtype=torch.{dtype}, device={device!r})"
+                
+            if np is not None and isinstance(obj, np.ndarray):
                 numel = obj.size
                 if numel > max_array_size:
-                    self.text(None, f'[save_configs]: variable {k} not '
-                              f'saved as its size {numel} is larger than given '
-                              f'threshold max_array_size: {max_array_size}')
-                    return 'lognflow_save_configs_skipped'
-
-                return f"np.array({obj.tolist()})"
-
+                    self.text(None, f'[save_configs]: variable {key} not saved as its size {numel} is larger than max_array_size: {max_array_size}')
+                    raise _SkipConfig
+                needs_import['numpy'] = True
+                return f"np.array({obj.tolist()!r}, dtype=np.dtype({obj.dtype.str!r}))"
+                
+            if isinstance(obj, pathlib.Path):
+                needs_import['pathlib'] = True
+                return f"Path({str(obj)!r})"
+                
             if obj is None:
+                return 'None'
+            if isinstance(obj, (bool, int, float, complex, str, bytes)):
                 return repr(obj)
-
-            if isinstance(obj, (int, float, bool, str)):
-                return repr(obj)
-
             if isinstance(obj, list):
-                return "[" + ", ".join(serialize(x, k, max_array_size) for x in obj) + "]"
-
+                return '[' + ', '.join(serialize(value, key) for value in obj) + ']'
             if isinstance(obj, tuple):
-                inner = ", ".join(serialize(x, k, max_array_size) for x in obj)
-                return f"({inner}{',' if len(obj)==1 else ''})"
-
+                inner = ', '.join(serialize(value, key) for value in obj)
+                if len(obj) == 1:
+                    inner += ','
+                return f'({inner})'
             if isinstance(obj, dict):
                 items = []
-                for k, v in obj.items():
-                    items.append(f'"{k}": {serialize(v, k, max_array_size)}')
-                return "{" + ", ".join(items) + "}"
-
-            self.text(None, f"[save_configs] Unsupported type for {k}: {type(obj)}")
-            return 'lognflow_save_configs_skipped'
+                for sub_key, value in obj.items():
+                    if not isinstance(sub_key, str) or not sub_key.isidentifier() or keyword.iskeyword(sub_key):
+                        raise ValueError(f'Invalid config key: {sub_key!r}')
+                    items.append(f'{sub_key!r}: {serialize(value, f"{key}.{sub_key}")}')
+                return '{' + ', '.join(items) + '}'
+                
+            self.text(None, f'[save_configs] Unsupported type for {key}: {type(obj)}')
+            raise _SkipConfig
 
         assignments = []
-        keys = []
-
-        for k, v in configs_dict.items():
-            if v is not None:
-                val_ = serialize(v, k, max_array_size)
-                if val_ != 'lognflow_save_configs_skipped':
-                    assignments.append(f"{k} = {val_}")
-                    keys.append(k)
-
-        script = save_configs_script.format(
-            assignments="\n\n".join(assignments),
-            cfg_dict=",\n".join(f"    {k}={k}" for k in keys),
-        )
-
-        self.configs_fpath.write_text(script)
-
+        for key, value in configs_dict.items():
+            if not isinstance(key, str) or not key.isidentifier() or keyword.iskeyword(key) or key.startswith('_') or key in {'np', 'torch', 'Path', 'CFG'}:
+                raise ValueError(f'Invalid config name: {key!r}')
+            try:
+                value_str = serialize(value, key)
+            except _SkipConfig:
+                continue
+            assignments.append(f'{key} = {value_str}')
+            
+        import_lines = []
+        if needs_import['numpy']:
+            import_lines.append('import numpy as np')
+        if needs_import['torch']:
+            import_lines.append('import torch')
+        if needs_import['pathlib']:
+            import_lines.append('from pathlib import Path')
+            
+        script = save_configs_script.replace('__IMPORTS__', '\n'.join(import_lines))
+        script = script.replace('__CONFIG_ASSIGNMENTS__', '\n'.join(assignments))
+        
+        self.configs_fpath.write_text(script, encoding='utf-8')
         return self.configs_fpath
-    
-    def load_configs(self):
 
-        import importlib.util
+    def load_configs(self, current_configs=None):
         import sys
-
-        try: 
-            assert self.configs_fpath.is_file() , "No configs have been saved."
-        except:
-            return None
-
-        module_name = f"_dynamic_configs_{self.configs_fpath.stem}"
-
-        spec = importlib.util.spec_from_file_location(module_name, self.configs_fpath)
-        module = importlib.util.module_from_spec(spec)
-
+        import types
+        configs_fpath = getattr(self, 'configs_fpath', self.log_dir / 'configs_gen.py')
+        if not configs_fpath.is_file():
+            return current_configs
+        self.configs_fpath = configs_fpath
+        module_name = f'_dynamic_configs_{configs_fpath.stem}_{id(self)}'
+        module = types.ModuleType(module_name)
+        module.__file__ = str(configs_fpath)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-
-        return module.CFG
+        try:
+            source = configs_fpath.read_text(encoding='utf-8')
+            code = compile(source, str(configs_fpath), 'exec')
+            exec(code, module.__dict__)
+        except Exception as e:
+            sys.modules.pop(module_name, None)
+            if current_configs is not None:
+                self.text(None, f'[load_configs]: Could not reload configs. Keeping current configs. {type(e).__name__}: {e}')
+                return current_configs
+            raise
+        return module.CFG.as_dict()
 
     def savefig(self, 
                 parameter_name: str, 
@@ -2461,6 +2469,7 @@ class getLogger:
                 logger('Hello lognflow')
             The text (str(...)) will be passed to the main log text file.
         """
+        kwargs.setdefault('time_tag', False)
         fpath = self.text(None, *args, **kwargs)
         return fpath
 
