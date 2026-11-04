@@ -300,7 +300,7 @@ def plt_hist2(data, bins=30, cmap='viridis', use_bars = False, function_on_z = N
         dz = function_on_z(dz)
     norm_dz = dz / dz.max() if dz.max() > 0 else dz
 
-    colors = plt.cm.get_cmap(cmap)(norm_dz)
+    colors = plt.colormaps[cmap](norm_dz)
 
     if fig_ax is None:
         fig = plt.figure(figsize = figsize)
@@ -2055,229 +2055,134 @@ def plt_imshow_subplots(
         titles=[], cmaps=[], colorbar=True, margin = 0.025,
         inter_image_margin = 0.01, title_y = None,
         colorbar_aspect=None, colorbar_pad_fraction=0.05, title_ax_gap = None,
-        figsize=None, remove_axis_ticks=True, **kwargs):
+        figsize=None, font_size=None, remove_axis_ticks=True, **kwargs):
     """
     Display multiple images on a single Matplotlib figure by laying them out
-    using absolute coordinates normalized to the figure canvas. This provides
-    fine-grained control over placement, margins, and colorbars compared to
-    standard `plt.subplots`.
-
-    The function automatically determines a grid layout if neither explicit
-    `grid_locations` nor `frame_shape` are provided. It supports per-image colormaps,
-    a global or complex-number-aware colorbar, optional figure title placement,
-    and automatic axis tick removal.
-
-    Parameters
-    ----------
-    images : Sequence[array-like]
-        A list/tuple of images. Each image can be:
-        - 2D array (H, W) for grayscale.
-        - 3D array (H, W, C) for RGB/RGBA.
-        - Complex-valued 2D array (H, W) — will be visualized using HSV mapping
-          (via `complex2hsv`), with a tailored inset colorbar (via
-          `complex2hsv_colorbar`) if `colorbar=True`.
-
-        PyTorch tensors are accepted and will be moved to CPU and converted to
-        NumPy internally.
-
-    grid_locations : array-like of shape (N, 2), optional
-        Absolute pixel-based top-left coordinates for each image (x, y),
-        *before* normalization to the figure canvas. If omitted, locations are
-        computed from `frame_shape` or an automatically determined grid.
-
-    frame_shape : tuple of (rows, cols), optional
-        The desired grid shape used to compute `grid_locations` when not
-        explicitly supplied. If not provided:
-        - For N in {2, 3}, the function chooses a row or column vector based on
-          the dominant image orientation (wide vs tall).
-        - Otherwise, it approximates a square grid (ceil(sqrt(N)) by rows/cols).
-
-    title : str, optional
-        Figure-level title (suptitle). If provided, it is positioned just above
-        the topmost image; use `title_y` for custom vertical placement.
-
-    titles : Sequence[str] or bool, default []
-        Per-image titles. If `True`, will default to integer indices `[0..N-1]`.
-        If a sequence, its length should be ≥ N (extra entries are ignored).
-        If omitted/empty, no individual axes titles are set.
-
-    cmaps : Sequence[str or Colormap], optional
-        Per-image Matplotlib colormap specifications. If provided, its length
-        must equal the number of images N. Do **not** pass `cmap` in `**kwargs`
-        simultaneously when using this list.
-
-    colorbar : bool, default True
-        If True, a colorbar is added:
-        - For real-valued images: a standard colorbar via `plt_colorbar`.
-        - For complex images: an inset HSV colorbar via `complex2hsv_colorbar`.
-        When enabled, the function enforces a minimum margin of 0.2 around/among
-        images for visual spacing.
-
-    margin : float, default 0.025
-        Fraction (relative to max image width/height) added around the outer
-        bounding box of all images. Ignored and replaced by ≥ 0.2 if
-        `colorbar=True`.
-
-    inter_image_margin : float, default 0.01
-        Fractional spacing between neighboring images when the grid is
-        auto-computed. Ignored and replaced by ≥ 0.2 if `colorbar=True`.
-
-    title_y : float, optional
-        Explicit normalized y-position for the figure suptitle. If omitted,
-        the function places the title just above the tallest axes block by a
-        heuristic gap (see `title_ax_gap`).
-
-    colorbar_aspect : float, optional
-        Aspect ratio passed to `plt_colorbar` for real-valued images.
-
-    colorbar_pad_fraction : float, default 0.05
-        Fractional padding between the axes and the colorbar for real-valued
-        images (passed to `plt_colorbar`).
-
-    title_ax_gap : float, optional
-        Gap between the top of the topmost axes and the figure title, in
-        normalized figure coordinates. If omitted, a heuristic is used:
-        - 0.1 if `titles` is provided (per-axis titles present),
-        - 0.05 otherwise.
-
-    figsize : tuple, optional
-        Passed to `plt.figure(figsize=...)`. If None, Matplotlib’s default
-        figure size is used.
-
-    remove_axis_ticks : bool, default True
-        If True, calls `ax.axis('off')` to hide axes spines and ticks for each
-        image.
-
-    **kwargs
-        Additional keyword arguments forwarded to `imshow` for real-valued
-        images (e.g., `vmin`, `vmax`, `interpolation`, `cmap` if `cmaps` not
-        supplied). For complex images, `vmin` and `vmax` are used to scale the
-        magnitude component in the inset HSV colorbar.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The created Matplotlib figure.
-
-    axes : list[matplotlib.axes.Axes]
-        A list of axes, one per image, in the same order as `images`.
-
-    Notes
-    -----
-    - **Layout normalization**: Input `grid_locations` are interpreted in pixel
-      space (x from left, y from bottom), then normalized to [0, 1] relative to
-      an automatically computed figure bounding box that includes `margin`.
-    - **Complex images**: Complex arrays are visualized via HSV conversion
-      (`complex2hsv`) mapping magnitude to value and angle/phase to hue. If
-      `colorbar=True`, an inset axes is added inside the image axes showing the
-      magnitude and phase legend via `complex2hsv_colorbar`.
-    - **Per-image colormaps**: When `cmaps` is provided, do not also pass a
-      global `cmap` in `**kwargs`. The function asserts that `len(cmaps) == N`.
-    - **Window title**: If supported by the Matplotlib backend, the OS window
-      title is set to `title`.
-
-    Examples
-    --------
-    Basic usage with automatic grid:
-
-    >>> fig, axes = plt_imshow_subplots([img1, img2, img3], title="Samples")
-
-    Specify a 2x2 grid and per-image titles:
-
-    >>> fig, axes = plt_imshow_subplots(
-    ...     [img_a, img_b, img_c, img_d],
-    ...     frame_shape=(2, 2),
-    ...     titles=["A", "B", "C", "D"],
-    ...     figsize=(8, 8)
-    ... )
-
-    Per-image colormaps (ensure `cmaps` length matches number of images):
-
-    >>> fig, axes = plt_imshow_subplots(
-    ...     [img_gray, img_edges, img_heat],
-    ...     cmaps=["gray", "magma", "viridis"]
-    ... )
-
-    Complex-valued image with HSV colorbar:
-
-    >>> fig, axes = plt_imshow_subplots(
-    ...     [complex_img],
-    ...     colorbar=True,  # shows HSV inset colorbar
-    ...     vmin=0, vmax=np.abs(complex_img).max()
-    ... )
-
-    Manual placement using `grid_locations` (x, y in pixels) for two images:
-
-    >>> H, W = img1.shape[:2]
-    >>> grid_locations = np.array([[0, 0], [W * 1.1, 0]])  # side-by-side
-    >>> fig, axes = plt_imshow_subplots(
-    ...     [img1, img2],
-    ...     grid_locations=grid_locations,
-    ...     margin=0.05, inter_image_margin=0.02
-    ... )
+    using absolute coordinates normalized to the figure canvas.
     """
 
     if colorbar:
         margin = np.maximum(margin, 0.2)
-        inter_image_margin = np.maximum(margin, 0.2)
+        inter_image_margin = np.maximum(inter_image_margin, 0.2)
 
     N = len(images)
-    # Determine the maximum image size
-    max_width = max(img.shape[1] for img in images)
-    max_height = max(img.shape[0] for img in images)
-
-    if titles is True: titles = np.arange(N, dtype='int')
     
+    processed_images = []
+    for img in images:
+        try:
+            img = img.detach().cpu().numpy()
+        except AttributeError:
+            pass
+        processed_images.append(img)
+        
+    max_width = max(img.shape[1] for img in processed_images)
+    max_height = max(img.shape[0] for img in processed_images)
+
+    if titles is True:
+        titles = np.arange(N, dtype='int')
+
+    # 1. Determine grid shape if not given
     if frame_shape is None:
         if (N == 2) | (N == 3):
             frame_shape = (N, 1) if max_width > max_height else (1, N)
-
-    if grid_locations is None:
-        if frame_shape is None:
+        else:
             cols = int(np.ceil(np.sqrt(N)))
             rows = int(np.ceil(N / cols))
-        else:
-            rows, cols = frame_shape
+            frame_shape = (rows, cols)
 
-        N = np.minimum(N, rows * cols)
-        spacing = np.array([max_height, max_width]) * (1 + inter_image_margin)
-        grid_locations = []
-        for col in range(cols):
-            for row in range(rows):
-                loc_x = col * spacing[1]
-                loc_y =  max_height*rows - row * spacing[0]
-                grid_locations.append([loc_x, loc_y])
-        # grid_locations = np.array([[col * spacing[1], max_height*rows - row * spacing[0]] for row in range(rows) for col in range(cols)])
-        grid_locations = np.array(grid_locations)[:N]  # Trim to number of images
+    rows, cols = frame_shape
+
+    has_titles = (titles is not None) and (len(titles) > 0)
+
+    computed_font_sizes = []
+    for cnt in range(N):
+        img_w = processed_images[cnt].shape[1]
+        if has_titles and cnt < len(titles) and titles[cnt] is not None:
+            t_str = str(titles[cnt])
+            t_len = len(t_str)
+            if font_size is None:
+                if t_len > 0:
+                    fs = min(14.0, max(6.0, (0.75 * img_w) / t_len * 1.8))
+                else:
+                    fs = 10.0
+            else:
+                fs = font_size
+        else:
+            fs = font_size if font_size is not None else 10.0
+        computed_font_sizes.append(fs)
+
+    row_heights = []
+    for r in range(rows):
+        indices = [r * cols + c for c in range(cols) if r * cols + c < N]
+        if not indices:
+            row_heights.append(max_height)
+            continue
+        
+        base_h = max(processed_images[i].shape[0] for i in indices)
+        
+        if has_titles:
+            max_fs_in_row = max(computed_font_sizes[i] for i in indices)
+            title_height_px = max_fs_in_row * 1.8
+            effective_h = base_h + title_height_px
+        else:
+            effective_h = base_h
             
+        row_heights.append(effective_h)
+
+    col_widths = []
+    for c in range(cols):
+        indices = [r * cols + c for r in range(rows) if r * cols + c < N]
+        col_widths.append(max(processed_images[i].shape[1] for i in indices) if indices else max_width)
+
+    if figsize is None and grid_locations is None:
+        sum_row_heights = sum(row_heights)
+        sum_col_widths = sum(col_widths)
+        scale = 1.0 / 90.0  # Pixels-to-inches scaling heuristic
+        figsize = (max(4.0, sum_col_widths * scale), max(3.0, sum_row_heights * scale))
+
+    if grid_locations is None:
+        grid_locations = []
+        current_y = sum(row_heights) * (1 + inter_image_margin)
+        for r in range(rows):
+            h = row_heights[r]
+            current_y -= h * (1 + inter_image_margin)
+            current_x = 0
+            for c in range(cols):
+                w = col_widths[c]
+                if r * cols + c < N:
+                    base_img_h = processed_images[r * cols + c].shape[0]
+                    title_offset = h - base_img_h if has_titles else 0
+                    grid_locations.append([current_x, current_y + title_offset])
+                current_x += w * (1 + inter_image_margin)
+        grid_locations = np.array(grid_locations[:N])
+
     lefts = grid_locations[:, 0]
     bottoms = grid_locations[:, 1]
-    rights = lefts + np.array([img.shape[1] for img in images])
-    tops = bottoms + np.array([img.shape[0] for img in images])
+    rights = lefts + np.array([img.shape[1] for img in processed_images])
+    tops = bottoms + np.array([img.shape[0] for img in processed_images])
+    
     min_left = lefts.min() - margin * max_width
     min_bottom = bottoms.min() - margin * max_height
     max_right = rights.max() + margin * max_width
     max_top = tops.max() + margin * max_height
+    
     lefts = (lefts - min_left) / (max_right - min_left)
     bottoms = (bottoms - min_bottom) / (max_top - min_bottom)
     rights = (rights - min_left) / (max_right - min_left)
     tops = (tops - min_bottom) / (max_top - min_bottom)
 
-    fig = plt.figure(figsize = figsize)
+    fig = plt.figure(figsize=figsize)
     axes = []
+    
     if cmaps:
-        assert len(cmaps) == N, \
-            'The length of cmaps should be equal to the number of images.'
+        assert len(cmaps) == N, 'The length of cmaps should be equal to the number of images.'
+
     for cnt in range(N):
         gs = matplotlib.gridspec.GridSpec(1, 1, left=lefts[cnt], right=rights[cnt], 
                                           top=tops[cnt], bottom=bottoms[cnt])
         ax = fig.add_subplot(gs[0])
         axes.append(ax)
-        image = images[cnt]
-        
-        try:
-            image = image.detach().cpu().numpy()
-        except: pass
+        image = processed_images[cnt]
         
         if image is not None:
             if np.iscomplexobj(image):
@@ -2288,7 +2193,7 @@ def plt_imshow_subplots(
                 except: max_angle = 0
                 cax = ax.imshow(complex_image)
                 
-                if(colorbar):
+                if colorbar:
                     vmin = kwargs.get('vmin', np.abs(image).min())
                     vmax = kwargs.get('vmax', np.abs(image).max())
                     
@@ -2297,11 +2202,9 @@ def plt_imshow_subplots(
                                             transform=ax.transAxes)),
                         vmin=vmin, vmax=vmax, min_angle=min_angle, max_angle=max_angle)
                     ax_inset.patch.set_alpha(0)
-                
             else:
                 if cmaps:
-                    assert not ('cmap' in kwargs), \
-                        'cmap should not be in kwargs if you want to provide cmaps list'
+                    assert not ('cmap' in kwargs), 'cmap should not be in kwargs if you want to provide cmaps list'
                     cax = ax.imshow(image, cmap=cmaps[cnt], **kwargs)
                 else:
                     cax = ax.imshow(image, **kwargs)
@@ -2309,8 +2212,9 @@ def plt_imshow_subplots(
                     plt_colorbar(cax, colorbar_aspect=colorbar_aspect,
                                  colorbar_pad_fraction=colorbar_pad_fraction)
             
-            try: ax.set_title(titles[cnt])
-            except: pass
+            # Set per-image title using computed font size
+            if has_titles and cnt < len(titles) and titles[cnt] is not None:
+                ax.set_title(str(titles[cnt]), fontsize=computed_font_sizes[cnt])
             
             if remove_axis_ticks:
                 ax.axis('off')    
@@ -2328,11 +2232,164 @@ def plt_imshow_subplots(
         
         try:
             fig.canvas.manager.window.setWindowTitle(title)
-        except: pass
+        except:
+            pass
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.margins(margin)
     return fig, axes
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+
+def plt_imshow_frame(
+        images, titles=None, max_width=1000, pad_x=2, pad_y=3,
+        font_size=None, figsize=None, canvas_background_value=None,
+        vmin=None, vmax=None, cmap='gray'):
+    
+    # Support PyTorch tensors as well as array-likes
+    processed_images = []
+    for img in images:
+        try:
+            img = img.detach().cpu().numpy()
+        except AttributeError:
+            img = np.asarray(img)
+        processed_images.append(img)
+    images = processed_images
+
+    if not images:
+        return None, None
+
+    N = len(images)
+    if titles is True:
+        titles = [str(i) for i in range(N)]
+    has_titles = (titles is not None) and (len(titles) > 0)
+
+    if vmin is None:
+        vmin = min(np.nanmin(img) for img in images if np.isfinite(img).any())
+    if vmax is None:
+        vmax = max(np.nanmax(img) for img in images if np.isfinite(img).any())
+    if canvas_background_value is None:
+        canvas_background_value = vmin
+
+    # 1. Group images into rows horizontally first
+    rows = []
+    current_row = []
+    current_x = 0
+    actual_canvas_w = 0
+
+    for i, img in enumerate(images):
+        h, w = img.shape[:2]
+        if current_x + w > max_width and current_x > 0:
+            rows.append(current_row)
+            current_row = []
+            current_x = 0
+        current_row.append((i, current_x))
+        current_x += w + pad_x
+        actual_canvas_w = max(actual_canvas_w, current_x)
+
+    if current_row:
+        rows.append(current_row)
+
+    canvas_w = max(max_width, actual_canvas_w)
+
+    # 2. Estimate points-per-pixel to size fonts and vertical row gaps accurately
+    base_canvas_h = sum(max(images[i].shape[0] for i, _ in row) + pad_y for row in rows) + pad_y
+    if figsize is not None:
+        est_fig_w = figsize[0]
+    else:
+        est_aspect = canvas_w / max(base_canvas_h, 1)
+        est_fig_h = min(20, max(4, 20 / max(est_aspect, 1e-6)))
+        est_fig_w = min(24, max(4, est_fig_h * est_aspect))
+
+    pts_per_px = (est_fig_w * 72.0) / max(canvas_w, 1)
+
+    # 3. Compute per-image font sizes (capped so title width <= 0.75 * image width)
+    computed_font_sizes = []
+    for i, img in enumerate(images):
+        w = img.shape[1]
+        if has_titles and i < len(titles) and titles[i] is not None:
+            t_len = len(str(titles[i]))
+            if font_size is None:
+                if t_len > 0:
+                    # 1 char is ~0.55 * fs points wide; keep total title width <= 0.75 * image width
+                    fs = min(14.0, max(6.0, (0.75 / 0.55) * (w / t_len) * pts_per_px))
+                else:
+                    fs = 10.0
+            else:
+                fs = float(font_size)
+        else:
+            fs = float(font_size) if font_size is not None else 10.0
+        computed_font_sizes.append(fs)
+
+    # 4. Compute final (x, y) positions with extra vertical space per row for titles
+    positions = []
+    current_y = pad_y
+
+    for row in rows:
+        row_max_h = max(images[i].shape[0] for i, _ in row)
+        if has_titles:
+            max_row_fs = max(computed_font_sizes[i] for i, _ in row)
+            # Convert font height in points to canvas pixels (~1.5x font size for breathing room)
+            title_band_px = int(np.ceil((max_row_fs * 1.5) / max(pts_per_px, 1e-6)))
+        else:
+            title_band_px = 0
+
+        current_y += title_band_px
+        for i, x in row:
+            positions.append((i, x, current_y))
+        current_y += row_max_h + pad_y
+
+    canvas_h = current_y
+    canvas = np.full(
+        (canvas_h, canvas_w),
+        canvas_background_value,
+        dtype=np.result_type(*[img.dtype for img in images], np.float32)
+    )
+
+    for i, x, y in positions:
+        img = images[i]
+        h, w = img.shape[:2]
+        canvas[y:y+h, x:x+w] = img
+
+    # 5. Finalize figsize using the updated canvas_h
+    if figsize is None:
+        aspect = canvas_w / max(canvas_h, 1)
+        fig_h = min(20, max(4, 20 / max(aspect, 1e-6)))
+        fig_w = min(24, max(4, fig_h * aspect))
+        figsize = (fig_w, fig_h)
+
+    # 6. Determine high-contrast text color from background value and colormap
+    denom = (vmax - vmin) if (vmax is not None and vmin is not None and vmax != vmin) else 1.0
+    norm_bg = float(np.clip((canvas_background_value - vmin) / denom, 0.0, 1.0))
+    cmap_obj = matplotlib.colormaps.get_cmap(cmap)
+    r, g, b, _ = cmap_obj(norm_bg)
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    text_color = 'white' if luminance < 0.5 else 'black'
+
+    # 7. Plot canvas and render titles above each image
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(canvas, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    if has_titles:
+        text_offset_px = max(1, pad_y * 0.25)
+        for i, x, y in positions:
+            if i < len(titles) and titles[i] is not None:
+                w = images[i].shape[1]
+                ax.text(
+                    x + w / 2.0,
+                    y - text_offset_px,
+                    str(titles[i]),
+                    color=text_color,
+                    fontsize=computed_font_sizes[i],
+                    ha='center',
+                    va='bottom'
+                )
+
+    ax.axis('off')
+    fig.tight_layout()
+    return fig, ax
 
 def subplots_grid(plots_shape,
     grid_locations=None, frame_shape = None, title = None,
@@ -3550,17 +3607,9 @@ class imshow_gui_by_function:
             pass
 
 def FunctionImshowGUI_test():
-    
     def gbys(L, s):
-        import numpy as np
-        from scipy import ndimage
         L = int(L)
-        kernel = np.zeros((L, L))
-        kernel[L // 2, L // 2] = 1.0
-        radius = (L - 1) / 2.0
-        kernel = ndimage.gaussian_filter(kernel, sigma=s, truncate=radius/s)
-        return kernel / np.sum(kernel)
-
+        return pyms.Gaussian_2dkernel(L, s).numpy()
     imshow_gui_by_function(gbys, ['L', 's'], [[3, 100], [0.001, 30]])
 
 if __name__ == '__main__':

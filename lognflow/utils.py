@@ -1,4 +1,4 @@
-import os, time, pathlib, posixpath
+import os, time, pathlib, posixpath, json, subprocess, sys
 import numpy as np
 from .printprogress import printprogress
 
@@ -1479,19 +1479,13 @@ def sanitize_config(x, path="root", verbose=True, _is_root=True, _removed_flag=N
             print(f"REMOVED {path} | type={type(x).__name__} | value={preview(x)}")
         return None
 
-save_configs_script = r"""\
+configs_file_template = r"""\
 __IMPORTS__
 
 __CONFIG_ASSIGNMENTS__
+"""
 
-
-
-
-
-
-# -------------------------------------------------------------------------------
-#                     AUTO-GENERATED — DO NOT EDIT BELOW
-# -------------------------------------------------------------------------------
+configs_loader_suffix = r"""
 import keyword as _keyword
 import types as _types
 from dataclasses import dataclass as _dataclass, field as _field
@@ -1573,141 +1567,223 @@ def _make_cfg():
     return _build(data, 'CFG')()
 
 CFG = _make_cfg()
-# ================================================================================
 """
 
-def job_handler_code():
-    import json, os, time, subprocess, pathlib
-    import numpy as np
-    from lognflow import getLogger, printv, print_line
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ nohup ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def _get_pid_stat(pid):
+    """Reads /proc/{pid}/stat and returns (state, start_time_ticks), or (None, None) if missing."""
+    if pid is None:
+        return None, None
+    stat_path = pathlib.Path(f'/proc/{pid}/stat')
+    if not stat_path.exists():
+        return None, None
+    try:
+        raw = stat_path.read_text()
+        fields_after_comm = raw[raw.rfind(')') + 2:].split()
+        return fields_after_comm[0], fields_after_comm[19]
+    except OSError:
+        return None, None
 
-    user_root = pathlib.Path(r'/mle1_data/USERS/sadria20')
-    log_dir = user_root / 'projects/classifier_using_pretrained/winter_2026_CUFES'
-    classifier_checkpoint = user_root / 'projects/classifier_using_pretrained/logs/1786851869/model/model_240.pth'
-    script_name = "step1_2_run_classifier.py"
-    python_executable = user_root / "venv/.pixi/envs/default/bin/python"
+def _is_pid_running(pid, pid_start_time):
+    """Verifies the PID is alive, not a zombie, and matches its original start time."""
+    if pid is None or pid_start_time is None:
+        return False
+    state, current_start_time = _get_pid_stat(pid)
+    if state is None or state == 'Z':
+        return False
+    return current_start_time == str(pid_start_time)
 
-    script_path = pathlib.Path(script_name).absolute()
+def _read_json_safe(fpath):
+    """Returns parsed JSON dict if valid, otherwise None."""
+    try:
+        data = json.loads(pathlib.Path(fpath).read_text())
+        return data if isinstance(data, dict) else None
+    except (json.JSONDecodeError, OSError):
+        return None
+
+def _write_json_atomic(fpath, data):
+    """Writes JSON to a PID-scoped temporary file and atomically replaces the target."""
+    fpath = pathlib.Path(fpath)
+    tmp_fpath = fpath.with_name(f"{fpath.name}.{os.getpid()}.tmp")
+    try:
+        tmp_fpath.write_text(json.dumps(data, indent=4))
+        os.replace(tmp_fpath, fpath)
+    finally:
+        tmp_fpath.unlink(missing_ok=True)
+
+def _acquire_file_lock(lock_path, stale_seconds=60):
+    """Attempts to atomically create a lock file, clearing stale locks if older than threshold."""
+    if lock_path.exists():
+        try:
+            if time.time() - lock_path.stat().st_mtime > stale_seconds:
+                lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+        return True
+    except FileExistsError:
+        return False
+
+def nohup_job_fetch(log_dir=None, pattern='CFG_*.json', lock_timeout=60):
+    from lognflow import getLogger
+
+    """Scans log_dir for JSON jobs matching pattern, atomically claims the first unvisited one, and returns it."""
+    if log_dir is None:
+        log_dir = os.environ.get('LOGNFLOW_NOHUP_DIR')
+        if not log_dir:
+            raise RuntimeError("log_dir was not provided and LOGNFLOW_NOHUP_DIR was not found in environment.")
+    log_dir = pathlib.Path(log_dir).resolve()
+    for job_fpath in sorted(log_dir.glob(pattern)):
+        cfg = _read_json_safe(job_fpath)
+        if cfg is None or 'visited_time_tag' in cfg:
+            continue
+        lock_path = log_dir / f'{job_fpath.name}.lock'
+        if not _acquire_file_lock(lock_path, stale_seconds=lock_timeout):
+            continue
+        try:
+            cfg = _read_json_safe(job_fpath)
+            if cfg is None or 'visited_time_tag' in cfg:
+                continue
+            pid = os.getpid()
+            timestamp = int(time.time())
+            _, pid_start_time = _get_pid_stat(pid)
+            if pid_start_time is None:
+                raise RuntimeError(f"Unable to read /proc/{pid}/stat for current process.")
+            cfg['job_fpath'] = str(job_fpath)
+            cfg['log_dir'] = str(log_dir)
+            cfg['visited_time_tag'] = timestamp
+            cfg['pid'] = pid
+            cfg['pid_start_time'] = pid_start_time
+            _write_json_atomic(job_fpath, cfg)
+            verify_data = _read_json_safe(job_fpath)
+            if not verify_data or verify_data.get('pid') != pid:
+                raise RuntimeError(f'Could not verify claim of {job_fpath.name}')
+            cfg['job_fpath'] = job_fpath
+            cfg['log_dir'] = log_dir
+            print(f"Running job: {cfg}")
+            logger_job = getLogger(log_dir=job_fpath.parent / job_fpath.stem)
+            logger_job(f"beginning job {pid}")
+            cfg['logger_job'] = logger_job
+            return cfg
+        finally:
+            lock_path.unlink(missing_ok=True)
+    print("No unvisited jobs found.")
+    sys.exit(0)
+
+def nohup_job_finish(CFG_jobs):
+    """Marks the claimed CFG JSON file as finished and logs completion."""
+    job_fpath = pathlib.Path(CFG_jobs['job_fpath'])
+    data = _read_json_safe(job_fpath)
+    if data is None:
+        raise RuntimeError(f"Could not read job file to mark finished: {job_fpath}")
+    data['finished'] = 1
+    data['finished_time_tag'] = int(time.time())
+    _write_json_atomic(job_fpath, data)
+    if 'logger_job' in CFG_jobs and callable(CFG_jobs['logger_job']):
+        CFG_jobs['logger_job'](f"finished job {CFG_jobs.get('pid')}")
+    return job_fpath
+
+def nohup_job_inspect_script(script_fpath):
+    script_path = pathlib.Path(script_fpath).absolute()
     assert script_path.exists(), f'Worker script not found: {script_path}'
     script_text = script_path.read_text()
-    required_keywords = ['fetch_nohup_job', 'finish_nohup_job', 'ETA.npy']
-    missing_keywords = [keyword for keyword in required_keywords if keyword not in script_text]
+    required_keywords = ['nohup_job_fetch(', 'nohup_job_finish(']
+    missing_keywords = [kw for kw in required_keywords if kw not in script_text]
     if missing_keywords:
-        raise RuntimeError(f'Worker script {script_path} is missing required job-handler keywords: {missing_keywords}')
+        raise RuntimeError(f'Worker script {script_path} is missing required job-handler keywords: {missing_keywords}. '
+                           f'Look at lognflow.utils.nohup_job_code() snippet.')
+    return script_path
 
-    logger = getLogger(log_dir=log_dir)
-    logger.log_code()
-    logger(f'[CHECK] Worker script has passed preflight check: {script_path}')
-
-    points = np.linspace(0, 412, 9, dtype='int')
-    starts = points[:-1]
-    ends = points[1:]
+def nohup_job_create_cfgs(cfg_list, logger, retry_failed=False):
+    """Section 1: Saves each CFG dict to CFG_{job_id}.json if it hasn't been claimed or finished yet."""
     n_created = 0
-    for job_id, (start, end) in enumerate(zip(starts, ends)):
-        CFG = {}
-        CFG['start'] = start
-        CFG['end'] = end
-        CFG['classifier_checkpoint'] = classifier_checkpoint
+    for job_id, CFG in enumerate(cfg_list):
         fname = f'CFG_{job_id}.json'
         CFG_jobs = logger.load(fname)
         if CFG_jobs is not None:
-            if ('finished' in CFG_jobs) or ('visited_time_tag' in CFG_jobs):
+            if 'finished' in CFG_jobs:
                 continue
+            if 'visited_time_tag' in CFG_jobs:
+                if retry_failed and not _is_pid_running(CFG_jobs.get('pid'), CFG_jobs.get('pid_start_time')):
+                    logger(f'{fname} previously failed/stopped; resetting for retry.')
+                else:
+                    continue
         fpath = logger.save(fname, CFG, time_tag=False)
-        print(fpath, ' saved!')
+        logger(fpath, ' saved!')
         n_created += 1
     if n_created > 0:
-        print(f'{n_created} CFG files made!')
+        logger(f'{n_created} CFG files made!')
     else:
-        print('No new CFG file was made!')
-    print_line('end of making CFG files')
+        logger('No new CFG file was made!')
+    logger('end of making CFG files')
+    return n_created
 
-    check_interval = 1
+def nohup_job_submit(logger, python_executable, script_fpath, check_interval=1, max_wait_seconds=60):
+    """Section 2: Launches background workers for unclaimed CFG_*.json files and collects active PIDs."""
+    script_fpath = nohup_job_inspect_script(script_fpath)
     worker_log_path = (pathlib.Path(logger.log_dir) / "all_processes_logs.log").absolute()
-    cmd = f"nohup {python_executable} -u {script_path} >> {worker_log_path} 2>&1 &"
-    files = logger.get_flist("CFG_*.json")
+    cmd = [str(python_executable), "-u", str(script_fpath)]
+    worker_env = {**os.environ, 'LOGNFLOW_NOHUP_DIR': str(pathlib.Path(logger.log_dir).absolute())}
+    files = sorted(logger.get_flist("CFG_*.json"))
     printv(logger)
     printv(files, logger)
-
-    list_pids = []
-    list_pid_start_times = []
-    list_log_dir = []
-    list_log_name = []
+    active_items = []
     for file_path in files:
-        CFG_jobs = json.loads(file_path.read_text())
+        CFG_jobs = _read_json_safe(file_path) or {}
         if 'visited_time_tag' in CFG_jobs:
-            pid = CFG_jobs['pid']
-            pid_start_time = CFG_jobs['pid_start_time']
-            log_dir = CFG_jobs['log_dir']
             log_name = pathlib.Path(CFG_jobs['job_fpath']).stem
-            list_pids.append(pid)
-            list_pid_start_times.append(pid_start_time)
-            list_log_dir.append(log_dir)
-            list_log_name.append(log_name)
+            active_items.append((CFG_jobs['log_dir'], CFG_jobs['pid'], CFG_jobs['pid_start_time'], log_name))
             logger(f'{file_path} is already there!')
             continue
-        active_process = subprocess.Popen(cmd, shell=True)
+        with open(worker_log_path, "a") as log_file:
+            active_process = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT,
+                                              env=worker_env, start_new_session=True)
         logger(f"[LAUNCH] Submitted process for {file_path}")
-        visited = False
-        wrnd = 0
+        visited, wrnd = False, 0
         while not visited:
-            exit_code = active_process.poll()
-            assert exit_code is None or exit_code == 0, f"[ERROR] Failed to launch command: {cmd} (Exit code: {exit_code})"
-            CFG_jobs = json.loads(file_path.read_text())
+            CFG_jobs = _read_json_safe(file_path) or {}
             if 'pid' in CFG_jobs:
                 print(f"PID: {CFG_jobs['pid']}")
             if all(key in CFG_jobs for key in ['visited_time_tag', 'pid', 'pid_start_time', 'log_dir']):
-                tag = CFG_jobs['visited_time_tag']
-                pid = CFG_jobs['pid']
-                pid_start_time = CFG_jobs['pid_start_time']
-                log_dir = CFG_jobs['log_dir']
+                tag, pid = CFG_jobs['visited_time_tag'], CFG_jobs['pid']
                 log_name = pathlib.Path(CFG_jobs['job_fpath']).stem
-                list_pids.append(pid)
-                list_pid_start_times.append(pid_start_time)
-                list_log_dir.append(log_dir)
-                list_log_name.append(log_name)
+                active_items.append((CFG_jobs['log_dir'], pid, CFG_jobs['pid_start_time'], log_name))
                 logger(f"[STATUS] File visited: {file_path} at timestamp {tag} (PID: {pid})")
                 visited = True
             else:
+                exit_code = active_process.poll()
+                if exit_code is not None:
+                    raise RuntimeError(f"[ERROR] Worker exited prematurely (Exit code: {exit_code}) "
+                                       f"before claiming {file_path}. Check {worker_log_path}")
+                if wrnd >= max_wait_seconds:
+                    raise RuntimeError(f"[TIMEOUT] Worker did not claim {file_path} within {max_wait_seconds}s. "
+                                       f"Check {worker_log_path}")
                 time.sleep(check_interval)
-                if wrnd % 10 == 0:
-                    print('waiting for the job to start', end='')
-                    wrnd = 0
-                else:
-                    print('.', end='')
+                print('waiting for the job to start' if wrnd % 10 == 0 else '.', end='', flush=True)
                 wrnd += 1
         print('')
     logger(f'All jobs launched. Logs routed to {worker_log_path}')
     print_line('End of launching jobs!')
+    return active_items
 
+def nohup_job_monitor(logger, active_items, monitor_interval=30, eta_fname='ETA_job.npy', custom_status_fn=None):
+    """Section 3: Monitors active background workers until all complete or fail."""
     logger("\n--- Starting Monitoring Phase ---")
-    monitor_interval = 30
-
-    def is_running(pid, pid_start_time):
-        stat_path = pathlib.Path(f'/proc/{pid}/stat')
-        if not stat_path.exists():
-            return False
-        try:
-            fields = stat_path.read_text().split()
-            state = fields[2]
-            current_start_time = fields[21]
-        except Exception:
-            return False
-        if state == 'Z':
-            return False
-        return current_start_time == str(pid_start_time)
-
-    active_items = list(zip(list_log_dir, list_pids, list_pid_start_times, list_log_name))
+    active_items = list(active_items)
+    rows_prev, header_prev = None, None
+    kill_msg_time_period = monitor_interval * 5
+    kill_msg_perv_time = time.time() - 2*kill_msg_time_period
     while active_items:
-        
         new_active_items = []
         for log_d, pid, pid_start, log_n in active_items:
-            if is_running(pid, pid_start):
+            if _is_pid_running(pid, pid_start):
                 new_active_items.append((log_d, pid, pid_start, log_n))
                 continue
             job_fpath = pathlib.Path(log_d) / f'{log_n}.json'
             if job_fpath.exists():
-                CFG_jobs = json.loads(job_fpath.read_text())
+                CFG_jobs = _read_json_safe(job_fpath) or {}
                 if 'finished' in CFG_jobs:
                     logger(f'[FINISHED] {log_n} PID {pid}')
                 else:
@@ -1715,83 +1791,76 @@ def job_handler_code():
             else:
                 logger(f'[FAILED] Could not find CFG file for {log_n}')
         active_items = new_active_items
-
         if active_items:
+            if (time.time() - kill_msg_perv_time) > kill_msg_time_period:
+                from lognflow import print_box
+                msg = 'To abort :> kill ' + ' '.join([str(_[1]) for _ in active_items])
+                print_box(msg)
+                kill_msg_perv_time = time.time()
+                print()
+
+            job_ids, job_etas = [], []
             for log_dir, pid, pid_start_time, log_name in active_items:
-                logged = getLogger(log_dir=pathlib.Path(log_dir) / log_name)
+                job_log_dir = pathlib.Path(log_dir) / log_name
                 try:
-                    ETA = logged.load('ETA.npy')
-                    logger(f'log with name {log_name} and pid {pid} is at {ETA}')
+                    if custom_status_fn is not None:
+                        eta_text = str(custom_status_fn(job_log_dir))
+                    else:
+                        ETA_job = np.load(job_log_dir / eta_fname)
+                        eta_text = str(int(np.asarray(ETA_job).squeeze()))
                 except Exception:
-                    logger(f'log with name {log_name} and pid {pid} has no ETA')
-                    logger(f'here is its log_dir {log_dir}')
-                del logged
+                    eta_text = '   ?'
+                job_ids.append(f'{pid:^5}')
+                job_etas.append(eta_text)
+            rows = [job_etas]
+            if (rows_prev != rows) or (header_prev != job_ids):
+                rows_prev, header_prev = rows, job_ids
+                print_table(header=job_ids, rows=rows)
             time.sleep(monitor_interval)
         else:
             logger('No active job is remaining!')
+
     logger("Monitoring complete.")
 
-def nohup_job_inspect_script(script_fpath):
-    script_path = pathlib.Path(script_fpath).absolute()
-    assert script_path.exists(), f'Worker script not found: {script_path}'
-    script_text = script_path.read_text()
-    required_keywords = ['nohup_job_fetch', 'nohup_job_finish', 'ETA.npy']
-    missing_keywords = [keyword for keyword in required_keywords if keyword not in script_text]
-    if missing_keywords:
-        raise RuntimeError(f'Worker script {script_path} is missing required job-handler keywords: {missing_keywords}')
-    return script_path
-
-def nohup_job_fetch(log_dir, pattern='CFG_*.json'):
-    """
-    Scans log_dir for JSON jobs matching pattern, atomically claims the first
-    unvisited one, and returns its configuration dictionary.
-    """
+def nohup_job_run(cfg_list, log_dir, python_executable, script_fpath, 
+                  check_interval=1, max_wait_seconds=60,
+                  monitor_interval=30, eta_fname='ETA_job.npy', 
+                  custom_status_fn=None, retry_failed=False, return_items = False):
+    """End-to-end runner: creates CFG files, submits unstarted jobs, and monitors active workers."""
     from lognflow import getLogger
-    log_dir = pathlib.Path(log_dir).absolute()
-    logged = getLogger(log_dir=log_dir)
-    fnames_jobs = logged.get_namelist(pattern)
-    for fname_job in fnames_jobs:
-        CFG_jobs = logged.load(fname_job)
-        if 'visited_time_tag' in CFG_jobs:
-            continue
-        lock_path = logged.log_dir / f'{fname_job}.lock'
-        try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.close(fd)
-        except FileExistsError:
-            continue
-        try:
-            CFG_jobs = logged.load(fname_job)
-            if 'visited_time_tag' in CFG_jobs:
-                continue
-            timestamp = int(time.time())
-            CFG_jobs['job_fpath'] = str((logged.log_dir / fname_job).absolute())
-            CFG_jobs['log_dir'] = str(log_dir)
-            CFG_jobs['visited_time_tag'] = timestamp
-            CFG_jobs['pid'] = os.getpid()
-            CFG_jobs['pid_start_time'] = pathlib.Path(f'/proc/{CFG_jobs["pid"]}/stat').read_text().split()[21]
+    import pathlib
+    log_dir = pathlib.Path(log_dir)
+    script_fpath = pathlib.Path(script_fpath)
+    python_executable = pathlib.Path(python_executable)
+    logger = getLogger(log_dir=log_dir)
+    nohup_job_create_cfgs(cfg_list, logger=logger, retry_failed=retry_failed)
+    logger.log_code()
+    active_items = nohup_job_submit(logger, python_executable, script_fpath, check_interval, max_wait_seconds)
+    if return_items: return logger, active_items
+    nohup_job_monitor(logger, active_items, monitor_interval, eta_fname, custom_status_fn)
 
-            logged.save(fname_job, CFG_jobs, time_tag=False)
-            verify_data = logged.load(fname_job)
-            if verify_data.get('visited_time_tag') != timestamp:
-                raise RuntimeError(f'Could not verify claim of {fname_job}')
-            CFG_jobs['job_fpath'] = pathlib.Path(CFG_jobs['job_fpath'])
-            CFG_jobs['log_dir'] = pathlib.Path(CFG_jobs['log_dir'])
-            print(f"Running job: {CFG_jobs}")
-            return CFG_jobs
-        finally:
-            try:
-                lock_path.unlink()
-            except FileNotFoundError:
-                pass
-    print("No unvisited jobs found.")
-    exit(0)
+def job_handler_py_snippet():
+    import pathlib
+    from lognflow.utils import nohup_job_run
+    user_root = pathlib.Path(r'USER_ROOT')
+    log_dir = user_root / "projects/A_PROJECT/SOME_NAME_FOR_YOUR_LOG"
+    python_exec = user_root / "venv/.pixi/envs/default/bin/python"
+    script_fpath = user_root / "projects/A_PROJECT/SOME_PYTHON_SCRIPT.py"
+    cfg_list = []
+    for job_id in range(10):
+        CFG = {'images_npy_path': "MAYBE_LOCATION_OF_SHARED_DATA?"}
+        cfg_list.append(CFG)
+    nohup_job_run(cfg_list=cfg_list, log_dir=log_dir, python_executable=python_exec,
+                  script_fpath=script_fpath, monitor_interval=30, eta_fname='ETA_job.npy')
 
-def nohup_job_finish(CFG_jobs):
-    import json, pathlib, time
-    job_fpath = pathlib.Path(CFG_jobs['job_fpath'])
-    data = json.loads(job_fpath.read_text())
-    data['finished'] = 1
-    data['finished_time_tag'] = int(time.time())
-    job_fpath.write_text(json.dumps(data, indent=4))
-    return job_fpath
+def user_job_py_snippet():
+    from lognflow.utils import nohup_job_fetch, nohup_job_finish
+    CFG_jobs = nohup_job_fetch()
+    logger_job = CFG_jobs['logger_job']
+    n_processes = 10
+    for process_cnt in range(n_processes):
+        logger_job(...)
+        ETA_job = 1 - process_cnt / n_processes
+        logger_job.save('ETA_job.npy', np.array(ETA_job), time_tag=False)
+        logger_job(ETA_job)
+    nohup_job_finish(CFG_jobs)

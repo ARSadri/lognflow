@@ -504,3 +504,7 @@ History
 0.15.02 (2026-10-05)
 -------------------
 * save_configs handles many.
+
+0.16.0 (2026-10-21)
+-------------------
+* fixed and simplified the nohup job handler

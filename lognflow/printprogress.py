@@ -17,7 +17,7 @@ class printprogress:
     """
     def __init__(self, 
                  int_or_iterable, 
-                 numTicks = 78,
+                 n_ticks = 78,
                  title = None,
                  desc = None,
                  method = 'linear',
@@ -28,12 +28,12 @@ class printprogress:
             int_or_iterable: int or iterable
                 Number of iterations in the for loop or iterable
                 n_steps = int(it) or n_steps = len(it)
-            numTicks: int
+            n_ticks: int
                 The number of charachters in a row of the screen - 2
                 default: 78 for old screens that have 80 coloumns
             title : str 
                 The title of progress bar.
-                default: f'Progress bar for {n_steps} steps in {numTicks} ticks'
+                default: f'Progress bar for {n_steps} steps in {n_ticks} ticks'
             desc : str
                 it is the same as title used by tqdm
             print_function:
@@ -83,20 +83,20 @@ class printprogress:
         self.ck = 0
         self.prog = 0
         self.n_steps = n_steps
-        if(numTicks < len(title) + 2 ):
-            self.numTicks = len(title)+2
+        if(n_ticks < len(title) + 2 ):
+            self.n_ticks = len(title)+2
         else:
-            self.numTicks = numTicks
+            self.n_ticks = n_ticks
         self.ETA_only = ETA_only
         if not self.ETA_only:
             self._print_func(' ', end='')
-            self._print_func('_'*self.numTicks, end='')
+            self._print_func('_'*self.n_ticks, end='')
             self._print_func(' ')
             self._print_func('/', end='')
-            self._print_func(' '*int((self.numTicks - len(title))/2), end='')
+            self._print_func(' '*int((self.n_ticks - len(title))/2), end='')
         self._print_func(title, end='')
         if not self.ETA_only:
-            self._print_func(' '*int(ceil((self.numTicks-len(title))/2)-1), end='')
+            self._print_func(' '*int(ceil((self.n_ticks-len(title))/2)-1), end='')
             self._print_func(' \\')
             self._print_func(' ', end = '')
         else:
@@ -126,8 +126,8 @@ class printprogress:
                 
                 self.remTimeS_perv = remTimeS
             else:
-                remTimeS = 1e+7
-        return remTimeS
+                remTimeS = 1e+9
+        return ceil(remTimeS*1000)/1000
     
     def _make_progress(self, ck = 1):
         remTimeS = 0
@@ -135,13 +135,13 @@ class printprogress:
             if(not self.FLAG_warning):
                 self.FLAG_warning = True
                 if not self.ETA_only:
-                    self._print_func('-' * (self.numTicks + 2))
+                    self._print_func('-' * (self.n_ticks + 2))
         else:
             self.ck += ck
             if(self.ck <= self.n_steps):
                 remTimeS = self._calc_ETA() # useful when print_function is None
-                try: cProg = int(self.numTicks*self.ck/(self.n_steps-1)/3)
-                except: cProg = int(self.numTicks/3) # 3 charachters are used
+                try: cProg = int(self.n_ticks*self.ck/(self.n_steps-1)/3)
+                except: cProg = int(self.n_ticks/3) # 3 charachters are used
                 while((self.prog < cProg) & (not self.FLAG_ended)):
                     self.prog += 1
                     remTimeS = self._calc_ETA()
@@ -177,7 +177,7 @@ class printprogress:
                         else:
                             self._end()
             if((self.ck >= self.n_steps) | 
-               (self.len_prog_text >= self.numTicks)):
+               (self.len_prog_text >= self.n_ticks)):
                 self._end()
         return remTimeS
     

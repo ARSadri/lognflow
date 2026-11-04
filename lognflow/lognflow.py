@@ -56,9 +56,11 @@ from   .utils      import (repr_raw,
                            name_from_file,
                            text_to_collection,
                            printv,
+                           has_len,
                            deepstr,
                            prepare_for_np_savez,
-                           save_configs_script)
+                           configs_file_template,
+                           configs_loader_suffix)
 @dataclass
 class varinlog:
     data_array          : np.ndarray      
@@ -216,7 +218,8 @@ class getLogger:
             self.log_dir_provided = False
         else:
             self.log_dir_provided = True
-            self.log_dir = pathlib_Path(log_dir)
+            log_dir = pathlib_Path(log_dir)
+            self.log_dir = log_dir
             self.logs_root = log_dir.parent
 
         self.logged = self
@@ -865,14 +868,12 @@ class getLogger:
         _var_time_array = _var.time_array[_var.time_array > 0]
         
         if _var.suffix == 'npz':
-            fpath = _param_dir / f'{param_name}_{_var.file_start_time:.6f}.npz'
-            np.savez(fpath,
-                time_array = _var_time_array,
-                data_array = _var_data_array)
+            fpath = self._get_fpath(param_dir, param_name, 'npz', time_tag)
+            np.savez(fpath, time_array = _var_time_array, data_array = _var_data_array)
         else:
-            fpath = _param_dir / f'{param_name}_time_{_var.file_start_time:.6f}.txt'
+            fpath = self._get_fpath(param_dir, f'{param_name}_time', 'txt', time_tag)
             np.savetxt(fpath, _var_time_array)
-            fpath = _param_dir / f'{param_name}_data_{_var.file_start_time:.6f}.txt'
+            fpath = self._get_fpath(param_dir, f'{param_name}_data', 'txt', time_tag)
             np.savetxt(fpath, _var_data_array)
         
         _var_data_array = _var_data_array.squeeze()
@@ -1015,8 +1016,9 @@ class getLogger:
                 with open(fpath,'w') as fdata: 
                     json.dump(obj_str, fdata)
             else:
-                with open(fpath,'a') as fdata: 
-                    fdata.write(str(parameter_value))
+                with open(fpath,'a') as fdata:
+                    with np.printoptions(threshold=np.inf):
+                        fdata.write(str(parameter_value))
         except Exception as e:
             print(f"lognflow: An error occurred while saving {parameter_name}")
             if verify: raise e
@@ -1123,7 +1125,8 @@ class getLogger:
         if needs_import['pathlib']:
             import_lines.append('from pathlib import Path')
             
-        script = save_configs_script.replace('__IMPORTS__', '\n'.join(import_lines))
+        # Use the NEW clean template here
+        script = configs_file_template.replace('__IMPORTS__', '\n'.join(import_lines))
         script = script.replace('__CONFIG_ASSIGNMENTS__', '\n'.join(assignments))
         
         self.configs_fpath.write_text(script, encoding='utf-8')
@@ -1141,15 +1144,23 @@ class getLogger:
         module.__file__ = str(configs_fpath)
         sys.modules[module_name] = module
         try:
-            source = configs_fpath.read_text(encoding='utf-8')
-            code = compile(source, str(configs_fpath), 'exec')
+            # Load the user's pristine code
+            user_source = configs_fpath.read_text(encoding='utf-8')
+            
+            # Combine it with our hidden loader logic
+            full_source = user_source + "\n\n" + configs_loader_suffix
+            
+            # Compile and execute the combined source
+            code = compile(full_source, str(configs_fpath), 'exec')
             exec(code, module.__dict__)
+            
         except Exception as e:
             sys.modules.pop(module_name, None)
             if current_configs is not None:
                 self.text(None, f'[load_configs]: Could not reload configs. Keeping current configs. {type(e).__name__}: {e}')
                 return current_configs
             raise
+            
         return module.CFG.as_dict()
 
     def savefig(self, 
@@ -2156,9 +2167,9 @@ class getLogger:
             except: pass
         return False
 
-    def _load(self, var_name, file_index = None, 
+    def _load(self, var_name, file_index = None, allow_pickle = True,
                    suffix = None, read_func = None, verbose = False,
-                   return_collection = False):
+                   return_collection = False, **kwargs):
         """ get a single variable
             return the value of a saved variable.
 
@@ -2225,7 +2236,7 @@ class getLogger:
                             buf = dict(buf)
                         return(buf, var_path)
                 if(var_path.suffix == '.npy'):
-                    try: return(np.load(var_path), var_path)
+                    try: return(np.load(var_path, allow_pickle=allow_pickle), var_path)
                     except: pass
                 if(var_path.suffix == '.mat'):
                     try: 
@@ -2271,9 +2282,9 @@ class getLogger:
                         f'{var_path} is not in: {self.log_dir}')
         return None, None
     
-    def load(self, var_name, file_index = -1, 
+    def load(self, var_name, file_index = -1, allow_pickle = True,
                    suffix = None, read_func = None, verbose = False,
-                   return_fpath = False, return_collection = False):
+                   return_fpath = False, return_collection = False, **kwargs):
         """ get a single variable
             return the value of a saved variable.
 
@@ -2298,7 +2309,7 @@ class getLogger:
         loaded_data, fpath = self._load(
             var_name = var_name, file_index = file_index, suffix = suffix, 
             read_func = read_func, verbose = verbose,
-            return_collection = return_collection)   
+            return_collection = return_collection, kwargs = kwargs)   
         if return_fpath:
             return loaded_data, fpath
         else:
@@ -2381,7 +2392,7 @@ class getLogger:
                 return(dataset_array)
 
     def get_stack_from_names(self, 
-             var_names = None, read_func = None, return_flist = False):
+             var_names, read_func = None, return_flist = False, verbose = False):
         self.assert_log_dir()
         try:
             var_names_str = str(var_names)
@@ -2390,6 +2401,15 @@ class getLogger:
             var_names = [var_names]
         assert var_names == list(var_names), \
             'input should be a list of variable names'
+        if verbose:
+            len_flist = 0
+            for name in var_names:
+                len_flist += len(self.get_flist(name))
+            if len_flist:
+                from .printprogress import printprogress
+                pbar = printprogress(len_flist, title = f'loading {len_flist} files')
+            else:
+                self.text(None, f'There are no files matching the pattern {var_names}')
         dataset = []
         flist = []
         for name in var_names:
@@ -2402,6 +2422,8 @@ class getLogger:
                     if data is not None:
                         dataset.append(data)
                         flist.append(fpath)
+                    if verbose:
+                        pbar()
 
         try:
             dataset = np.array(dataset, dtype=dataset[0].dtype)
